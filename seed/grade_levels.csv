@@ -1,0 +1,5 @@
+id,school_id,name,stage,sort_order,grading_scale_id
+afc3b18e-6e2a-5943-aee8-f07176c9ff16,9341cf1e-f77b-5e4a-abbe-6a72f8c4a2fa,Form 3,o_level,3,f0c579ea-7586-5043-b29a-5ab4b9789cb2
+9834c7a5-2d21-5b80-9487-33ab7c21b948,9341cf1e-f77b-5e4a-abbe-6a72f8c4a2fa,Form 4,o_level,4,f0c579ea-7586-5043-b29a-5ab4b9789cb2
+44e1acde-b051-507b-b3b6-1aa0ea8750ca,f2856ae5-c561-5f69-8db8-0495481bb2b0,Grade 5,primary,5,7eccd8f8-7940-5687-882d-cec5f3d05091
+321abb8b-6bbd-5ad3-b373-c1caf15a2c30,f2856ae5-c561-5f69-8db8-0495481bb2b0,Grade 6,primary,6,7eccd8f8-7940-5687-882d-cec5f3d05091

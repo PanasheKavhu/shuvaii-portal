@@ -1,0 +1,19 @@
+id,school_id,code,name,stage_scope,is_core,sort_order
+e3e9b681-898c-5854-935a-38baf69e5642,9341cf1e-f77b-5e4a-abbe-6a72f8c4a2fa,ENG,English Language,secondary,true,1
+0a32f6ea-2165-5cef-86a8-2e3ad1498d75,9341cf1e-f77b-5e4a-abbe-6a72f8c4a2fa,MATH,Mathematics,secondary,true,2
+227fcef7-84fd-50b7-8530-036a70b7b7f4,9341cf1e-f77b-5e4a-abbe-6a72f8c4a2fa,SHO,Shona,secondary,true,3
+e7f88ba3-392d-5826-b554-1909e7dd1aeb,9341cf1e-f77b-5e4a-abbe-6a72f8c4a2fa,HIS,History,secondary,false,4
+2e3dad5a-2478-50a4-9003-3410405a65b8,9341cf1e-f77b-5e4a-abbe-6a72f8c4a2fa,GEO,Geography,secondary,false,5
+73351fc9-5676-5c38-afa8-2eadd5106d52,9341cf1e-f77b-5e4a-abbe-6a72f8c4a2fa,BIO,Biology,secondary,false,6
+581f9dd6-582f-51f4-8651-d771f854e7ef,9341cf1e-f77b-5e4a-abbe-6a72f8c4a2fa,CHE,Chemistry,secondary,false,7
+4226582c-4dbf-50dc-883c-97162b5531ee,9341cf1e-f77b-5e4a-abbe-6a72f8c4a2fa,PHY,Physics,secondary,false,8
+7d76cb55-be59-5997-b6b9-9d7e37d829a2,9341cf1e-f77b-5e4a-abbe-6a72f8c4a2fa,ACC,Accounting,secondary,false,9
+c0d93d4c-ff77-5891-93fc-8eada19f1e53,9341cf1e-f77b-5e4a-abbe-6a72f8c4a2fa,BLD,Building,secondary,false,10
+bc5502a7-ddb0-5ae0-826f-73382681f587,f2856ae5-c561-5f69-8db8-0495481bb2b0,ENG,English,primary,true,1
+b2d6a186-b1ac-532e-a4b4-32d3c65e10ee,f2856ae5-c561-5f69-8db8-0495481bb2b0,SHO,Shona,primary,true,2
+798327c7-a58f-5e7a-8734-66b937a689f2,f2856ae5-c561-5f69-8db8-0495481bb2b0,MATH,Mathematics,primary,true,3
+c1beae31-909d-5ce8-92e3-d23296781bcc,f2856ae5-c561-5f69-8db8-0495481bb2b0,SCT,Science and Technology,primary,true,4
+e44d33fe-3aa0-5ed2-96ba-da80699708e8,f2856ae5-c561-5f69-8db8-0495481bb2b0,SST,Social Studies,primary,true,5
+f55865e6-08e0-5f63-a361-25674612df1c,f2856ae5-c561-5f69-8db8-0495481bb2b0,RME,Religious and Moral Education,primary,true,6
+8dc1da1f-e172-584f-b65e-946105ad0f0e,f2856ae5-c561-5f69-8db8-0495481bb2b0,PEA,Physical Education and Arts,primary,true,7
+2b0cdef0-891f-513d-96c6-dea1cf70a8e1,f2856ae5-c561-5f69-8db8-0495481bb2b0,ICT,Information and Communication Technology,primary,true,8

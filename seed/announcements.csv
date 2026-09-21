@@ -1,0 +1,7 @@
+id,school_id,title,body,audience,class_id,pinned,status,published_at,expires_at,author_id
+3879cfa2-f70c-5d61-9e25-c62aeb91308f,9341cf1e-f77b-5e4a-abbe-6a72f8c4a2fa,Welcome to Term 3,School reopens on 8 September. Please check the calendar.,all,,true,published,2026-09-01T08:00:00Z,,b3ac79e9-cba5-5ec6-b88f-e31fa513b51c
+0c23d526-e00c-5e57-8829-0bf723fc7671,9341cf1e-f77b-5e4a-abbe-6a72f8c4a2fa,Staff meeting Friday,All teachers: staff meeting Friday 14:00 in the hall.,staff,,false,published,2026-09-10T08:00:00Z,2026-09-18T00:00:00Z,1cb3e40f-43a9-5096-862c-48bf20b9b306
+65f7f3a3-5f0e-5e55-a508-7226f59b1c2f,9341cf1e-f77b-5e4a-abbe-6a72f8c4a2fa,Class 3 Blue trip,Permission slips are due Monday.,class,0758e88b-235c-52a0-b041-f5b632fb6cb7,false,published,2026-09-12T08:00:00Z,,b3ac79e9-cba5-5ec6-b88f-e31fa513b51c
+6726d56d-d032-5f87-8caa-3ef5eb93d61a,f2856ae5-c561-5f69-8db8-0495481bb2b0,Welcome to Term 3,School reopens on 8 September. Please check the calendar.,all,,true,published,2026-09-01T08:00:00Z,,decc154d-d1c1-531a-8a67-b77a2a50b88f
+d80396b8-e1a1-5c9c-a3bc-410a140b74dd,f2856ae5-c561-5f69-8db8-0495481bb2b0,Staff meeting Friday,All teachers: staff meeting Friday 14:00 in the hall.,staff,,false,published,2026-09-10T08:00:00Z,2026-09-18T00:00:00Z,14620dad-0473-5e7b-8ef8-905588d239ff
+1b05d0e2-8246-5ed8-8840-63596669b51a,f2856ae5-c561-5f69-8db8-0495481bb2b0,Class 5A trip,Permission slips are due Monday.,class,e3a4c962-2e8c-5c8d-a4b8-43fffd8afe2c,false,published,2026-09-12T08:00:00Z,,decc154d-d1c1-531a-8a67-b77a2a50b88f

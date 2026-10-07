@@ -22,6 +22,7 @@ export function SignInForm() {
           autoComplete="username"
           inputMode="email"
           required
+          key={state.email}
           defaultValue={state.email}
           className="h-12 text-base"
         />

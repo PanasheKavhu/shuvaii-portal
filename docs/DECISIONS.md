@@ -54,12 +54,24 @@ Format: **D#. Title** (date). Decision. Why. Alternatives.
 - Why: keeps URLs short and school-free while RLS stays the real boundary (the cookie only picks which of your schools the UI shows). Area order puts staff work before the parent view for a teacher who is also a parent.
 - Alternatives: school slug in every URL (longer links, and still needs the same check).
 
-## D10. "Not allowed" through `forbidden()` (2026-10-07)
+## D10. Role areas blocked in the proxy and again in each page (2026-10-07)
 
-- Decision: every area page calls `requireArea()` (`src/lib/auth/viewer.ts`), which calls Next's `forbidden()` and renders `src/app/forbidden.tsx` with HTTP 403. This needs `experimental.authInterrupts` in `next.config.ts`.
-- Why: a real 403 status and one shared page, checked per page rather than in a layout (layouts do not re-run on client navigation). The flag is experimental in Next 16; if it is removed, swap to rendering the same component directly.
+- Decision: `src/proxy.ts` (Next 16's name for middleware) looks up the user's memberships for any role-area path and redirects to sign in or the school picker, or rewrites to `/not-allowed` with HTTP 403. Each area page repeats the same rule through `requireArea()`, which calls Next's `forbidden()` (`src/app/forbidden.tsx`, needs `experimental.authInterrupts`). Both use one pure rule, `decideAreaAccess()` in `src/lib/auth/route-access.ts`.
+- Why: the request asked for middleware blocking, and it stops forbidden pages before any rendering. Next's docs warn the proxy is not a full authorization layer, so pages check too, and RLS stays the guard on the data. The proxy costs two small queries only on role-area requests.
+- If `authInterrupts` is removed from Next, render `NotAllowed` directly in `requireArea()`.
 
 ## D11. Two-school demo user (2026-10-07)
 
 - Decision: the seed generator adds `relief1@demo.spportal.test`, a teacher in both schools with no class subjects.
 - Why: US-1.1 needs a multi-school user to demonstrate the school picker; with no class subjects the marks and fixtures are unchanged.
+
+## D12. School theme from the database, AA enforced automatically (2026-10-07)
+
+- Decision: `ThemeProvider` (`src/components/theme/theme-provider.tsx`) takes the active school's `logo_path`, `primary_color` and `accent_color` and writes CSS variables for light and dark mode (`--primary`, `--primary-foreground`, `--ring`, `--brand-accent`, ...). Each brand colour is moved towards black (light mode) or white (dark mode) just enough to reach WCAG AA against the page, and its foreground is black or white, whichever reads better. Only validated hex colours are inlined. Pages outside a school (sign in, home) keep the neutral theme.
+- Why: US-1.5 wants colours applied without a deploy and every page AA. Adjusting at render time keeps a school's colour readable in dark mode too. Rejecting a failing pair with a suggestion when the super admin saves it (US-1.5) will use `checkContrast()` from `src/lib/branding/contrast.ts`.
+- Logos: `logo_path` is a path in a public `school-branding` Storage bucket (or a full URL). The bucket and upload arrive with US-1.5; until then schools show an initials badge.
+
+## D13. Light and dark mode per device (2026-10-07)
+
+- Decision: a Light / Dark / System switch above the footer, stored in `localStorage` (`sp-color-mode`), applied by a small inline script in `<head>` before first paint. System follows `prefers-color-scheme`.
+- Why: no account setting needed, no flash of the wrong theme, works on sign-in pages too.

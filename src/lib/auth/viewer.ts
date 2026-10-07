@@ -4,21 +4,12 @@ import { cookies } from "next/headers";
 import { forbidden, redirect } from "next/navigation";
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
-import {
-  SCHOOL_COOKIE,
-  groupMemberships,
-  pickActiveSchool,
-  type SchoolMembership,
-} from "./active-school";
-import { AREAS, canUseArea, homeFor, isAppRole, type AreaKey } from "./roles";
+import { SCHOOL_COOKIE, pickActiveSchool, type SchoolMembership } from "./active-school";
+import { loadAccess, type Access } from "./load-access";
+import { homeFor, type AreaKey } from "./roles";
+import { decideAreaAccess } from "./route-access";
 
-export type Viewer = {
-  userId: string;
-  fullName: string;
-  isPlatformAdmin: boolean;
-  /** Active memberships in active schools, one entry per school. */
-  schools: SchoolMembership[];
-};
+export type Viewer = Access & { userId: string };
 
 /**
  * The signed-in person and their schools, or null. Reads through the
@@ -37,29 +28,7 @@ export async function loadViewer(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
 ): Promise<Viewer> {
-  const [profile, memberships, platformAdmin] = await Promise.all([
-    supabase.from("profiles").select("full_name").eq("id", userId).maybeSingle(),
-    supabase
-      .from("memberships")
-      .select("role, school_id, schools!inner(name, status)")
-      .eq("user_id", userId)
-      .eq("status", "active"),
-    supabase.from("platform_admins").select("user_id").eq("user_id", userId).maybeSingle(),
-  ]);
-  if (profile.error || memberships.error || platformAdmin.error) {
-    throw new Error("Could not load the signed-in user's access");
-  }
-
-  const rows = (memberships.data ?? [])
-    .filter((m) => m.schools.status === "active" && isAppRole(m.role))
-    .map((m) => ({ schoolId: m.school_id, schoolName: m.schools.name, role: m.role }));
-
-  return {
-    userId,
-    fullName: profile.data?.full_name ?? "",
-    isPlatformAdmin: platformAdmin.data !== null,
-    schools: groupMemberships(rows),
-  };
+  return { userId, ...(await loadAccess(supabase, userId)) };
 }
 
 /** The viewer's current school (from the school cookie), or null if they must choose. */
@@ -83,26 +52,25 @@ export async function requireViewer(): Promise<Viewer> {
 }
 
 /**
- * Guards a role area (US-1.8): signed out goes to sign in, a multi-school
- * user who has not chosen goes to the picker, anyone else without a role
- * for the area gets the "not allowed" page (HTTP 403).
+ * Guards a role area (US-1.8). The proxy already applies the same rule
+ * before rendering; pages check again so a page is never reachable through
+ * a path the proxy matcher misses.
  */
 export async function requireArea(
   key: AreaKey,
 ): Promise<{ viewer: Viewer; school: SchoolMembership | null }> {
   const viewer = await requireViewer();
-  const area = AREAS[key];
+  const cookieStore = await cookies();
+  const decision = decideAreaAccess(key, viewer, cookieStore.get(SCHOOL_COOKIE)?.value);
 
-  if ("platformOnly" in area && area.platformOnly) {
-    if (!viewer.isPlatformAdmin) forbidden();
-    return { viewer, school: await getActiveSchool(viewer) };
+  switch (decision.kind) {
+    case "allow":
+      return { viewer, school: decision.school };
+    case "sign-in":
+      redirect("/sign-in");
+    case "choose-school":
+      redirect("/select-school");
+    case "forbidden":
+      forbidden();
   }
-
-  const school = await getActiveSchool(viewer);
-  if (!school) {
-    if (viewer.schools.length > 1) redirect("/select-school");
-    forbidden();
-  }
-  if (!canUseArea(area, school.roles, viewer.isPlatformAdmin)) forbidden();
-  return { viewer, school };
 }

@@ -1,3 +1,4 @@
+import type { SchoolBranding } from "@/lib/branding/theme";
 import type { AppRole } from "./roles";
 
 /** Name of the cookie holding the school a multi-school user chose (US-1.1). */
@@ -7,6 +8,7 @@ export type SchoolMembership = {
   schoolId: string;
   schoolName: string;
   roles: AppRole[];
+  branding: SchoolBranding;
 };
 
 /**
@@ -25,7 +27,12 @@ export function pickActiveSchool(
 
 /** Groups membership rows (one per role) into one entry per school, sorted by name. */
 export function groupMemberships(
-  rows: readonly { schoolId: string; schoolName: string; role: AppRole }[],
+  rows: readonly {
+    schoolId: string;
+    schoolName: string;
+    role: AppRole;
+    branding: SchoolBranding;
+  }[],
 ): SchoolMembership[] {
   const bySchool = new Map<string, SchoolMembership>();
   for (const row of rows) {
@@ -33,6 +40,7 @@ export function groupMemberships(
       schoolId: row.schoolId,
       schoolName: row.schoolName,
       roles: [],
+      branding: row.branding,
     };
     if (!school.roles.includes(row.role)) school.roles.push(row.role);
     bySchool.set(row.schoolId, school);

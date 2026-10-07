@@ -1,8 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { groupMemberships, pickActiveSchool } from "@/lib/auth/active-school";
+import { NO_BRANDING } from "@/lib/branding/theme";
 
-const msasa = { schoolId: "s-msasa", schoolName: "Msasa", roles: ["teacher" as const] };
-const kudzai = { schoolId: "s-kudzai", schoolName: "Kudzai", roles: ["teacher" as const] };
+const branding = NO_BRANDING;
+
+const msasa = { schoolId: "s-msasa", schoolName: "Msasa", roles: ["teacher" as const], branding };
+const kudzai = {
+  schoolId: "s-kudzai",
+  schoolName: "Kudzai",
+  roles: ["teacher" as const],
+  branding,
+};
 
 describe("pickActiveSchool", () => {
   it("uses the only school without a cookie", () => {
@@ -31,14 +39,14 @@ describe("groupMemberships", () => {
   it("groups roles per school and sorts by name", () => {
     expect(
       groupMemberships([
-        { schoolId: "s-msasa", schoolName: "Msasa", role: "teacher" },
-        { schoolId: "s-kudzai", schoolName: "Kudzai", role: "teacher" },
-        { schoolId: "s-msasa", schoolName: "Msasa", role: "parent" },
-        { schoolId: "s-msasa", schoolName: "Msasa", role: "parent" },
+        { schoolId: "s-msasa", schoolName: "Msasa", role: "teacher", branding },
+        { schoolId: "s-kudzai", schoolName: "Kudzai", role: "teacher", branding },
+        { schoolId: "s-msasa", schoolName: "Msasa", role: "parent", branding },
+        { schoolId: "s-msasa", schoolName: "Msasa", role: "parent", branding },
       ]),
     ).toEqual([
-      { schoolId: "s-kudzai", schoolName: "Kudzai", roles: ["teacher"] },
-      { schoolId: "s-msasa", schoolName: "Msasa", roles: ["teacher", "parent"] },
+      { schoolId: "s-kudzai", schoolName: "Kudzai", roles: ["teacher"], branding },
+      { schoolId: "s-msasa", schoolName: "Msasa", roles: ["teacher", "parent"], branding },
     ]);
   });
 });

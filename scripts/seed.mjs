@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Seeds the local Supabase stack from seed/*.csv: creates an auth user for
 // every row in profiles.csv (triggering public.handle_new_user), then loads
-// schools, platform_admins and memberships. See seed/README.md for the load
+// schools, platform_admins, memberships and the academic structure tables. See seed/README.md for the load
 // order and what is deliberately not seeded.
 //
 // Usage: npm run db:seed  (reads SUPABASE env vars from .env.local; see
@@ -188,13 +188,50 @@ async function seedMemberships() {
   console.log(`memberships: ${rows.length} upserted`);
 }
 
+/** Upserts a CSV as-is (blank cells become null), keyed on id. */
+async function upsertCsv(table, transform = (row) => row) {
+  const rows = readCsv(table).map((row) =>
+    transform(Object.fromEntries(Object.entries(row).map(([k, v]) => [k, orNull(v)]))),
+  );
+  const { error } = await admin.from(table).upsert(rows, { onConflict: "id" });
+  if (error) throw new Error(`seeding ${table} failed: ${error.message}`);
+  console.log(`${table}: ${rows.length} upserted`);
+}
+
+/**
+ * Academic structure in the documented order. A scale can only be the
+ * default once its bands cover 0 to 100 (D21), so scales go in as
+ * non-default and are made default after their bands.
+ */
+async function seedAcademicStructure() {
+  const defaults = readCsv("grading_scales")
+    .filter((row) => row.is_default === "true")
+    .map((row) => row.id);
+  await upsertCsv("grading_scales", (row) => ({ ...row, is_default: false }));
+  await upsertCsv("grade_levels");
+  await upsertCsv("grading_bands");
+  const { error } = await admin
+    .from("grading_scales")
+    .update({ is_default: true })
+    .in("id", defaults);
+  if (error) throw new Error(`setting default grading scales failed: ${error.message}`);
+  console.log(`grading_scales: ${defaults.length} set as default`);
+
+  await upsertCsv("academic_years");
+  await upsertCsv("terms");
+  await upsertCsv("classes");
+  await upsertCsv("subjects");
+  await upsertCsv("class_subjects");
+}
+
 async function main() {
   // Load order per seed/README.md: auth users (-> profiles), schools,
-  // platform_admins, memberships.
+  // platform_admins, memberships, then the academic structure.
   await seedAuthUsersAndProfiles();
   await seedSchools();
   await seedPlatformAdmins();
   await seedMemberships();
+  await seedAcademicStructure();
   console.log("Seed complete.");
 }
 

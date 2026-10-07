@@ -75,3 +75,25 @@ Format: **D#. Title** (date). Decision. Why. Alternatives.
 
 - Decision: a Light / Dark / System switch above the footer, stored in `localStorage` (`sp-color-mode`), applied by a small inline script in `<head>` before first paint. System follows `prefers-color-scheme`.
 - Why: no account setting needed, no flash of the wrong theme, works on sign-in pages too.
+
+## D14. First school-admin invite through Supabase Auth, not an `invites` table (2026-10-07)
+
+- Decision: the console invites a school's first admin with `auth.admin.inviteUserByEmail` (service-role client, in a server action that first checks the caller is a platform admin) and adds a `memberships` row with status `invited`. The email (`supabase/templates/invite.html`) links to `/auth/confirm?token_hash=...&type=invite`, which verifies the token server-side and signs the invitee in; `/welcome` asks for a password, then `public.accept_my_invites()` (security definer, own rows only, `invited` to `active` only) activates the membership. If the email already has an account, the membership is created `active` at once. The console shows the invite form only while the school has no admin.
+- Why: US-10.1 needs only staff invites, which Auth handles (one-time token, email delivery); the `invites` table (D7) is still needed for parent codes in US-1.3. Server-side token verification works with the cookie-based SSR client; the default email link puts tokens in the URL fragment, which the server never sees.
+- Hosted projects: set the same invite template (subject and link) in the dashboard, and the site URL, before go-live. Local `email_sent` is raised to 100 per hour for e2e runs.
+- Known gaps: no "resend invite" yet; the link lasts `otp_expiry` (1 hour locally). A school with an un-accepted invite needs its membership disabled (SQL) before a new invite.
+
+## D15. Logo storage: `school-branding` bucket, platform admin writes only (2026-10-07)
+
+- Decision: a public bucket `school-branding` (named in D12; `DATA_MODEL.md` section 8 calls it `branding`), 1 MB limit, PNG, JPEG and WebP only. Object names start with the school id (`{school_id}/logo-<timestamp>.<ext>`), checked by `private.is_school_folder()`. Insert and update policies allow platform admins only (D3: logos are platform-admin only); no delete policy, so old logos stay (rule 6). The upload action checks the file's first bytes and stores it with the sniffed type.
+- Why: SVG is excluded because an SVG opened from its public URL can run script. A new object name per upload means browsers never show a stale cached logo. Stamps and signatures (school-admin writes) will get their own policies with the report stories.
+
+## D16. What "colour pairs failing AA" means when saving (2026-10-07)
+
+- Decision: `parseBrandColors()` (`src/lib/branding/brand-colors.ts`) rejects a primary colour under 4.5:1 as text on the white page (so white button text on it passes too), and an accent where neither black nor white text reaches 4.5:1. Failures carry a suggestion from `adjustForContrast()`; the form shows the same check live with a "Use #......" button. Dark mode is not checked at save time because the theme adjusts colours per mode (D12).
+- Note: every colour gets at least about 4.58:1 with black or white, so the accent rule in practice only rejects malformed values.
+
+## D17. The console reads school-admin names with the service role (2026-10-07)
+
+- Decision: the school page in the console shows each school admin's name, email and invite status. Memberships come through RLS; the matching `profiles` rows are read with the service-role client, limited to that school's `school_admin` memberships.
+- Why: D5 gives platform admins no read of `profiles` (it holds parents and learners). A narrow server-side read keeps that rule while letting the super admin see who they invited.

@@ -40,3 +40,26 @@ Format: **D#. Title** (date). Decision. Why. Alternatives.
 
 - Decision: `invites` (migration order step 2) lands with the parent-invite story (US-1.3), not in the tenancy migration.
 - Why: it references `guardians` and `learners`, which do not exist until the people tables; adding it then keeps its foreign keys and RLS tests in one place.
+
+## D8. Sign-in lockout in the app, recorded by hashed email (2026-10-07)
+
+- Decision: the US-1.1 lockout (5 failures in 10 minutes block for 15 minutes from the 5th) is checked in the sign-in server action before calling Supabase Auth. Attempts go in `sign_in_attempts`, keyed by a SHA-256 hash of the normalised email, written and read only with the service-role client. A successful sign in clears earlier failures; only `invalid_credentials` errors count. Unknown emails are counted too, so the response never reveals whether an account exists.
+- Why: Supabase Auth only rate-limits per IP, and a whole school shares one IP. Hashing keeps readable emails out of the table. The rule is a pure function (`src/lib/auth/lockout.ts`) so it is unit tested.
+- Local `sign_in_sign_ups` in `supabase/config.toml` is raised to 300 so e2e runs from one IP are not throttled. Hosted projects keep their own setting.
+- Known gap: old rows are never pruned. Add a scheduled clean-up before go-live.
+
+## D9. Active school in a cookie, role areas as top-level routes (2026-10-07)
+
+- Decision: the chosen school is an httpOnly `sp_school` cookie holding a school id, trusted only if it names one of the user's active memberships in an active school. Single-school users need no cookie. Multi-school users choose at every sign in and can switch from the top bar. Each role has one area: `/admin`, `/head`, `/department` (hod), `/teaching`, `/children` (parent), `/my-reports` (learner), `/platform` (super admin). Menus and home pages come from `src/lib/auth/roles.ts`; a person with several roles sees each area and lands on the first in that order.
+- Why: keeps URLs short and school-free while RLS stays the real boundary (the cookie only picks which of your schools the UI shows). Area order puts staff work before the parent view for a teacher who is also a parent.
+- Alternatives: school slug in every URL (longer links, and still needs the same check).
+
+## D10. "Not allowed" through `forbidden()` (2026-10-07)
+
+- Decision: every area page calls `requireArea()` (`src/lib/auth/viewer.ts`), which calls Next's `forbidden()` and renders `src/app/forbidden.tsx` with HTTP 403. This needs `experimental.authInterrupts` in `next.config.ts`.
+- Why: a real 403 status and one shared page, checked per page rather than in a layout (layouts do not re-run on client navigation). The flag is experimental in Next 16; if it is removed, swap to rendering the same component directly.
+
+## D11. Two-school demo user (2026-10-07)
+
+- Decision: the seed generator adds `relief1@demo.spportal.test`, a teacher in both schools with no class subjects.
+- Why: US-1.1 needs a multi-school user to demonstrate the school picker; with no class subjects the marks and fixtures are unchanged.

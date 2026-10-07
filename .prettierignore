@@ -4,3 +4,4 @@ package-lock.json
 supabase/.temp
 next-env.d.ts
 seed
+src/lib/supabase/database.types.ts

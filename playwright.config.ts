@@ -6,6 +6,8 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   reporter: "list",
+  // The dev server compiles each route on first visit, which can exceed the 5s default.
+  expect: { timeout: 15_000 },
   use: { baseURL: "http://localhost:3000", trace: "on-first-retry" },
   projects: [
     // Mobile-first: 360px-wide screens are the primary target.

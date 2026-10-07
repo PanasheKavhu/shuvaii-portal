@@ -1,4 +1,6 @@
 import { expect, type Page } from "@playwright/test";
+import { createClient } from "@supabase/supabase-js";
+import type { Database } from "../../src/lib/supabase/database.types";
 
 // Seed data (seed/*.csv); the password is the published local demo password
 // from scripts/seed.mjs.
@@ -38,7 +40,15 @@ const MAILPIT = process.env.MAILPIT_URL ?? "http://127.0.0.1:54324";
 
 /** Waits for the invite email to `to` and returns the token hash from its link. */
 export async function inviteTokenFor(to: string): Promise<string> {
-  let html = "";
+  return (await inviteTokensFor(to, 1))[0]!;
+}
+
+/**
+ * Waits until `count` invite emails to `to` have arrived and returns the
+ * token hash from each link, newest first.
+ */
+export async function inviteTokensFor(to: string, count: number): Promise<string[]> {
+  let ids: string[] = [];
   await expect
     .poll(
       async () => {
@@ -46,16 +56,52 @@ export async function inviteTokenFor(to: string): Promise<string> {
           `${MAILPIT}/api/v1/search?query=${encodeURIComponent(`to:"${to}"`)}`,
         );
         const { messages } = (await search.json()) as { messages: { ID: string }[] };
-        if (!messages.length) return false;
-        const message = await fetch(`${MAILPIT}/api/v1/message/${messages[0]!.ID}`);
-        html = ((await message.json()) as { HTML: string }).HTML;
-        return true;
+        ids = messages.map((m) => m.ID);
+        return ids.length >= count;
       },
-      { message: `invite email to ${to}`, timeout: 20_000 },
+      { message: `${count} invite email(s) to ${to}`, timeout: 20_000 },
     )
     .toBe(true);
 
-  const match = /token_hash=([^&"'\s]+)/.exec(html);
-  if (!match) throw new Error("Invite email has no token_hash link");
-  return match[1]!;
+  return Promise.all(
+    ids.map(async (id) => {
+      const message = await fetch(`${MAILPIT}/api/v1/message/${id}`);
+      const { HTML } = (await message.json()) as { HTML: string };
+      const match = /token_hash=([^&"'\s]+)/.exec(HTML);
+      if (!match) throw new Error("Invite email has no token_hash link");
+      return match[1]!;
+    }),
+  );
+}
+
+/**
+ * Console events in a school's audit log, read as that school's admin
+ * through RLS (D18), oldest first. Uses the public URL and anon key from
+ * .env.local, as the app does.
+ */
+export async function auditEventsAs(
+  email: string,
+  password: string,
+  schoolId: string,
+): Promise<string[]> {
+  try {
+    process.loadEnvFile(".env.local");
+  } catch {
+    // Already in the environment (CI).
+  }
+  const supabase = createClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { persistSession: false } },
+  );
+  const signedIn = await supabase.auth.signInWithPassword({ email, password });
+  if (signedIn.error) throw new Error("Could not sign in to read the audit log");
+  const { data, error } = await supabase
+    .from("audit_log")
+    .select("event")
+    .eq("school_id", schoolId)
+    .eq("action", "event")
+    .order("id");
+  if (error) throw new Error("Could not read the audit log");
+  return data.map((row) => row.event!);
 }

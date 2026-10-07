@@ -16,6 +16,7 @@ Phase 1 (E1: access, tenancy, branding). Tenancy schema, staff sign in, role-bas
 - 2026-10-07: Minimal super-admin console (US-10.1 create school, US-1.5 branding). `/platform` lists schools; `/platform/schools/new` creates one (name, slug suggested from the name, stage); each school's page saves colours with a live AA check and a one-tap suggested fix (D16), uploads a logo to the `school-branding` bucket (D15), and invites the first school admin by email, who accepts at `/auth/confirm` and `/welcome` (D14, D17). pgTAP tests for the bucket policies and `accept_my_invites()`. Playwright: a super admin creates, brands and invites, and the new admin sees the theme and logo, then a later colour change, with no deploy; a school admin gets 403 on every console page; a school A teacher sees no school B data on any page, even with the school cookie pointed at school B.
 - 2026-10-07: Line endings normalised to LF (`.gitattributes`, Prettier `endOfLine`), so `format:check` passes on Windows.
 - 2026-10-07: `audit_log` (append-only, read by that school's admin and head) with a generic row trigger on `memberships` and console events for school created, branding changed and admin invited, each recorded against the school it changed (D18). pgTAP: cross-school read, no update/delete/truncate for anyone, one row per membership role change, console events.
+- 2026-10-07: "Resend invite" on the console school page for a school admin whose invite is not accepted yet: re-sends the Auth invite (platform admin checked first), which replaces the old link, and records an `invite_resent` audit event (D14, D18). Playwright: the old link is rejected, the new one works, the button disappears once accepted, and the new admin sees `school_created`, `admin_invited` and `invite_resent` in their audit log.
 
 ## In progress
 
@@ -32,4 +33,9 @@ _None._
 - CI does not yet run `test:db` (needs Docker/Supabase) or `test:e2e`.
 - `sign_in_attempts` rows are never pruned (D8).
 - Two-factor sign in for super admin, school admin and head (SPEC section 5) is not built yet.
-- No "resend invite" (D14). Hosted projects need the invite email template and site URL set in the dashboard.
+
+## Go-live checklist
+
+Things to do on the hosted Supabase project and deployment before the first real school uses the portal.
+
+- [ ] Set the invite email template (subject and the `/auth/confirm?token_hash=...&type=invite` link from `supabase/templates/invite.html`) and the site URL in the Supabase dashboard (D14).

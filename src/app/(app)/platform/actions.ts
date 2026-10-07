@@ -205,6 +205,59 @@ export async function inviteSchoolAdmin(
 }
 
 /**
+ * Sends a school admin's invite email again while their membership is still
+ * `invited` (D14). Auth issues a fresh link; the old one stops working.
+ */
+export async function resendInvite(schoolId: string, membershipId: string): Promise<FormState> {
+  if (!(await isPlatformAdmin()) || !UUID_RE.test(schoolId) || !UUID_RE.test(membershipId)) {
+    return NOT_ALLOWED;
+  }
+
+  const supabase = await createClient();
+  const pending = await supabase
+    .from("memberships")
+    .select("id, user_id")
+    .eq("id", membershipId)
+    .eq("school_id", schoolId)
+    .eq("role", "school_admin")
+    .eq("status", "invited")
+    .maybeSingle();
+  if (pending.error) return FAILED("resend the invite");
+  if (!pending.data) {
+    revalidatePath(`/platform/schools/${schoolId}`);
+    return { status: "error", message: "This invite is no longer waiting.", errors: {} };
+  }
+
+  const admin = createAdminClient();
+  const profile = await admin
+    .from("profiles")
+    .select("email")
+    .eq("id", pending.data.user_id)
+    .maybeSingle();
+  if (profile.error || !profile.data?.email) return FAILED("resend the invite");
+  const email = profile.data.email;
+
+  const invited = await admin.auth.admin.inviteUserByEmail(email);
+  if (invited.error?.code === "email_exists") {
+    return {
+      status: "error",
+      message: `${email} has already set a password. Ask them to sign in.`,
+      errors: {},
+    };
+  }
+  if (invited.error?.code === "over_email_send_rate_limit") {
+    return {
+      status: "error",
+      message: "An invite was sent moments ago. Please wait a minute and try again.",
+      errors: {},
+    };
+  }
+  if (invited.error) return FAILED("resend the invite");
+
+  return logInviteEvent(pending.data.id, "invite_resent", `Invite sent again to ${email}.`);
+}
+
+/**
  * Records an invite console event (D18). The email has already gone, so a
  * failure here is reported beside the success rather than as a retry.
  */

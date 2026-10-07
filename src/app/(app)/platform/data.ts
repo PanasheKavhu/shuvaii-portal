@@ -58,7 +58,12 @@ export async function getSchool(id: string): Promise<SchoolSummary | null> {
   return data ? toSummary(data) : null;
 }
 
-export type SchoolAdmin = { fullName: string | null; email: string | null; status: string };
+export type SchoolAdmin = {
+  membershipId: string;
+  fullName: string | null;
+  email: string | null;
+  status: string;
+};
 
 /**
  * The school's admins with name and email. Memberships come through RLS;
@@ -70,7 +75,7 @@ export async function listSchoolAdmins(schoolId: string): Promise<SchoolAdmin[]>
   const supabase = await createClient();
   const memberships = await supabase
     .from("memberships")
-    .select("user_id, status")
+    .select("id, user_id, status")
     .eq("school_id", schoolId)
     .eq("role", "school_admin")
     .order("created_at");
@@ -89,6 +94,7 @@ export async function listSchoolAdmins(schoolId: string): Promise<SchoolAdmin[]>
   return memberships.data.map((m) => {
     const profile = profiles.data.find((p) => p.id === m.user_id);
     return {
+      membershipId: m.id,
       fullName: profile?.full_name ?? null,
       email: profile?.email ?? null,
       status: m.status,

@@ -81,7 +81,8 @@ Format: **D#. Title** (date). Decision. Why. Alternatives.
 - Decision: the console invites a school's first admin with `auth.admin.inviteUserByEmail` (service-role client, in a server action that first checks the caller is a platform admin) and adds a `memberships` row with status `invited`. The email (`supabase/templates/invite.html`) links to `/auth/confirm?token_hash=...&type=invite`, which verifies the token server-side and signs the invitee in; `/welcome` asks for a password, then `public.accept_my_invites()` (security definer, own rows only, `invited` to `active` only) activates the membership. If the email already has an account, the membership is created `active` at once. The console shows the invite form only while the school has no admin.
 - Why: US-10.1 needs only staff invites, which Auth handles (one-time token, email delivery); the `invites` table (D7) is still needed for parent codes in US-1.3. Server-side token verification works with the cookie-based SSR client; the default email link puts tokens in the URL fragment, which the server never sees.
 - Hosted projects: set the same invite template (subject and link) in the dashboard, and the site URL, before go-live. Local `email_sent` is raised to 100 per hour for e2e runs.
-- Known gaps: no "resend invite" yet; the link lasts `otp_expiry` (1 hour locally). A school with an un-accepted invite needs its membership disabled (SQL) before a new invite.
+- Resend (added later the same day): while the membership is still `invited`, the console shows "Resend invite", which calls `inviteUserByEmail` again. Auth issues a new link and the old one stops working; the resend is audited (D18).
+- Known gaps: the link lasts `otp_expiry` (1 hour locally). A school with an un-accepted invite needs its membership disabled (SQL) before a new invite.
 
 ## D15. Logo storage: `school-branding` bucket, platform admin writes only (2026-10-07)
 

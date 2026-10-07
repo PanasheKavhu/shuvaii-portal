@@ -8,11 +8,12 @@ import { isHexColor, readableOn } from "@/lib/branding/contrast";
 import { logoUrl } from "@/lib/branding/theme";
 import { STAGE_LABELS } from "@/lib/platform/school-input";
 import { supabaseUrl } from "@/lib/supabase/env";
-import { inviteSchoolAdmin, saveColors, uploadLogo } from "../../actions";
+import { inviteSchoolAdmin, resendInvite, saveColors, uploadLogo } from "../../actions";
 import { getSchool, listSchoolAdmins } from "../../data";
 import { ColorsForm } from "./colors-form";
 import { InviteForm } from "./invite-form";
 import { LogoForm } from "./logo-form";
+import { ResendInviteForm } from "./resend-invite-form";
 
 export const metadata: Metadata = { title: "School" };
 
@@ -76,12 +77,23 @@ export default async function SchoolPage({ params }: PageProps<"/platform/school
       >
         {admins.length > 0 ? (
           <ul className="flex flex-col gap-2" aria-label="School admins">
-            {admins.map((a, i) => (
-              <li key={i} className="bg-muted/40 flex flex-col rounded-xl border p-3">
-                <span className="font-medium">{a.fullName ?? a.email ?? "Unknown"}</span>
-                <span className="text-muted-foreground text-sm">
-                  {a.email} · {STATUS_LABELS[a.status] ?? a.status}
-                </span>
+            {admins.map((a) => (
+              <li
+                key={a.membershipId}
+                className="bg-muted/40 flex flex-col gap-3 rounded-xl border p-3"
+              >
+                <div className="flex flex-col">
+                  <span className="font-medium">{a.fullName ?? a.email ?? "Unknown"}</span>
+                  <span className="text-muted-foreground text-sm">
+                    {a.email} · {STATUS_LABELS[a.status] ?? a.status}
+                  </span>
+                </div>
+                {a.status === "invited" && (
+                  <ResendInviteForm
+                    action={resendInvite.bind(null, school.id, a.membershipId)}
+                    email={a.email}
+                  />
+                )}
               </li>
             ))}
           </ul>

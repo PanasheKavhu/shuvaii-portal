@@ -191,6 +191,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_my_invites: { Args: never; Returns: number }
       current_school_ids: { Args: never; Returns: string[] }
       has_role: {
         Args: {

@@ -1,1 +1,4 @@
--- Local seed; generated from seed/ CSVs in a later story.
+-- Intentionally empty. Seeding needs the Auth admin API (to create
+-- auth.users rows for seed/profiles.csv), which plain SQL run against the
+-- database cannot do. `npm run db:reset` runs this file (a no-op) and then
+-- `npm run db:seed` (scripts/seed.mjs), which does the real work.

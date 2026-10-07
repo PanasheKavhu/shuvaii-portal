@@ -112,3 +112,18 @@ Format: **D#. Title** (date). Decision. Why. Alternatives.
 - Wrong codes count towards the US-1.1 lockout in `sign_in_attempts` (D8): 5 wrong passwords or codes in 10 minutes block both for 15 minutes. A 6-digit code is otherwise guessable across many IPs; the link carries a long token and needs no lockout. Auth reports a wrong and an expired code the same way (`otp_expired`), so the message covers both.
 - Not now: phone (SMS) codes need an SMS provider, and SMS is out of the MVP (SPEC section 1); add when a provider is chosen. Learner PIN resets by an admin land with US-1.2, which brings learner accounts. Password resets are not written to `audit_log`, which needs a school and covers marks, comments, reports and membership changes.
 - Hosted projects: set the recovery template (subject and link) in the dashboard before go-live, as for the invite (D14).
+
+## D20. Academic structure access and teaching staff (2026-10-07)
+
+- Decision: `grading_scales`, `grading_bands`, `grade_levels`, `academic_years`, `terms`, `classes`, `subjects` and `class_subjects` are read by active staff of the school (`school_admin`, `head`, `hod`, `teacher`, through `public.is_staff()`) and written (insert, update, delete) only by that school's `school_admin`. Parents and learners get no direct read; `DATA_MODEL.md` section 7 said "any member", narrowed here as requested. What they need will reach them through published report snapshots. Platform admins get no read, as for other tenant data (D5).
+- Every child row points at its parent through an `(id, school_id)` foreign key, so a school A row can never reference a school B year, level, scale, class or subject, and `private.keep_school_id()` stops any row changing school.
+- A class teacher and a class subject's teacher must hold an active `teacher` or `hod` membership in the same school (`private.is_active_teacher()`, checked by triggers). Heads of department count because they teach: the seed has two HODs who teach and one who is a class teacher. Disabling a membership later does not clear existing assignments.
+- One teacher per class subject: `teacher_id` is `not null` and `(class_id, subject_id)` is unique. A subject is added to a class when its teacher is known.
+- Deletes are allowed for the school admin (these rows are not personal data, rule 6); foreign keys stop deleting anything still in use. `subjects.stage_scope` uses the `school_stage` enum (`combined` meaning both parts of the school).
+- Not audited yet: the audit triggers named in `DATA_MODEL.md` cover marks, comments, reports, assessments, memberships and learners, none of which is in this step.
+
+## D21. A default grading scale must cover 0 to 100 exactly (2026-10-07)
+
+- Decision: `public.grading_scale_problems(scale_id)` lists every gap (a whole mark from 0 to 100 in no band) and overlap (a mark in more than one band) as runs, for example `gap 40-49`; `public.grading_scale_is_complete()` is true when it returns nothing. Both are security invoker, so they see only bands the caller may read. A trigger refuses making a scale default (on insert or update) unless it is complete, and a deferred constraint trigger refuses, at commit, any band change that leaves a default scale incomplete, so a boundary can still be moved in two statements within one transaction. At most one default scale per school and stage.
+- Bands are whole marks with both ends included (Q1, Q4), `0 <= min_mark <= max_mark <= 100`, and a grade appears once per scale.
+- The seed loads scales as non-default, then levels and bands, then sets the default, which exercises the rule.

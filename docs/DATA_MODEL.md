@@ -141,8 +141,8 @@ unique (school_id, code)
 **class_subjects**: a subject taught to a class, with its teacher.
 
 ```
-id, school_id, class_id, subject_id, teacher_id fk profiles
-unique (class_id, subject_id)
+id, school_id, class_id, subject_id, teacher_id fk profiles not null
+unique (class_id, subject_id); teacher and class teacher must be active teacher or hod (D20)
 ```
 
 ### 4.3 People in the school
@@ -194,7 +194,8 @@ One guardian linked to two learners is how siblings appear under one parent logi
 ```
 id, school_id, scale_id, grade, min_mark int, max_mark int, remark, sort_order
 check min_mark <= max_mark; a validation function proves a scale covers 0 to 100
-with no gaps or overlaps before it can be set default.
+with no gaps or overlaps before it can be set default
+(grading_scale_problems, grading_scale_is_complete; D21).
 ```
 
 **assessments**
@@ -322,7 +323,7 @@ Helper functions (security definer, stable): `current_school_ids()`, `has_role(s
 | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
 | schools                                                                            | members of that school                                                                       | super admin (branding), school admin (limited fields)                             |
 | memberships, invites, import_jobs                                                  | school admin, head                                                                           | school admin                                                                      |
-| structure (levels, years, terms, classes, subjects, class_subjects, scales, bands) | any member of the school                                                                     | school admin                                                                      |
+| structure (levels, years, terms, classes, subjects, class_subjects, scales, bands) | staff of the school (D20)                                                                    | school admin                                                                      |
 | learners, enrolments, enrolment_subjects, guardians, guardian_links                | admin, head, hod; teachers for their classes; parents and learners for themselves            | school admin                                                                      |
 | assessments, marks                                                                 | admin, head; hod for department; teacher for own class subjects                              | teacher for own class subjects while term is open and not locked; admin (audited) |
 | subject_comments                                                                   | as marks; parents and learners only when the report is published                             | assigned teacher; admin                                                           |

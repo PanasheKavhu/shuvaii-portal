@@ -4,7 +4,7 @@ Update at the end of every story (definition of done, `SPEC.md` section 6).
 
 ## Current phase
 
-Phase 1 (E1: access, tenancy, branding). Tenancy schema, staff sign in, role-based navigation, school theming and a minimal super-admin console done.
+Phase 1 (E1: access, tenancy, branding). Tenancy schema, staff sign in, password reset, role-based navigation, school theming and a minimal super-admin console done. Phase 2 schema started: academic structure tables are in; the setup wizard (US-2.1) is not built yet.
 
 ## Done
 
@@ -20,6 +20,8 @@ Phase 1 (E1: access, tenancy, branding). Tenancy schema, staff sign in, role-bas
 
 - 2026-10-07: US-1.7 password reset for email accounts: "Forgot your password?" on sign in, `/forgot-password` emails a link and a 6-digit code (same reply for unknown addresses), `/reset-password` sets the new password only in the session the link or code opened, then signs out other sessions (D19). Wrong codes share the sign-in lockout. Playwright: reset by link (link then rejected on reuse), reset by code after a wrong code, old password rejected and new one works, unknown email gets the same reply, 5 wrong codes lock out, and the new-password page refuses an ordinary session.
 
+- 2026-10-07: Academic structure tables (migration order step 3): `grading_scales`, `grading_bands`, `grade_levels`, `academic_years`, `terms`, `classes`, `subjects`, `class_subjects`, each with `school_id`, same-school foreign keys and RLS (staff read, school admin writes, D20). `grading_scale_problems()` and `grading_scale_is_complete()` check a scale covers 0 to 100 with no gaps or overlaps, and a scale cannot be default unless it does (D21). One teacher per class subject; class and subject teachers must be active teaching staff of the school. `scripts/seed.mjs` loads these CSVs in the documented order; types regenerated. pgTAP (`08_academic_structure.test.sql`, 104 tests): cross-school read and write for every table, a teacher who reads but cannot write any of them, head and parent reads, gap, overlap, good and empty scales, the default guard, teacher checks and cross-school references.
+
 ## In progress
 
 _None._
@@ -28,6 +30,7 @@ _None._
 
 - US-1.2 learner sign in (learner number and PIN), with the admin PIN reset that completes US-1.7 for learners.
 - `invites` table with US-1.3 parent accounts (D7).
+- People tables (migration order step 4: learners, enrolments, enrolment_subjects, guardians, guardian_links) and the US-2.1 setup wizard screens on top of the structure tables.
 - US-10.3 feature flags and US-10.4 usage in the console.
 
 ## Known gaps

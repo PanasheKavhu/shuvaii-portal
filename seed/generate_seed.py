@@ -415,6 +415,14 @@ for sc in SCHOOLS:
     tables["announcements"].append([a(3), sid, f"Class {cnames[0]} trip", "Permission slips are due Monday.",
                                     "class", class_ids[cnames[0]], "false", "published", "2026-09-12T08:00:00Z", "", uid("profile", k, ADMINS[k][0][0])])
 
+# multi-school staff: a relief teacher at both schools (US-1.1 school picker).
+# No class subjects, so marks, comments and fixtures are unchanged.
+relief_id = uid("profile", "relief1")
+tables["profiles"].append([relief_id, "Kudakwashe Mhlanga", "relief1@demo.spportal.test", "", "2026-01-06T08:00:00Z"])
+for sc in SCHOOLS:
+    tables["memberships"].append([uid("membership", sc["key"], "relief1", "teacher"), uid("school", sc["key"]),
+                                  relief_id, "teacher", "active", "2026-01-06T08:00:00Z"])
+
 # ------------------------------------------------------------------ write
 write("schools", "id slug name motto stage address phone email logo_path stamp_path head_signature_path primary_color accent_color report_footer_text timezone feature_flags status created_at".split(), tables["schools"])
 write("profiles", "id full_name email phone created_at".split(), tables["profiles"])

@@ -8,7 +8,7 @@ All names, numbers, marks and comments are invented. School names are fictional;
 | --- | --- |
 | Schools | 2: Msasa Demo High School (secondary, Forms 3 and 4), Kudzai Demo Primary School (Grades 5 and 6) |
 | Classes | 6 (3 per school) |
-| Teachers | 12 (8 secondary with 2 as `hod`, 4 primary); plus 2 school admins, 2 heads, 1 platform admin |
+| Teachers | 12 (8 secondary with 2 as `hod`, 4 primary); plus 2 school admins, 2 heads, 1 platform admin, 1 relief teacher (`relief1@demo.spportal.test`) who belongs to both schools and teaches no class subjects |
 | Learners | 60 (30 per school, 10 per class); 10 sibling pairs share one guardian |
 | Guardians | 50; 4 parent logins and 2 learner logins for portal testing |
 | Subjects | 10 secondary, 8 primary; secondary learners take 3 core plus 4 electives |

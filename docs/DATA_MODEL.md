@@ -284,11 +284,11 @@ status ('draft'|'published'|'archived'), published_at, expires_at, author_id
 **audit_log**
 
 ```
-id bigint identity, school_id, actor_id, table_name, row_id, action ('insert'|'update'|'delete'),
-old_data jsonb, new_data jsonb, reason text null, created_at
+id bigint identity, school_id, actor_id, table_name, row_id, action ('insert'|'update'|'delete'|'event'),
+event text null, old_data jsonb, new_data jsonb, reason text null, created_at
 ```
 
-Written by triggers on `marks`, `subject_comments`, `class_comments`, `reports`, `assessments`, `memberships`, `learners`. Append-only: no update or delete policy for anyone.
+Written by triggers on `marks`, `subject_comments`, `class_comments`, `reports`, `assessments`, `memberships`, `learners` (one generic function, `private.audit_row_change()`). Console events (`school_created`, `branding_changed`, `admin_invited`, `invite_resent`) use action `event` with the event name, recorded against the school they changed (D18). Append-only: no update or delete policy for anyone, and a trigger rejects update, delete and truncate even for the table owner.
 
 ## 5. Report state machine
 

@@ -22,6 +22,10 @@ import type { FormState } from "./form-state";
  * caller is a platform admin; the writes then go through the user-scoped
  * client, so RLS and the write guards apply as well. The service-role
  * client is used only to create the invitee's Auth account.
+ *
+ * Audit (D18): creating a school and changing its colours or logo are
+ * recorded by a trigger on `schools`; invites are recorded here through
+ * `log_invite_event()`, since an email leaves no row change of its own.
  */
 
 const NOT_ALLOWED: FormState = {
@@ -187,16 +191,39 @@ export async function inviteSchoolAdmin(
 
   const membership = await supabase
     .from("memberships")
-    .insert({ school_id: schoolId, user_id: userId, role: "school_admin", status });
+    .insert({ school_id: schoolId, user_id: userId, role: "school_admin", status })
+    .select("id")
+    .single();
   if (membership.error) return FAILED("add the school admin");
 
   revalidatePath(`/platform/schools/${schoolId}`);
-  return {
-    status: "saved",
-    message:
-      status === "invited"
-        ? `Invite sent to ${email}.`
-        : `${email} already has an account, so they are now this school's admin.`,
-    errors: {},
-  };
+  const message =
+    status === "invited"
+      ? `Invite sent to ${email}.`
+      : `${email} already has an account, so they are now this school's admin.`;
+  return logInviteEvent(membership.data.id, "admin_invited", message);
+}
+
+/**
+ * Records an invite console event (D18). The email has already gone, so a
+ * failure here is reported beside the success rather than as a retry.
+ */
+async function logInviteEvent(
+  membershipId: string,
+  event: "admin_invited" | "invite_resent",
+  message: string,
+): Promise<FormState> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("log_invite_event", {
+    p_membership_id: membershipId,
+    p_event: event,
+  });
+  if (error) {
+    return {
+      status: "error",
+      message: `${message} It could not be recorded in the audit log.`,
+      errors: {},
+    };
+  }
+  return { status: "saved", message, errors: {} };
 }

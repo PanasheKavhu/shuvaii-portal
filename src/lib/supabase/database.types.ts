@@ -9,6 +9,63 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      audit_log: {
+        Row: {
+          action: Database["public"]["Enums"]["audit_action"]
+          actor_id: string | null
+          created_at: string
+          event: string | null
+          id: number
+          new_data: Json | null
+          old_data: Json | null
+          reason: string | null
+          row_id: string
+          school_id: string
+          table_name: string
+        }
+        Insert: {
+          action: Database["public"]["Enums"]["audit_action"]
+          actor_id?: string | null
+          created_at?: string
+          event?: string | null
+          id?: never
+          new_data?: Json | null
+          old_data?: Json | null
+          reason?: string | null
+          row_id: string
+          school_id: string
+          table_name: string
+        }
+        Update: {
+          action?: Database["public"]["Enums"]["audit_action"]
+          actor_id?: string | null
+          created_at?: string
+          event?: string | null
+          id?: never
+          new_data?: Json | null
+          old_data?: Json | null
+          reason?: string | null
+          row_id?: string
+          school_id?: string
+          table_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_log_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_log_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       memberships: {
         Row: {
           created_at: string
@@ -201,6 +258,10 @@ export type Database = {
         Returns: boolean
       }
       is_platform_admin: { Args: never; Returns: boolean }
+      log_invite_event: {
+        Args: { p_event: string; p_membership_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role:
@@ -210,6 +271,7 @@ export type Database = {
         | "teacher"
         | "parent"
         | "learner"
+      audit_action: "insert" | "update" | "delete" | "event"
       membership_status: "invited" | "active" | "disabled"
       school_stage: "primary" | "secondary" | "combined"
     }
@@ -340,6 +402,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["school_admin", "head", "hod", "teacher", "parent", "learner"],
+      audit_action: ["insert", "update", "delete", "event"],
       membership_status: ["invited", "active", "disabled"],
       school_stage: ["primary", "secondary", "combined"],
     },

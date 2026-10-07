@@ -105,3 +105,49 @@ export async function auditEventsAs(
   if (error) throw new Error("Could not read the audit log");
   return data.map((row) => row.event!);
 }
+
+/**
+ * A fresh account with no school, made through the public sign-up API, so a
+ * test can change its password without touching the seed users.
+ */
+export async function createLoneUser(prefix: string): Promise<string> {
+  try {
+    process.loadEnvFile(".env.local");
+  } catch {
+    // Already in the environment (CI).
+  }
+  const email = `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@demo.spportal.test`;
+  const supabase = createClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { persistSession: false } },
+  );
+  const { error } = await supabase.auth.signUp({ email, password: PASSWORD });
+  if (error) throw new Error("Could not create a test user");
+  return email;
+}
+
+/** Waits for the password-reset email to `to`; returns its link's token hash and its code. */
+export async function resetEmailFor(to: string): Promise<{ tokenHash: string; code: string }> {
+  let id = "";
+  await expect
+    .poll(
+      async () => {
+        const search = await fetch(
+          `${MAILPIT}/api/v1/search?query=${encodeURIComponent(`to:"${to}" subject:"Reset"`)}`,
+        );
+        const { messages } = (await search.json()) as { messages: { ID: string }[] };
+        id = messages[0]?.ID ?? "";
+        return id !== "";
+      },
+      { message: `reset email to ${to}`, timeout: 20_000 },
+    )
+    .toBe(true);
+
+  const message = await fetch(`${MAILPIT}/api/v1/message/${id}`);
+  const { HTML } = (await message.json()) as { HTML: string };
+  const tokenHash = /token_hash=([^&"'\s]+)/.exec(HTML)?.[1];
+  const code = /<strong>(\d{6})<\/strong>/.exec(HTML)?.[1];
+  if (!tokenHash || !code) throw new Error("Reset email has no link or code");
+  return { tokenHash, code };
+}

@@ -18,13 +18,15 @@ Phase 1 (E1: access, tenancy, branding). Tenancy schema, staff sign in, role-bas
 - 2026-10-07: `audit_log` (append-only, read by that school's admin and head) with a generic row trigger on `memberships` and console events for school created, branding changed and admin invited, each recorded against the school it changed (D18). pgTAP: cross-school read, no update/delete/truncate for anyone, one row per membership role change, console events.
 - 2026-10-07: "Resend invite" on the console school page for a school admin whose invite is not accepted yet: re-sends the Auth invite (platform admin checked first), which replaces the old link, and records an `invite_resent` audit event (D14, D18). Playwright: the old link is rejected, the new one works, the button disappears once accepted, and the new admin sees `school_created`, `admin_invited` and `invite_resent` in their audit log.
 
+- 2026-10-07: US-1.7 password reset for email accounts: "Forgot your password?" on sign in, `/forgot-password` emails a link and a 6-digit code (same reply for unknown addresses), `/reset-password` sets the new password only in the session the link or code opened, then signs out other sessions (D19). Wrong codes share the sign-in lockout. Playwright: reset by link (link then rejected on reuse), reset by code after a wrong code, old password rejected and new one works, unknown email gets the same reply, 5 wrong codes lock out, and the new-password page refuses an ordinary session.
+
 ## In progress
 
 _None._
 
 ## Next
 
-- US-1.7 password reset, US-1.2 learner sign in (learner number and PIN).
+- US-1.2 learner sign in (learner number and PIN), with the admin PIN reset that completes US-1.7 for learners.
 - `invites` table with US-1.3 parent accounts (D7).
 - US-10.3 feature flags and US-10.4 usage in the console.
 
@@ -32,10 +34,12 @@ _None._
 
 - CI does not yet run `test:db` (needs Docker/Supabase) or `test:e2e`.
 - `sign_in_attempts` rows are never pruned (D8).
+- Password reset by phone code (US-1.7) waits for an SMS provider (D19).
 - Two-factor sign in for super admin, school admin and head (SPEC section 5) is not built yet.
 
 ## Go-live checklist
 
 Things to do on the hosted Supabase project and deployment before the first real school uses the portal.
 
+- [ ] Set the password-reset (recovery) email template from `supabase/templates/recovery.html` in the Supabase dashboard (D19).
 - [ ] Set the invite email template (subject and the `/auth/confirm?token_hash=...&type=invite` link from `supabase/templates/invite.html`) and the site URL in the Supabase dashboard (D14).

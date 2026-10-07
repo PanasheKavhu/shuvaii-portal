@@ -253,6 +253,13 @@ otp_expiry = 3600
 subject = "You have been invited to SP Portal"
 content_path = "./supabase/templates/invite.html"
 
+# Password reset (US-1.7). Same token-hash link as the invite, plus the
+# one-time code for people who read email on another device (D19). Hosted
+# projects need the same template set in the dashboard.
+[auth.email.template.recovery]
+subject = "Reset your SP Portal password"
+content_path = "./supabase/templates/recovery.html"
+
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]
 # enabled = true

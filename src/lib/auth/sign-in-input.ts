@@ -3,7 +3,7 @@ export type SignInInput = { email: string; password: string };
 
 export type SignInParse = { ok: true; value: SignInInput } | { ok: false; error: string };
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();

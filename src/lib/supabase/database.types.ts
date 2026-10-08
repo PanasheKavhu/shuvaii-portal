@@ -981,6 +981,14 @@ export type Database = {
         }[]
       }
       accept_my_invites: { Args: never; Returns: number }
+      commit_learner_import: {
+        Args: { p_guardians: Json; p_job_id: string; p_learners: Json }
+        Returns: Json
+      }
+      commit_staff_import: {
+        Args: { p_job_id: string; p_members: Json }
+        Returns: number
+      }
       current_school_ids: { Args: never; Returns: string[] }
       grading_scale_is_complete: {
         Args: { p_scale_id: string }
@@ -1001,6 +1009,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      import_learners: {
+        Args: { p_guardians: Json; p_learners: Json; p_school_id: string }
+        Returns: Json
+      }
       is_class_teacher: { Args: { p_class_id: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
       is_staff: { Args: { p_school_id: string }; Returns: boolean }
@@ -1008,15 +1020,49 @@ export type Database = {
         Args: { p_event: string; p_membership_id: string }
         Returns: undefined
       }
+      log_staff_invite_event: {
+        Args: { p_event: string; p_membership_id: string }
+        Returns: undefined
+      }
       save_grading_bands: {
         Args: { p_bands: Json; p_scale_id: string }
         Returns: undefined
+      }
+      school_staff: {
+        Args: { p_school_id: string }
+        Returns: {
+          created_at: string
+          email: string
+          full_name: string
+          membership_id: string
+          phone: string
+          role: Database["public"]["Enums"]["app_role"]
+          status: Database["public"]["Enums"]["membership_status"]
+          user_id: string
+        }[]
       }
       set_current_academic_year: {
         Args: { p_year_id: string }
         Returns: undefined
       }
+      set_learner_class: {
+        Args: { p_class_id: string; p_learner_id: string }
+        Returns: string
+      }
+      set_learner_subjects: {
+        Args: { p_class_subject_ids: string[]; p_enrolment_id: string }
+        Returns: undefined
+      }
       teaches: { Args: { p_class_subject_id: string }; Returns: boolean }
+      update_staff_profile: {
+        Args: {
+          p_full_name: string
+          p_phone: string
+          p_school_id: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role:

@@ -21,10 +21,31 @@ export function lockedUntil(attempts: readonly SignInAttempt[], now: Date): Date
     .filter((a) => !a.succeeded)
     .map((a) => a.at.getTime());
 
+  return blockEnd(failures, MAX_FAILURES, now);
+}
+
+/**
+ * Wrong learner PINs from one network address in a school (D28): 40 in 10
+ * minutes, against any learners, block that address for 15 minutes. A
+ * success does not clear them. High enough that a class signing in from
+ * the school's one address does not reach it by mistyping.
+ */
+export const SOURCE_MAX_FAILURES = 40;
+
+export function sourceLockedUntil(attempts: readonly SignInAttempt[], now: Date): Date | null {
+  const failures = attempts
+    .filter((a) => !a.succeeded)
+    .map((a) => a.at.getTime())
+    .sort((a, b) => a - b);
+  return blockEnd(failures, SOURCE_MAX_FAILURES, now);
+}
+
+/** When the latest block ends: `max` failures (sorted times) within the window block for BLOCK_MS. */
+function blockEnd(failures: readonly number[], max: number, now: Date): Date | null {
   let until: number | null = null;
-  for (let i = MAX_FAILURES - 1; i < failures.length; i++) {
-    if (failures[i] - failures[i - (MAX_FAILURES - 1)] <= FAILURE_WINDOW_MS) {
-      until = Math.max(until ?? 0, failures[i] + BLOCK_MS);
+  for (let i = max - 1; i < failures.length; i++) {
+    if (failures[i]! - failures[i - (max - 1)]! <= FAILURE_WINDOW_MS) {
+      until = Math.max(until ?? 0, failures[i]! + BLOCK_MS);
     }
   }
   return until !== null && until > now.getTime() ? new Date(until) : null;

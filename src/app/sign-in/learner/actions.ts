@@ -1,11 +1,16 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { SCHOOL_COOKIE } from "@/lib/auth/active-school";
 import { learnerLogin } from "@/lib/auth/learner-accounts";
-import { learnerAttemptHash, mustChangePin, parseLearnerSignIn } from "@/lib/auth/learner-pin";
-import { lockedUntil, minutesLeft } from "@/lib/auth/lockout";
+import {
+  learnerAttemptHash,
+  learnerSourceHash,
+  mustChangePin,
+  parseLearnerSignIn,
+} from "@/lib/auth/learner-pin";
+import { lockedUntil, minutesLeft, sourceLockedUntil } from "@/lib/auth/lockout";
 import {
   lockedAfterFailure,
   recentAttempts,
@@ -21,12 +26,20 @@ export type LearnerSignInState = { error: string | null; schoolId: string; learn
 const UNAVAILABLE = "Sign in is unavailable right now. Please try again shortly.";
 const WRONG = "Learner number or PIN is incorrect.";
 
+/** The caller's network address as the hosting proxy reports it. */
+async function clientAddress(): Promise<string> {
+  const h = await headers();
+  return h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown";
+}
+
 /**
  * Learner sign in with learner number and PIN (US-1.2, D26). The same
  * lockout as staff (US-1.1, D8), counted per school and learner number:
  * unknown numbers and learners without an account count as wrong PINs, so
- * the reply never says who exists. A learner whose PIN an admin has just
- * set chooses their own before anything else.
+ * the reply never says who exists. Wrong PINs from one network address
+ * across the school's learners have their own, higher limit (D28). A
+ * learner whose PIN an admin has just set chooses their own before
+ * anything else.
  */
 export async function signInLearner(
   _prev: LearnerSignInState,
@@ -47,12 +60,16 @@ export async function signInLearner(
   const { schoolId, learnerNumber, pin } = parsed.value;
 
   const hash = learnerAttemptHash(schoolId, learnerNumber);
+  const sourceHash = learnerSourceHash(schoolId, await clientAddress());
   const admin = createAdminClient();
   const now = new Date();
 
-  const history = await recentAttempts(admin, hash, now);
-  if (!history) return { error: UNAVAILABLE, ...echo };
-  const blockedUntil = lockedUntil(history, now);
+  const [history, sourceHistory] = await Promise.all([
+    recentAttempts(admin, hash, now),
+    recentAttempts(admin, sourceHash, now),
+  ]);
+  if (!history || !sourceHistory) return { error: UNAVAILABLE, ...echo };
+  const blockedUntil = lockedUntil(history, now) ?? sourceLockedUntil(sourceHistory, now);
   if (blockedUntil) return { error: tooManyAttempts(minutesLeft(blockedUntil, now)), ...echo };
 
   const login = await learnerLogin(schoolId, learnerNumber, pin);
@@ -71,6 +88,7 @@ export async function signInLearner(
   if (!recorded && !user) return { error: UNAVAILABLE, ...echo };
 
   if (!user) {
+    await recordAttempt(admin, sourceHash, false);
     const failedAt = new Date();
     const nowBlocked = lockedAfterFailure(history, failedAt);
     return {

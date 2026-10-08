@@ -2,6 +2,7 @@ import { randomInt } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   generatePin,
+  isDateLikePin,
   isWeakPin,
   learnerAttemptHash,
   learnerAuthEmail,
@@ -46,9 +47,27 @@ describe("isWeakPin and parseNewPin", () => {
     for (const pin of ["000000", "777777", "123456", "654321", "890123", "345678"]) {
       expect(isWeakPin(pin)).toBe(true);
     }
-    for (const pin of ["246810", "135790", "482913", "112233"]) {
+    for (const pin of ["246810", "135790", "482913", "597346"]) {
       expect(isWeakPin(pin)).toBe(false);
     }
+  });
+
+  it("flags dates written DDMMYY, MMDDYY or YYMMDD", () => {
+    // 14 March 2012, 25 December 2009, 2011-07-30, 22 November 2033
+    for (const pin of ["140312", "122509", "110730", "112233"]) {
+      expect(isDateLikePin(pin)).toBe(true);
+      expect(isWeakPin(pin)).toBe(true);
+    }
+    for (const pin of ["482913", "593274", "004500", "991399"]) {
+      expect(isDateLikePin(pin)).toBe(false);
+    }
+  });
+
+  it("refuses a birthday as a new PIN", () => {
+    expect(parseNewPin({ pin: "140312", confirm: "140312" })).toEqual({
+      ok: false,
+      error: "That PIN is too easy to guess. Avoid repeats, runs like 123456 and dates.",
+    });
   });
 
   it("accepts six matching digits", () => {

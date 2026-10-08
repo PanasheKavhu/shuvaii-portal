@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { BLOCK_MS, lockedUntil, minutesLeft, type SignInAttempt } from "@/lib/auth/lockout";
+import {
+  BLOCK_MS,
+  SOURCE_MAX_FAILURES,
+  lockedUntil,
+  minutesLeft,
+  sourceLockedUntil,
+  type SignInAttempt,
+} from "@/lib/auth/lockout";
 
 const t0 = new Date("2026-10-07T10:00:00Z").getTime();
 const min = 60_000;
@@ -41,5 +48,28 @@ describe("minutesLeft", () => {
   it("rounds up and never shows zero", () => {
     expect(minutesLeft(at(15), at(0.5))).toBe(15);
     expect(minutesLeft(at(1), at(0.99))).toBe(1);
+  });
+});
+
+describe("sourceLockedUntil", () => {
+  const failures = (count: number, start = 0, step = 0.2) =>
+    Array.from({ length: count }, (_, i) => fail(start + i * step));
+
+  it("allows one fewer than the limit within ten minutes", () => {
+    expect(sourceLockedUntil(failures(SOURCE_MAX_FAILURES - 1), at(9))).toBeNull();
+  });
+
+  it("blocks the address at the limit, for 15 minutes from the last failure", () => {
+    const attempts = failures(SOURCE_MAX_FAILURES);
+    const last = attempts.at(-1)!.at.getTime();
+    expect(sourceLockedUntil(attempts, at(9))).toEqual(new Date(last + BLOCK_MS));
+  });
+
+  it("is not cleared by a success, unlike a learner's own lockout", () => {
+    expect(sourceLockedUntil([...failures(SOURCE_MAX_FAILURES), ok(8.5)], at(9))).not.toBeNull();
+  });
+
+  it("ignores failures spread over more than ten minutes", () => {
+    expect(sourceLockedUntil(failures(SOURCE_MAX_FAILURES, 0, 0.5), at(20))).toBeNull();
   });
 });

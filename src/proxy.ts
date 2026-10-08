@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { SCHOOL_COOKIE } from "@/lib/auth/active-school";
+import { mustChangePin } from "@/lib/auth/learner-pin";
 import { loadAccess } from "@/lib/auth/load-access";
 import { areaForPath, decideAreaAccess } from "@/lib/auth/route-access";
 import type { Database } from "@/lib/supabase/database.types";
@@ -41,6 +42,11 @@ export async function proxy(request: NextRequest) {
   if (!area) return response;
 
   const userId = typeof data?.claims.sub === "string" ? data.claims.sub : null;
+  // A learner whose PIN an admin set chooses their own first (US-1.2).
+  if (userId && mustChangePin(data?.claims.app_metadata)) {
+    return withCookies(NextResponse.redirect(new URL("/change-pin", request.url)), response);
+  }
+
   const access = userId ? await loadAccess(supabase, userId) : null;
   const decision = decideAreaAccess(area, access, request.cookies.get(SCHOOL_COOKIE)?.value);
 

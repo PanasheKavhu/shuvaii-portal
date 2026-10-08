@@ -5,11 +5,16 @@ import { forbidden, redirect } from "next/navigation";
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { SCHOOL_COOKIE, pickActiveSchool, type SchoolMembership } from "./active-school";
+import { mustChangePin } from "./learner-pin";
 import { loadAccess, type Access } from "./load-access";
 import { homeFor, type AreaKey } from "./roles";
 import { decideAreaAccess } from "./route-access";
 
-export type Viewer = Access & { userId: string };
+export type Viewer = Access & {
+  userId: string;
+  /** A learner whose PIN an admin set must choose their own first (US-1.2). */
+  mustChangePin?: boolean;
+};
 
 /**
  * The signed-in person and their schools, or null. Reads through the
@@ -20,7 +25,11 @@ export const getViewer = cache(async (): Promise<Viewer | null> => {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  return user ? loadViewer(supabase, user.id) : null;
+  if (!user) return null;
+  return {
+    ...(await loadViewer(supabase, user.id)),
+    mustChangePin: mustChangePin(user.app_metadata),
+  };
 });
 
 /** Loads a viewer with a client already signed in as `userId` (used right after sign in). */
@@ -60,6 +69,7 @@ export async function requireArea(
   key: AreaKey,
 ): Promise<{ viewer: Viewer; school: SchoolMembership | null }> {
   const viewer = await requireViewer();
+  if (viewer.mustChangePin) redirect("/change-pin");
   const cookieStore = await cookies();
   const decision = decideAreaAccess(key, viewer, cookieStore.get(SCHOOL_COOKIE)?.value);
 

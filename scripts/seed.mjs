@@ -15,6 +15,7 @@
 // The fixed password below is a published demo credential, not a secret.
 
 import { createClient } from "@supabase/supabase-js";
+import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -23,6 +24,9 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const seedDir = path.join(here, "..", "seed");
 
 const DEMO_PASSWORD = process.env.SEED_DEMO_PASSWORD ?? "sp-portal-demo-2026";
+// Seeded learner logins sign in with their learner number and this PIN
+// (US-1.2, D26). Also a published demo credential.
+const DEMO_PIN = process.env.SEED_DEMO_PIN ?? "246810";
 
 const supabaseUrl = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -238,6 +242,28 @@ async function seedPeople() {
   await upsertCsv("guardian_links");
 }
 
+/**
+ * Seeded learner logins (learners.user_id set) become learner-number-and-PIN
+ * accounts, as src/lib/auth/learner-accounts.ts makes them: app_metadata
+ * names the learner and the password is an HMAC of DEMO_PIN keyed by
+ * LEARNER_PIN_SECRET (same derivation as pinPassword() in learner-pin.ts).
+ */
+async function seedLearnerLogins() {
+  const secret = process.env.LEARNER_PIN_SECRET;
+  if (!secret || secret.length < 32) {
+    throw new Error("Missing LEARNER_PIN_SECRET (at least 32 characters) in .env.local.");
+  }
+  const learners = readCsv("learners").filter((row) => row.user_id);
+  for (const row of learners) {
+    const { error } = await admin.auth.admin.updateUserById(row.user_id, {
+      password: createHmac("sha256", secret).update(`${row.user_id}:${DEMO_PIN}`).digest("base64url"),
+      app_metadata: { learner_id: row.id, school_id: row.school_id, pin_must_change: false },
+    });
+    if (error) throw new Error(`setting learner login ${row.id} failed: ${error.message}`);
+  }
+  console.log(`learner logins: ${learners.length} set to the demo PIN`);
+}
+
 async function main() {
   // Load order per seed/README.md: auth users (-> profiles), schools,
   // platform_admins, memberships, the academic structure, then people.
@@ -247,6 +273,7 @@ async function main() {
   await seedMemberships();
   await seedAcademicStructure();
   await seedPeople();
+  await seedLearnerLogins();
   console.log("Seed complete.");
 }
 

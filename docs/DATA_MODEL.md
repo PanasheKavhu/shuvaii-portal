@@ -104,6 +104,8 @@ id, school_id, kind import_kind, status import_status,
 file_path, error_report jsonb, created_by
 ```
 
+`file_path` is the stored upload in the `imports` bucket. `error_report` holds `{fileName, errors: [{row, message}], summary, committed, notInvited}` (D24). A job is `validated` (clean, waiting), `committed` (by `commit_learner_import()` or `commit_staff_import()`, all or nothing) or `failed` (errors, nothing imported).
+
 ### 4.2 Academic structure
 
 **grade_levels**
@@ -341,12 +343,12 @@ Default is deny. Each policy has a test in each direction (allowed and blocked) 
 
 ## 8. Storage buckets (Supabase Storage)
 
-| Bucket        | Contents                  | Access                                                  |
-| ------------- | ------------------------- | ------------------------------------------------------- |
-| `branding`    | logos, stamps, signatures | public read (logos only), write by school admin         |
-| `reports`     | published PDFs            | private; signed URLs for owners, share tokens for links |
-| `attachments` | newsletter files          | private; signed URLs for audience                       |
-| `imports`     | uploaded CSV/Excel        | private; school admin only; deleted after 30 days       |
+| Bucket        | Contents                  | Access                                                                          |
+| ------------- | ------------------------- | ------------------------------------------------------------------------------- |
+| `branding`    | logos, stamps, signatures | public read (logos only), write by school admin                                 |
+| `reports`     | published PDFs            | private; signed URLs for owners, share tokens for links                         |
+| `attachments` | newsletter files          | private; signed URLs for audience                                               |
+| `imports`     | uploaded CSV/Excel        | private; school admin and head (D24); deleted after 30 days (not yet automated) |
 
 Object paths start with the school id (`{school_id}/...`) so storage policies can check it.
 

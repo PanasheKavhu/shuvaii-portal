@@ -17,6 +17,7 @@ export type Database = {
           is_current: boolean
           label: string
           school_id: string
+          setup_completed_at: string | null
           starts_on: string
           updated_at: string
         }
@@ -27,6 +28,7 @@ export type Database = {
           is_current?: boolean
           label: string
           school_id: string
+          setup_completed_at?: string | null
           starts_on: string
           updated_at?: string
         }
@@ -37,6 +39,7 @@ export type Database = {
           is_current?: boolean
           label?: string
           school_id?: string
+          setup_completed_at?: string | null
           starts_on?: string
           updated_at?: string
         }
@@ -114,7 +117,7 @@ export type Database = {
           id: string
           school_id: string
           subject_id: string
-          teacher_id: string
+          teacher_id: string | null
           updated_at: string
         }
         Insert: {
@@ -123,7 +126,7 @@ export type Database = {
           id?: string
           school_id: string
           subject_id: string
-          teacher_id: string
+          teacher_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -132,7 +135,7 @@ export type Database = {
           id?: string
           school_id?: string
           subject_id?: string
-          teacher_id?: string
+          teacher_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -651,6 +654,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      academic_year_setup_gaps: {
+        Args: { p_year_id: string }
+        Returns: {
+          class_id: string
+          class_subject_id: string
+          gap: string
+        }[]
+      }
       accept_my_invites: { Args: never; Returns: number }
       current_school_ids: { Args: never; Returns: string[] }
       grading_scale_is_complete: {
@@ -676,6 +687,14 @@ export type Database = {
       is_staff: { Args: { p_school_id: string }; Returns: boolean }
       log_invite_event: {
         Args: { p_event: string; p_membership_id: string }
+        Returns: undefined
+      }
+      save_grading_bands: {
+        Args: { p_bands: Json; p_scale_id: string }
+        Returns: undefined
+      }
+      set_current_academic_year: {
+        Args: { p_year_id: string }
         Returns: undefined
       }
     }

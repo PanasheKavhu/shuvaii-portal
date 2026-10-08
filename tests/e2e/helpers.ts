@@ -213,3 +213,71 @@ export async function createEmptySchool(prefix: string): Promise<{
   if (memberError) throw new Error("Could not add the test school's staff");
   return { schoolId: school.id, adminEmail: admin.email, teacherName, hodName };
 }
+
+/**
+ * Two new learners in Msasa with one shared guardian, made through the API
+ * as Msasa's school admin (RLS allows admin writes, D23). Fresh numbers,
+ * names and phone each run, since learners are never deleted.
+ */
+export async function createFamily(prefix: string): Promise<{
+  learners: { id: string; number: string; firstName: string }[];
+  guardianName: string;
+  lastName: string;
+}> {
+  try {
+    process.loadEnvFile(".env.local");
+  } catch {
+    // Already in the environment (CI).
+  }
+  const supabase = createClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { persistSession: false } },
+  );
+  const signedIn = await supabase.auth.signInWithPassword({
+    email: MSASA_ADMIN,
+    password: PASSWORD,
+  });
+  if (signedIn.error) throw new Error("Could not sign in as Msasa's admin");
+
+  const stamp = `${Date.now().toString().slice(-7)}${Math.floor(Math.random() * 90 + 10)}`;
+  const lastName = `Family${stamp}`;
+  const { data: learners, error } = await supabase
+    .from("learners")
+    .insert(
+      ["Rudo", "Tino"].map((firstName, i) => ({
+        school_id: MSASA.id,
+        learner_number: `${prefix}${stamp}${i}`.toUpperCase(),
+        first_name: firstName,
+        last_name: lastName,
+      })),
+    )
+    .select("id, learner_number, first_name");
+  if (error) throw new Error("Could not add test learners");
+
+  const guardianName = `Chipo ${lastName}`;
+  const { data: guardian, error: guardianError } = await supabase
+    .from("guardians")
+    .insert({ school_id: MSASA.id, full_name: guardianName, phone: `078${stamp}` })
+    .select("id")
+    .single();
+  if (guardianError) throw new Error("Could not add a test guardian");
+  const { error: linkError } = await supabase.from("guardian_links").insert(
+    learners.map((l) => ({
+      school_id: MSASA.id,
+      guardian_id: guardian.id,
+      learner_id: l.id,
+      relationship: "mother",
+      is_primary: true,
+    })),
+  );
+  if (linkError) throw new Error("Could not link the test guardian");
+
+  return {
+    learners: learners
+      .map((l) => ({ id: l.id, number: l.learner_number, firstName: l.first_name }))
+      .sort((a, b) => a.number.localeCompare(b.number)),
+    guardianName,
+    lastName,
+  };
+}

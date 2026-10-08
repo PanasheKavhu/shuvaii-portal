@@ -31,7 +31,7 @@ Phase 3 tests must reproduce both files exactly from `marks`, `assessments` and 
 1. Create Supabase Auth users for every row in `profiles.csv` with the same `id` (use the admin API in the seed script; give all users a known test password in local and staging only).
 2. Load CSVs in this order: schools, platform_admins, memberships, grading_scales, grade_levels, grading_bands, academic_years, terms, classes, subjects, class_subjects, learners, enrolments, enrolment_subjects, guardians, guardian_links, assessments, marks, subject_comments, class_comments, announcements.
 3. `profiles.csv` is loaded as part of step 1 (a trigger on `auth.users` may create the profile row; update it rather than insert).
-4. Learner and parent logins in the seed: learner emails are `<learner_number>@<school>.demo.spportal.test`; parent logins are `parent0` and `parent5` at each school's demo domain.
+4. Learner and parent logins in the seed: learner emails are `<learner_number>@<school>.demo.spportal.test`; parent logins are `parent0` and `parent5` at each school's demo domain. The seed script then turns the two learner logins into learner-number-and-PIN accounts (PIN `246810`, D26), so they sign in at `/sign-in/learner`, not with their email.
 
 ## Not seeded on purpose
 

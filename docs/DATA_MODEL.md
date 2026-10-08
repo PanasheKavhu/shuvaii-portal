@@ -79,7 +79,7 @@ Readable only by the person themselves and by users who share a school with them
 
 **platform_admins**: `user_id pk fk auth.users`. Super admins. No policy grants them tenant data by default (support access is a deliberate later feature).
 
-**sign_in_attempts**: `id bigint identity pk`, `email_hash` (SHA-256 hex of the trimmed, lower-cased email), `succeeded bool`, `created_at`. Per-account sign-in lockout (US-1.1); wrong password-reset codes count too (US-1.7, D19). No `school_id`, because the school is unknown before sign in. RLS on with no policies and privileges revoked from `anon` and `authenticated`: only the service role reads or writes it.
+**sign_in_attempts**: `id bigint identity pk`, `email_hash` (SHA-256 hex of the trimmed, lower-cased email), `succeeded bool`, `created_at`. Per-account sign-in lockout (US-1.1); wrong password-reset codes count too (US-1.7, D19). Learner PIN tries are counted here too, under a hash of the school and learner number (D26). No `school_id`, because the school is unknown before sign in. RLS on with no policies and privileges revoked from `anon` and `authenticated`: only the service role reads or writes it.
 
 **memberships**: a person's role in a school.
 
@@ -90,12 +90,15 @@ unique (school_id, user_id, role)
 
 A person can have several rows (a teacher who is also a parent; a teacher in two schools).
 
-**invites**
+**invites**: one-time parent codes (US-1.3, D25).
 
 ```
 id, school_id, role app_role, email, phone, guardian_id null, learner_id null,
-code_hash, expires_at, accepted_at null, created_by
+code_hash (SHA-256 hex, unique), expires_at, accepted_at null, accepted_by null, created_by, created_at
+check: role = parent and guardian_id not null (staff use Auth invites, D14; learners get PINs, D26)
 ```
+
+Written only by `create_parent_invite()` (school admin; 14 days; stops older waiting codes for the guardian) and `redeem_parent_invite()` (links the caller to the guardian and gives them an active parent membership). `parent_invite_preview()` tells anyone holding a code whether it is valid, used, expired or unknown. Read by school admin and head.
 
 **import_jobs**
 
@@ -158,6 +161,7 @@ unique (class_id, subject_id); teacher and class teacher must be active teacher 
 id, school_id, learner_number, first_name, last_name, date_of_birth, sex,
 status learner_status ('active'|'left'|'graduated'), user_id null fk profiles, admission_date
 unique (school_id, learner_number); never deleted (trigger), audited (D23)
+user_id: the learner's own login (US-1.2), set only by link_learner_login() (D26)
 ```
 
 **enrolments**: a learner in a class for a year.
@@ -180,6 +184,8 @@ check: class_subject.class_id = enrolment.class_id (trigger; an enrolment cannot
 ```
 id, school_id, full_name, phone, email, user_id null fk profiles
 ```
+
+`user_id` is the parent login, set only by `redeem_parent_invite()` (D25). Neither `learners.user_id` nor `guardians.user_id` is writable through the Data API.
 
 **guardian_links**
 
@@ -328,7 +334,7 @@ Helper functions (security definer, stable): `current_school_ids()`, `has_role(s
 | Tables                                                                             | Read                                                                                         | Write                                                                             |
 | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
 | schools                                                                            | members of that school                                                                       | super admin (branding), school admin (limited fields)                             |
-| memberships, invites                                                               | school admin, head                                                                           | school admin                                                                      |
+| memberships, invites                                                               | school admin, head                                                                           | school admin (invites only through create_parent_invite(), D25)                   |
 | import_jobs                                                                        | school admin, head                                                                           | school admin, head (D23)                                                          |
 | structure (levels, years, terms, classes, subjects, class_subjects, scales, bands) | staff of the school (D20)                                                                    | school admin                                                                      |
 | learners, enrolments, enrolment_subjects, guardians, guardian_links                | admin, head; teachers and hods for classes they teach (D23); parents and learners in Phase 4 | school admin, head                                                                |

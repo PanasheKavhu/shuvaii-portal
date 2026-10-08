@@ -51,6 +51,9 @@ Reading it: a learner is enrolled in one class per year; each learner takes some
 | `enrolment_status`  | enrolled, promoted, repeating, transferred, left, graduated                                |
 | `audience_type`     | all, staff, learners, parents, class                                                       |
 | `sex`               | F, M (Q27)                                                                                 |
+| `learner_status`    | active, left, graduated                                                                    |
+| `import_kind`       | staff, learners, marks                                                                     |
+| `import_status`     | validated, committed, failed                                                               |
 
 ## 4. Tables
 
@@ -97,7 +100,7 @@ code_hash, expires_at, accepted_at null, created_by
 **import_jobs**
 
 ```
-id, school_id, kind ('staff'|'learners'|'marks'), status ('validated'|'committed'|'failed'),
+id, school_id, kind import_kind, status import_status,
 file_path, error_report jsonb, created_by
 ```
 
@@ -151,15 +154,15 @@ unique (class_id, subject_id); teacher and class teacher must be active teacher 
 
 ```
 id, school_id, learner_number, first_name, last_name, date_of_birth, sex,
-status ('active'|'left'|'graduated'), user_id null fk profiles, admission_date
-unique (school_id, learner_number)
+status learner_status ('active'|'left'|'graduated'), user_id null fk profiles, admission_date
+unique (school_id, learner_number); never deleted (trigger), audited (D23)
 ```
 
 **enrolments**: a learner in a class for a year.
 
 ```
 id, school_id, learner_id, class_id, academic_year_id, status enrolment_status
-unique (learner_id, academic_year_id)
+unique (learner_id, academic_year_id); (class_id, academic_year_id) must be the class's own year (fk)
 ```
 
 **enrolment_subjects**: the subjects an enrolled learner takes.
@@ -167,7 +170,7 @@ unique (learner_id, academic_year_id)
 ```
 id, school_id, enrolment_id, class_subject_id
 unique (enrolment_id, class_subject_id)
-check: class_subject.class_id = enrolment.class_id (trigger)
+check: class_subject.class_id = enrolment.class_id (trigger; an enrolment cannot change class while it has choices in the old one)
 ```
 
 **guardians**
@@ -180,7 +183,7 @@ id, school_id, full_name, phone, email, user_id null fk profiles
 
 ```
 id, school_id, guardian_id, learner_id, relationship, is_primary
-unique (guardian_id, learner_id)
+unique (guardian_id, learner_id); at most one is_primary per learner
 ```
 
 One guardian linked to two learners is how siblings appear under one parent login.
@@ -323,9 +326,10 @@ Helper functions (security definer, stable): `current_school_ids()`, `has_role(s
 | Tables                                                                             | Read                                                                                         | Write                                                                             |
 | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
 | schools                                                                            | members of that school                                                                       | super admin (branding), school admin (limited fields)                             |
-| memberships, invites, import_jobs                                                  | school admin, head                                                                           | school admin                                                                      |
+| memberships, invites                                                               | school admin, head                                                                           | school admin                                                                      |
+| import_jobs                                                                        | school admin, head                                                                           | school admin, head (D23)                                                          |
 | structure (levels, years, terms, classes, subjects, class_subjects, scales, bands) | staff of the school (D20)                                                                    | school admin                                                                      |
-| learners, enrolments, enrolment_subjects, guardians, guardian_links                | admin, head, hod; teachers for their classes; parents and learners for themselves            | school admin                                                                      |
+| learners, enrolments, enrolment_subjects, guardians, guardian_links                | admin, head; teachers and hods for classes they teach (D23); parents and learners in Phase 4 | school admin, head                                                                |
 | assessments, marks                                                                 | admin, head; hod for department; teacher for own class subjects                              | teacher for own class subjects while term is open and not locked; admin (audited) |
 | subject_comments                                                                   | as marks; parents and learners only when the report is published                             | assigned teacher; admin                                                           |
 | class_comments                                                                     | as above                                                                                     | class teacher                                                                     |

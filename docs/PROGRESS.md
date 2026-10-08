@@ -4,7 +4,7 @@ Update at the end of every story (definition of done, `SPEC.md` section 6).
 
 ## Current phase
 
-Phase 1 (E1: access, tenancy, branding). Tenancy schema, staff sign in, password reset, role-based navigation, school theming and a minimal super-admin console done. Phase 2 started: academic structure tables and the school admin setup area (US-2.1 to US-2.4) are in.
+Phase 1 (E1: access, tenancy, branding). Tenancy schema, staff sign in, password reset, role-based navigation, school theming and a minimal super-admin console done. Phase 2 started: academic structure tables, the school admin setup area (US-2.1 to US-2.4) and the people tables are in.
 
 ## Done
 
@@ -23,6 +23,7 @@ Phase 1 (E1: access, tenancy, branding). Tenancy schema, staff sign in, password
 - 2026-10-07: Academic structure tables (migration order step 3): `grading_scales`, `grading_bands`, `grade_levels`, `academic_years`, `terms`, `classes`, `subjects`, `class_subjects`, each with `school_id`, same-school foreign keys and RLS (staff read, school admin writes, D20). `grading_scale_problems()` and `grading_scale_is_complete()` check a scale covers 0 to 100 with no gaps or overlaps, and a scale cannot be default unless it does (D21). One teacher per class subject; class and subject teachers must be active teaching staff of the school. `scripts/seed.mjs` loads these CSVs in the documented order; types regenerated. pgTAP (`08_academic_structure.test.sql`, 104 tests): cross-school read and write for every table, a teacher who reads but cannot write any of them, head and parent reads, gap, overlap, good and empty scales, the default guard, teacher checks and cross-school references.
 
 - 2026-10-08: School admin setup area at `/admin/setup` (US-2.1 setup wizard, US-2.2 assign teachers, US-2.3 grading scale editor, US-2.4 term status and marks deadline). A new year is proposed with three terms and the April vacation school; a new scale starts from the O-level bands. Steps for terms, scales and the band editor (names each gap, overlap and out-of-range band as you type), grade levels, subjects, classes with class teachers, and class subjects with one teacher each; a teacher (or HOD) may take many subjects across classes and grades, and the class subjects step shows who teaches what. Finishing is blocked, with a linked list of gaps, while a class has no class teacher or a class subject has no teacher (D22). Migration `setup_wizard`: class subject teacher optional until finish, `academic_years.setup_completed_at`, `academic_year_setup_gaps()`, `save_grading_bands()`, `set_current_academic_year()`. Pure rules in `src/lib/setup` with unit tests; pgTAP `09_setup_wizard.test.sql` (24 tests); Playwright at 360 px: an admin of a new school sets up a year from scratch, finishing is refused until the gaps are fixed, and a teacher gets 403 on `/admin/setup`.
+- 2026-10-08: People tables (migration order step 4): `learners`, `enrolments`, `enrolment_subjects`, `guardians`, `guardian_links`, `import_jobs`, each with `school_id`, same-school foreign keys and RLS (D23). School admin and head read and write; a teacher or hod reads only learners in classes where they are class teacher or teach a subject (with their enrolments, subject choices, guardians and links); parents and learners get nothing yet. Learners are never deleted and every learner change is audited. A subject choice must belong to the learner's class (trigger, both directions). `scripts/seed.mjs` loads the people CSVs in the documented order; types regenerated. pgTAP `10_people.test.sql` (68 tests): cross-school read and write for every table, head access, teacher scoping (a 4 Blue teacher cannot read a 3 Green learner; subject teacher, disabled teacher, school B teacher), parents, learners and anonymous see nothing, the class check, no deletes, and an audit row per learner update.
 
 ## In progress
 
@@ -32,7 +33,7 @@ _None._
 
 - US-1.2 learner sign in (learner number and PIN), with the admin PIN reset that completes US-1.7 for learners.
 - `invites` table with US-1.3 parent accounts (D7).
-- People tables (migration order step 4: learners, enrolments, enrolment_subjects, guardians, guardian_links).
+- Learner and guardian screens for the school admin, and CSV import into `import_jobs` (D23).
 - US-10.3 feature flags and US-10.4 usage in the console.
 
 ## Known gaps

@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { SCHOOL_COOKIE } from "@/lib/auth/active-school";
 import { homeFor } from "@/lib/auth/roles";
+import { rememberSchool } from "@/lib/auth/school-cookie";
 import { requireViewer } from "@/lib/auth/viewer";
 import { createClient } from "@/lib/supabase/server";
 
@@ -14,14 +15,7 @@ export async function chooseSchool(formData: FormData) {
   const school = viewer.schools.find((s) => s.schoolId === schoolId);
   if (!school) redirect("/select-school");
 
-  const cookieStore = await cookies();
-  cookieStore.set(SCHOOL_COOKIE, school.schoolId, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 365,
-  });
+  await rememberSchool(school.schoolId);
   redirect(homeFor(school.roles, viewer.isPlatformAdmin) ?? "/no-access");
 }
 

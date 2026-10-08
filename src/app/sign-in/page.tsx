@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getViewer } from "@/lib/auth/viewer";
@@ -28,6 +29,20 @@ export default async function SignInPage({ searchParams }: PageProps<"/sign-in">
             </p>
           )}
           <SignInForm />
+          <div className="flex flex-col gap-1 border-t pt-4 text-center text-sm">
+            <Link
+              href="/sign-in/learner"
+              className="text-muted-foreground hover:text-foreground py-2 underline underline-offset-4"
+            >
+              Learner? Sign in with your learner number
+            </Link>
+            <Link
+              href="/join"
+              className="text-muted-foreground hover:text-foreground py-2 underline underline-offset-4"
+            >
+              Parent with a code from the school? Set up your account
+            </Link>
+          </div>
         </CardContent>
       </Card>
     </main>

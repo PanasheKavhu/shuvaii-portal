@@ -13,7 +13,7 @@ import { getSchool, listSchoolAdmins } from "../../data";
 import { ColorsForm } from "./colors-form";
 import { InviteForm } from "./invite-form";
 import { LogoForm } from "./logo-form";
-import { ResendInviteForm } from "./resend-invite-form";
+import { ResendInviteForm } from "@/components/resend-invite-form";
 
 export const metadata: Metadata = { title: "School" };
 

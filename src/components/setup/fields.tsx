@@ -49,15 +49,17 @@ export function TextField({
   className,
   inputMode,
   maxLength,
+  autoComplete = "off",
 }: {
   id: string;
   name: string;
   label: string;
   defaultValue?: string | number | null;
+  autoComplete?: string;
   hint?: string;
-  type?: "text" | "date" | "number";
+  type?: "text" | "date" | "number" | "email" | "tel";
   className?: string;
-  inputMode?: "numeric" | "text";
+  inputMode?: "numeric" | "text" | "email" | "tel";
   maxLength?: number;
 }) {
   return (
@@ -69,6 +71,7 @@ export function TextField({
         defaultValue={defaultValue ?? ""}
         inputMode={inputMode}
         maxLength={maxLength}
+        autoComplete={autoComplete}
         aria-describedby={hint ? `${id}-hint` : undefined}
         className={inputClass}
       />

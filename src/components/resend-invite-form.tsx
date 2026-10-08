@@ -3,10 +3,10 @@
 import { useActionState } from "react";
 import { FormMessage } from "@/components/platform/form-bits";
 import { Button } from "@/components/ui/button";
-import type { FormState } from "../../form-state";
-import { idle } from "../../form-state";
+import type { FormState } from "@/app/(app)/platform/form-state";
+import { idle } from "@/app/(app)/platform/form-state";
 
-/** Re-sends a school admin's invite email while the invite is not accepted yet (D14). */
+/** Re-sends a staff invite email while the invite is not accepted yet (D14, D24). */
 export function ResendInviteForm({
   action,
   email,

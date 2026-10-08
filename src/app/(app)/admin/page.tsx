@@ -12,8 +12,12 @@ export default async function AdminPage() {
       <Link href="/admin/setup" className="text-primary font-medium underline">
         School setup
       </Link>
-      : academic years and terms, grading scales, grade levels, subjects, classes and teachers.
-      Users, imports and oversight will appear here too.
+      : academic years and terms, grading scales, grade levels, subjects, classes and teachers.{" "}
+      <Link href="/admin/people" className="text-primary font-medium underline">
+        People
+      </Link>
+      : learners, guardians and staff, added one at a time or imported from a file. Oversight will
+      appear here too.
     </AreaHome>
   );
 }

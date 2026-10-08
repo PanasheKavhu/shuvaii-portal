@@ -1,0 +1,4 @@
+learner_number,first_name,last_name,date_of_birth,sex,class,admission_date,guardian_name,guardian_relationship,guardian_phone,guardian_email
+2027001,Tinashe,Moyo,2014-03-21,M,1 Blue,2027-01-12,Chipo Moyo,mother,0772 123 456,chipo.moyo@example.com
+2027002,Rufaro,Moyo,2016-07-02,F,1 Green,2027-01-12,Chipo Moyo,mother,0772 123 456,
+2027003,Kudzai,Banda,2014-11-30,F,1 Blue,2027-01-12,Peter Banda,father,0712 555 010,

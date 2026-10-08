@@ -629,6 +629,90 @@ export type Database = {
           },
         ]
       }
+      invites: {
+        Row: {
+          accepted_at: string | null
+          accepted_by: string | null
+          code_hash: string
+          created_at: string
+          created_by: string | null
+          email: string | null
+          expires_at: string
+          guardian_id: string | null
+          id: string
+          learner_id: string | null
+          phone: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          school_id: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          code_hash: string
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          expires_at: string
+          guardian_id?: string | null
+          id?: string
+          learner_id?: string | null
+          phone?: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          school_id: string
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          code_hash?: string
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          expires_at?: string
+          guardian_id?: string | null
+          id?: string
+          learner_id?: string | null
+          phone?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+          school_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invites_accepted_by_fkey"
+            columns: ["accepted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invites_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invites_guardian_id_school_id_fkey"
+            columns: ["guardian_id", "school_id"]
+            isOneToOne: false
+            referencedRelation: "guardians"
+            referencedColumns: ["id", "school_id"]
+          },
+          {
+            foreignKeyName: "invites_learner_id_school_id_fkey"
+            columns: ["learner_id", "school_id"]
+            isOneToOne: false
+            referencedRelation: "learners"
+            referencedColumns: ["id", "school_id"]
+          },
+          {
+            foreignKeyName: "invites_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       learners: {
         Row: {
           admission_date: string | null
@@ -989,6 +1073,13 @@ export type Database = {
         Args: { p_job_id: string; p_members: Json }
         Returns: number
       }
+      create_parent_invite: {
+        Args: { p_code_hash: string; p_guardian_id: string }
+        Returns: {
+          expires_at: string
+          invite_id: string
+        }[]
+      }
       current_school_ids: { Args: never; Returns: string[] }
       grading_scale_is_complete: {
         Args: { p_scale_id: string }
@@ -1016,6 +1107,10 @@ export type Database = {
       is_class_teacher: { Args: { p_class_id: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
       is_staff: { Args: { p_school_id: string }; Returns: boolean }
+      link_learner_login: {
+        Args: { p_learner_id: string; p_user_id: string }
+        Returns: undefined
+      }
       log_invite_event: {
         Args: { p_event: string; p_membership_id: string }
         Returns: undefined
@@ -1024,6 +1119,26 @@ export type Database = {
         Args: { p_event: string; p_membership_id: string }
         Returns: undefined
       }
+      my_children: {
+        Args: { p_school_id: string }
+        Returns: {
+          first_name: string
+          last_name: string
+          learner_id: string
+          learner_number: string
+        }[]
+      }
+      parent_invite_preview: {
+        Args: { p_code_hash: string }
+        Returns: {
+          children: number
+          guardian_email: string
+          guardian_name: string
+          school_name: string
+          status: string
+        }[]
+      }
+      redeem_parent_invite: { Args: { p_code_hash: string }; Returns: string }
       save_grading_bands: {
         Args: { p_bands: Json; p_scale_id: string }
         Returns: undefined
@@ -1052,6 +1167,14 @@ export type Database = {
       set_learner_subjects: {
         Args: { p_class_subject_ids: string[]; p_enrolment_id: string }
         Returns: undefined
+      }
+      sign_in_schools: {
+        Args: never
+        Returns: {
+          id: string
+          name: string
+          slug: string
+        }[]
       }
       teaches: { Args: { p_class_subject_id: string }; Returns: boolean }
       update_staff_profile: {

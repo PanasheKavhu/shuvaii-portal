@@ -11,6 +11,14 @@ import { createHash } from "node:crypto";
 export const CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 export const CODE_LENGTH = 12;
 
+/**
+ * httpOnly cookie holding the code from a /join link or the code form. The
+ * proxy moves `?code=` into it and redirects to a clean /join, so the
+ * one-time code does not stay in the address bar or history (D28).
+ */
+export const JOIN_CODE_COOKIE = "sp_join_code";
+export const JOIN_CODE_MAX_AGE_S = 60 * 60;
+
 /** A new code; `randomInt(n)` returns a uniform integer in [0, n). */
 export function generateInviteCode(randomInt: (max: number) => number): string {
   let code = "";

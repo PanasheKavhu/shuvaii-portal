@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { SCHOOL_COOKIE } from "@/lib/auth/active-school";
+import { JOIN_CODE_COOKIE, JOIN_CODE_MAX_AGE_S } from "@/lib/auth/invite-code";
 import { mustChangePin } from "@/lib/auth/learner-pin";
 import { loadAccess } from "@/lib/auth/load-access";
 import { areaForPath, decideAreaAccess } from "@/lib/auth/route-access";
@@ -16,6 +17,8 @@ import { supabaseAnonKey, supabaseUrl } from "@/lib/supabase/env";
  *    whose role may not use the area gets the 403 "Not allowed" page.
  *    Pages repeat the check through requireArea(); RLS is the final guard
  *    on the data itself.
+ * 3. Moves a parent code in `/join?code=` into a short-lived httpOnly
+ *    cookie and redirects to a clean /join (D28).
  */
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -37,6 +40,22 @@ export async function proxy(request: NextRequest) {
 
   // Validates the JWT and refreshes it when it has expired.
   const { data } = await supabase.auth.getClaims();
+
+  if (request.nextUrl.pathname === "/join" && request.nextUrl.searchParams.has("code")) {
+    const target = NextResponse.redirect(new URL("/join", request.url), 303);
+    target.cookies.set(
+      JOIN_CODE_COOKIE,
+      (request.nextUrl.searchParams.get("code") ?? "").slice(0, 64),
+      {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/join",
+        maxAge: JOIN_CODE_MAX_AGE_S,
+      },
+    );
+    return withCookies(target, response);
+  }
 
   const area = areaForPath(request.nextUrl.pathname);
   if (!area) return response;

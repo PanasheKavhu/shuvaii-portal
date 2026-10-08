@@ -1,8 +1,9 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { EMAIL_UNVERIFIED, matchesEmailOnFile } from "@/lib/auth/account-trust";
-import { hashInviteCode, normalizeInviteCode } from "@/lib/auth/invite-code";
+import { JOIN_CODE_COOKIE, hashInviteCode, normalizeInviteCode } from "@/lib/auth/invite-code";
 import { parseParentSignUp } from "@/lib/auth/parent-sign-up";
 import { rememberSchool } from "@/lib/auth/school-cookie";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -111,6 +112,7 @@ export async function claimWithNewAccount(
   const result = await redeem(hashInviteCode(code));
   if ("error" in result) return fail(result.error);
   await rememberSchool(result.schoolId);
+  (await cookies()).delete({ name: JOIN_CODE_COOKIE, path: "/join" });
   redirect("/children");
 }
 
@@ -122,10 +124,11 @@ export async function claimWithThisAccount(rawCode: string): Promise<FormState> 
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect(`/join?code=${code}`);
+  if (!user) redirect("/join");
 
   const result = await redeem(hashInviteCode(code));
   if ("error" in result) return { status: "error", message: result.error, errors: {} };
   await rememberSchool(result.schoolId);
+  (await cookies()).delete({ name: JOIN_CODE_COOKIE, path: "/join" });
   redirect("/children");
 }

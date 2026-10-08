@@ -1,10 +1,16 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { formatInviteCode, hashInviteCode, normalizeInviteCode } from "@/lib/auth/invite-code";
+import {
+  JOIN_CODE_COOKIE,
+  formatInviteCode,
+  hashInviteCode,
+  normalizeInviteCode,
+} from "@/lib/auth/invite-code";
 import { MIN_PASSWORD_LENGTH } from "@/lib/auth/new-password";
 import { getViewer } from "@/lib/auth/viewer";
 import { createClient } from "@/lib/supabase/server";
@@ -24,9 +30,9 @@ const PROBLEMS: Record<string, string> = {
  * account, or a signed-in person add the children to their own. A used,
  * expired or unknown code says so plainly.
  */
-export default async function JoinPage({ searchParams }: PageProps<"/join">) {
-  const { code: rawCode } = await searchParams;
-  const typed = typeof rawCode === "string" ? rawCode : "";
+export default async function JoinPage() {
+  // The proxy moved any ?code= into this cookie (D28).
+  const typed = (await cookies()).get(JOIN_CODE_COOKIE)?.value ?? "";
   const code = normalizeInviteCode(typed);
 
   let problem: string | null = typed && !code ? PROBLEMS.unknown : null;

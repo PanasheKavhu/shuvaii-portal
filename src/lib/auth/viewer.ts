@@ -63,6 +63,19 @@ export async function landingPathFor(viewer: Viewer): Promise<string> {
   return homeFor([], viewer.isPlatformAdmin) ?? "/no-access";
 }
 
+/**
+ * The active school and user when the viewer is that school's admin, else
+ * null. For server actions, which answer with a message rather than a 403.
+ */
+export async function schoolAdminContext(): Promise<{ schoolId: string; userId: string } | null> {
+  const viewer = await getViewer();
+  if (!viewer) return null;
+  const school = await getActiveSchool(viewer);
+  return school?.roles.includes("school_admin")
+    ? { schoolId: school.schoolId, userId: viewer.userId }
+    : null;
+}
+
 export async function requireViewer(): Promise<Viewer> {
   const viewer = await getViewer();
   if (!viewer) redirect("/sign-in");

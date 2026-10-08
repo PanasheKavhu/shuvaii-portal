@@ -294,3 +294,42 @@ export async function createFamily(prefix: string): Promise<{
     lastName,
   };
 }
+
+/** Msasa's school admin through the API (RLS applies, D23), for checks a page cannot show. */
+async function msasaAdminClient() {
+  try {
+    process.loadEnvFile(".env.local");
+  } catch {
+    // Already in the environment (CI).
+  }
+  const supabase = createClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { persistSession: false } },
+  );
+  const signedIn = await supabase.auth.signInWithPassword({
+    email: MSASA_ADMIN,
+    password: PASSWORD,
+  });
+  if (signedIn.error) throw new Error("Could not sign in as Msasa's admin");
+  return supabase;
+}
+
+/** How many Msasa learners have a learner number starting with `prefix`. */
+export async function countLearners(prefix: string): Promise<number> {
+  const supabase = await msasaAdminClient();
+  const { count, error } = await supabase
+    .from("learners")
+    .select("id", { count: "exact", head: true })
+    .eq("school_id", MSASA.id)
+    .ilike("learner_number", `${prefix}%`);
+  if (error || count === null) throw new Error("Could not count learners");
+  return count;
+}
+
+/** Marks a Msasa learner as left (or back to active), as the learner page does. */
+export async function setLearnerStatus(learnerId: string, status: "active" | "left") {
+  const supabase = await msasaAdminClient();
+  const { error } = await supabase.from("learners").update({ status }).eq("id", learnerId);
+  if (error) throw new Error("Could not change the learner's status");
+}

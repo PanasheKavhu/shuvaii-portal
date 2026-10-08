@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { buildXlsx } from "../unit/people/xlsx-fixture";
-import { MSASA_ADMIN, MSASA_TEACHER, inviteTokenFor, signIn } from "./helpers";
+import { MSASA_ADMIN, MSASA_TEACHER, countLearners, inviteTokenFor, signIn } from "./helpers";
 
 // SPEC US-3.1 to US-3.4 on a phone-sized screen, against the seed school
 // Msasa (2026 classes 3 Blue, 3 Green, 4 Blue). Every run uses fresh
@@ -79,6 +79,66 @@ test("a learners file with errors imports nothing and lists every problem by row
   await expect(
     page.getByRole("link", { name: /Learners: learners-with-errors.csv/ }).first(),
   ).toContainText("Not imported");
+});
+
+test("a 1,000-row learner file imports in one go, and the same file with one bad row imports nothing", async ({
+  page,
+}) => {
+  test.setTimeout(240_000);
+  const s = stamp();
+  const classes = ["3 Blue", "3 Green", "4 Blue"];
+  const rows = Array.from({ length: 1000 }, (_, i) => {
+    const n = String(i).padStart(4, "0");
+    // Every tenth learner is a sibling of the one before, sharing a guardian.
+    const family = i % 10 === 9 ? i - 1 : i;
+    return [
+      `K${s}${n}`,
+      ["Rudo", "Tatenda", "Nyasha", "Tino", "Farai"][i % 5],
+      `Family${family}`,
+      `201${2 + (i % 4)}-0${1 + (i % 9)}-1${i % 10}`,
+      i % 2 ? "M" : "F",
+      classes[i % 3],
+      "",
+      `Parent ${family}`,
+      "mother",
+      "",
+      `g${s}-${family}@demo.spportal.test`,
+    ].join(",");
+  });
+  const file = (lines: string[]) => Buffer.from([LEARNER_HEADER, ...lines].join("\n"));
+
+  await signIn(page, MSASA_ADMIN);
+  await expect(page).toHaveURL("/admin");
+
+  // One bad row (an unknown class on row 501): nothing is imported.
+  const bad = [...rows];
+  bad[499] = bad[499]!.replace(/,(3 Blue|3 Green|4 Blue),/, ",9 Purple,");
+  await upload(page, "Import learners", {
+    name: "school-bad.csv",
+    mimeType: "text/csv",
+    buffer: file(bad),
+  });
+  await expect(
+    page.getByText(/Nothing was imported\. Fix (this problem|these 1 problems?)/),
+  ).toBeVisible();
+  await expect(page.getByRole("list", { name: "Import errors" })).toContainText("Row 501");
+  await expect(page.getByRole("button", { name: "Import now" })).toHaveCount(0);
+  expect(await countLearners(`K${s}`)).toBe(0);
+
+  // The whole clean file goes in at once.
+  await upload(page, "Import learners", {
+    name: "school.csv",
+    mimeType: "text/csv",
+    buffer: file(rows),
+  });
+  await expect(page.getByRole("list", { name: "What will be imported" })).toContainText(
+    "1000 learners",
+  );
+  await page.getByRole("button", { name: "Import now" }).click();
+  await expect(page.getByRole("heading", { name: "Imported", exact: true })).toBeVisible({
+    timeout: 60_000,
+  });
+  expect(await countLearners(`K${s}`)).toBe(1000);
 });
 
 test("a clean Excel file imports all learners, with siblings sharing one guardian", async ({

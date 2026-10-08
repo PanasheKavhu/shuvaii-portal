@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getActiveSchool, getViewer } from "@/lib/auth/viewer";
+import { schoolAdminContext } from "@/lib/auth/viewer";
 import { SCALE_TEMPLATES, describeBandProblem, parseBands } from "@/lib/setup/bands";
 import { parseTerm, parseYear, termClashes, type TermDraft } from "@/lib/setup/calendar";
 import { describeGap } from "@/lib/setup/gaps";
@@ -15,7 +15,7 @@ import {
   parseSubject,
 } from "@/lib/setup/structure";
 import { createClient } from "@/lib/supabase/server";
-import type { FormState } from "../../platform/form-state";
+import { failed, notAllowed, saved, type FormState } from "../../platform/form-state";
 import { getYear, listTerms, loadYearSetup } from "./data";
 
 /**
@@ -25,24 +25,7 @@ import { getYear, listTerms, loadYearSetup } from "./data";
  * so RLS and the database checks (D20, D21, D22) apply as well.
  */
 
-const NOT_ALLOWED: FormState = {
-  status: "error",
-  message: "Only a school admin can do this.",
-  errors: {},
-};
-const saved = (message: string): FormState => ({ status: "saved", message, errors: {} });
-const failed = (message: string, errors: FormState["errors"] = {}): FormState => ({
-  status: "error",
-  message,
-  errors,
-});
-
-async function adminSchool(): Promise<string | null> {
-  const viewer = await getViewer();
-  if (!viewer) return null;
-  const school = await getActiveSchool(viewer);
-  return school?.roles.includes("school_admin") ? school.schoolId : null;
-}
+const NOT_ALLOWED = notAllowed("a school admin");
 
 /** A readable message for a database refusal. */
 function dbMessage(error: { code?: string; message: string }, what: string): string {
@@ -74,7 +57,7 @@ function readTerm(formData: FormData, prefix = "") {
 
 /** US-2.1: a new year with its proposed (and edited) terms. */
 export async function createYear(_prev: FormState, formData: FormData): Promise<FormState> {
-  const schoolId = await adminSchool();
+  const schoolId = (await schoolAdminContext())?.schoolId;
   if (!schoolId) return NOT_ALLOWED;
   const year = parseYear({
     label: formData.get("label"),
@@ -133,7 +116,7 @@ export async function createYear(_prev: FormState, formData: FormData): Promise<
     );
     if (termError) {
       // Leave nothing half made: the year has no other rows yet.
-      await supabase.from("academic_years").delete().eq("id", data.id);
+      await supabase.from("academic_years").delete().eq("id", data.id).eq("school_id", schoolId);
       return failed(dbMessage(termError, "term"));
     }
   }
@@ -183,7 +166,7 @@ export async function addTerm(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const schoolId = await adminSchool();
+  const schoolId = (await schoolAdminContext())?.schoolId;
   if (!schoolId || !isUuid(yearId)) return NOT_ALLOWED;
   const checked = await checkTermInYear(schoolId, yearId, null, formData);
   if (!checked.ok) return checked.state;
@@ -203,7 +186,7 @@ export async function saveTerm(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const schoolId = await adminSchool();
+  const schoolId = (await schoolAdminContext())?.schoolId;
   if (!schoolId || !isUuid(yearId) || !isUuid(termId)) return NOT_ALLOWED;
   const checked = await checkTermInYear(schoolId, yearId, termId, formData);
   if (!checked.ok) return checked.state;
@@ -212,6 +195,7 @@ export async function saveTerm(
     .from("terms")
     .update(termRow(checked.value))
     .eq("id", termId)
+    .eq("school_id", schoolId)
     .eq("academic_year_id", yearId)
     .select("id");
   if (error) return failed(dbMessage(error, "term"));
@@ -227,7 +211,7 @@ export async function createScale(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const schoolId = await adminSchool();
+  const schoolId = (await schoolAdminContext())?.schoolId;
   if (!schoolId || !isUuid(yearId)) return NOT_ALLOWED;
   const name = String(formData.get("name") ?? "")
     .trim()
@@ -275,7 +259,7 @@ export async function saveBands(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const schoolId = await adminSchool();
+  const schoolId = (await schoolAdminContext())?.schoolId;
   if (!schoolId || !isUuid(yearId) || !isUuid(scaleId)) return NOT_ALLOWED;
   const grades = formData.getAll("grade").map(String);
   const mins = formData.getAll("minMark").map(String);
@@ -321,7 +305,8 @@ export async function saveBands(
     const { error: defaultError } = await supabase
       .from("grading_scales")
       .update({ is_default: true })
-      .eq("id", scaleId);
+      .eq("id", scaleId)
+      .eq("school_id", schoolId);
     if (defaultError) return failed(dbMessage(defaultError, "grading scale"));
   }
   revalidatePath(setupPath(yearId), "layout");
@@ -336,7 +321,7 @@ export async function saveLevel(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const schoolId = await adminSchool();
+  const schoolId = (await schoolAdminContext())?.schoolId;
   if (!schoolId || !isUuid(yearId) || (levelId !== null && !isUuid(levelId))) return NOT_ALLOWED;
   const parsed = parseGradeLevel({
     name: formData.get("name"),
@@ -353,7 +338,7 @@ export async function saveLevel(
   };
   const supabase = await createClient();
   const { error } = levelId
-    ? await supabase.from("grade_levels").update(row).eq("id", levelId)
+    ? await supabase.from("grade_levels").update(row).eq("id", levelId).eq("school_id", schoolId)
     : await supabase.from("grade_levels").insert({ school_id: schoolId, ...row });
   if (error) return failed(dbMessage(error, "grade level"));
   revalidatePath(setupPath(yearId), "layout");
@@ -366,7 +351,7 @@ export async function saveSubject(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const schoolId = await adminSchool();
+  const schoolId = (await schoolAdminContext())?.schoolId;
   if (!schoolId || !isUuid(yearId) || (subjectId !== null && !isUuid(subjectId)))
     return NOT_ALLOWED;
   const parsed = parseSubject({
@@ -386,7 +371,7 @@ export async function saveSubject(
   };
   const supabase = await createClient();
   const { error } = subjectId
-    ? await supabase.from("subjects").update(row).eq("id", subjectId)
+    ? await supabase.from("subjects").update(row).eq("id", subjectId).eq("school_id", schoolId)
     : await supabase.from("subjects").insert({ school_id: schoolId, ...row });
   if (error) return failed(dbMessage(error, "subject"));
   revalidatePath(setupPath(yearId), "layout");
@@ -402,7 +387,7 @@ export async function saveClass(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const schoolId = await adminSchool();
+  const schoolId = (await schoolAdminContext())?.schoolId;
   if (!schoolId || !isUuid(yearId) || (classId !== null && !isUuid(classId))) return NOT_ALLOWED;
   const parsed = parseClass({
     name: formData.get("name"),
@@ -417,7 +402,12 @@ export async function saveClass(
   };
   const supabase = await createClient();
   const { error } = classId
-    ? await supabase.from("classes").update(row).eq("id", classId).eq("academic_year_id", yearId)
+    ? await supabase
+        .from("classes")
+        .update(row)
+        .eq("id", classId)
+        .eq("academic_year_id", yearId)
+        .eq("school_id", schoolId)
     : await supabase
         .from("classes")
         .insert({ school_id: schoolId, academic_year_id: yearId, ...row });
@@ -433,7 +423,7 @@ export async function addClassSubjects(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const schoolId = await adminSchool();
+  const schoolId = (await schoolAdminContext())?.schoolId;
   if (!schoolId || !isUuid(yearId) || !isUuid(classId)) return NOT_ALLOWED;
   const subjectIds = formData.getAll("subjectId").filter(isUuid);
   if (subjectIds.length === 0) return failed("Tick at least one subject to add.");
@@ -460,7 +450,7 @@ export async function setSubjectTeacher(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const schoolId = await adminSchool();
+  const schoolId = (await schoolAdminContext())?.schoolId;
   if (!schoolId || !isUuid(yearId) || !isUuid(classSubjectId)) return NOT_ALLOWED;
   const teacher = parseOptionalTeacher(formData.get("teacherId"));
   if (!teacher.ok) return failed("Choose a teacher from the list.");
@@ -469,6 +459,7 @@ export async function setSubjectTeacher(
     .from("class_subjects")
     .update({ teacher_id: teacher.value })
     .eq("id", classSubjectId)
+    .eq("school_id", schoolId)
     .select("id");
   if (error) return failed(dbMessage(error, "class subject"));
   if (data.length !== 1) return NOT_ALLOWED;
@@ -480,10 +471,14 @@ export async function removeClassSubject(
   yearId: string,
   classSubjectId: string,
 ): Promise<FormState> {
-  const schoolId = await adminSchool();
+  const schoolId = (await schoolAdminContext())?.schoolId;
   if (!schoolId || !isUuid(yearId) || !isUuid(classSubjectId)) return NOT_ALLOWED;
   const supabase = await createClient();
-  const { error } = await supabase.from("class_subjects").delete().eq("id", classSubjectId);
+  const { error } = await supabase
+    .from("class_subjects")
+    .delete()
+    .eq("id", classSubjectId)
+    .eq("school_id", schoolId);
   if (error) return failed(dbMessage(error, "class subject"));
   revalidatePath(setupPath(yearId), "layout");
   return saved("Subject removed from the class.");
@@ -496,7 +491,7 @@ export async function removeClassSubject(
  * the teacher gaps again (D22). The first finished year becomes current.
  */
 export async function finishSetup(yearId: string): Promise<FormState> {
-  const schoolId = await adminSchool();
+  const schoolId = (await schoolAdminContext())?.schoolId;
   if (!schoolId || !isUuid(yearId)) return NOT_ALLOWED;
   const year = await getYear(schoolId, yearId);
   const { gaps } = await loadYearSetup(schoolId, yearId);
@@ -509,7 +504,8 @@ export async function finishSetup(yearId: string): Promise<FormState> {
   const { error } = await supabase
     .from("academic_years")
     .update({ setup_completed_at: new Date().toISOString() })
-    .eq("id", yearId);
+    .eq("id", yearId)
+    .eq("school_id", schoolId);
   if (error) return failed(dbMessage(error, "year"));
 
   const { data: current } = await supabase
@@ -524,8 +520,10 @@ export async function finishSetup(yearId: string): Promise<FormState> {
 }
 
 export async function makeCurrentYear(yearId: string): Promise<FormState> {
-  const schoolId = await adminSchool();
+  const schoolId = (await schoolAdminContext())?.schoolId;
   if (!schoolId || !isUuid(yearId)) return NOT_ALLOWED;
+  // The year must be one of the active school's, not just any the admin can write.
+  await getYear(schoolId, yearId);
   const supabase = await createClient();
   const { error } = await supabase.rpc("set_current_academic_year", { p_year_id: yearId });
   if (error) return failed(dbMessage(error, "year"));

@@ -89,8 +89,9 @@ export type LearnerLogin = { email: string; password: string };
 
 /**
  * What to pass to Supabase Auth for a learner number and PIN, or null when
- * the school has no such learner with an account. The caller treats null
- * exactly like a wrong PIN, so the reply never says which learners exist.
+ * the school has no such learner with an account, or the learner has left
+ * (D28). The caller treats null exactly like a wrong PIN, so the reply
+ * never says which learners exist.
  */
 export async function learnerLogin(
   schoolId: string,
@@ -101,13 +102,13 @@ export async function learnerLogin(
   const escaped = learnerNumber.replace(/[\\%_]/g, (ch) => `\\${ch}`);
   const { data, error } = await admin
     .from("learners")
-    .select("id, user_id")
+    .select("id, user_id, status")
     .eq("school_id", schoolId)
     .ilike("learner_number", escaped)
     .limit(2);
   if (error) return "unavailable";
   const learner = data.length === 1 ? data[0] : null;
-  if (!learner?.user_id) return null;
+  if (!learner?.user_id || learner.status !== "active") return null;
 
   const account = await learnerAccount(admin, learner.id, learner.user_id);
   if (!account?.email) return null;

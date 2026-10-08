@@ -6,6 +6,7 @@ import {
   createFamily,
   createLoneUser,
   resetEmailFor,
+  setLearnerStatus,
   signIn,
 } from "./helpers";
 
@@ -128,6 +129,28 @@ test("an admin gives a learner a PIN, and the learner must choose their own", as
   await learnerSignIn(learnerPage, learner.number, ownPin);
   await expect(formError(learnerPage)).toHaveText("Learner number or PIN is incorrect.");
   await learnerSignIn(learnerPage, learner.number, resetPin);
+  await expect(learnerPage).toHaveURL("/change-pin");
+  await learnerContext.close();
+});
+
+test("a learner marked as left can no longer sign in", async ({ browser, page }) => {
+  const family = await createFamily("lft");
+  const learner = family.learners[0];
+  const pin = await adminSetsPin(page, learner.id, "Create PIN");
+
+  const learnerContext = await browser.newContext();
+  const learnerPage = await learnerContext.newPage();
+  await learnerSignIn(learnerPage, learner.number, pin);
+  await expect(learnerPage).toHaveURL("/change-pin");
+  await learnerContext.clearCookies();
+
+  await setLearnerStatus(learner.id, "left");
+  await learnerSignIn(learnerPage, learner.number, pin);
+  await expect(formError(learnerPage)).toHaveText("Learner number or PIN is incorrect.");
+
+  // Back at school: the same PIN works again.
+  await setLearnerStatus(learner.id, "active");
+  await learnerSignIn(learnerPage, learner.number, pin);
   await expect(learnerPage).toHaveURL("/change-pin");
   await learnerContext.close();
 });

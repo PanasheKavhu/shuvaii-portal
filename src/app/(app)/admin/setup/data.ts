@@ -6,6 +6,7 @@ import { checkBands } from "@/lib/setup/bands";
 import type { TermKind, TermStatus } from "@/lib/setup/calendar";
 import { findSetupGaps, type SetupGap } from "@/lib/setup/gaps";
 import { isUuid, type LevelStage, type SubjectScope } from "@/lib/setup/structure";
+import { rowsOrThrow } from "@/lib/supabase/rows";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -13,16 +14,8 @@ import { createClient } from "@/lib/supabase/server";
  * through the user-scoped client, so RLS limits it to the active school.
  */
 
-/**
- * A query's rows, or a thrown error. A failed read must not look like an
- * empty list (which would show "no years" or a 404). Logs only the code.
- */
 function rows<T>(result: { data: T[] | null; error: { code?: string } | null }): T[] {
-  if (result.error) {
-    console.error("setup read failed", result.error.code);
-    throw new Error("Could not load the school setup. Please try again.");
-  }
-  return result.data ?? [];
+  return rowsOrThrow(result, "setup", "Could not load the school setup. Please try again.");
 }
 
 /** The active school of a school admin, or 403. Used by pages and actions. */

@@ -7,6 +7,7 @@ import type { LearnerStatus, MembershipStatus } from "@/lib/people/person-input"
 import { searchWords } from "@/lib/people/person-input";
 import type { ExistingStaff } from "@/lib/people/staff-import";
 import { isUuid, type LevelStage } from "@/lib/setup/structure";
+import { rowsOrThrow } from "@/lib/supabase/rows";
 import { createClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/database.types";
 
@@ -18,13 +19,8 @@ import type { Json } from "@/lib/supabase/database.types";
 
 export { requireSchoolAdmin } from "../setup/data";
 
-/** A query's rows, or a thrown error; a failed read must not look like "no one". */
 function rows<T>(result: { data: T[] | null; error: { code?: string } | null }): T[] {
-  if (result.error) {
-    console.error("people read failed", result.error.code);
-    throw new Error("Could not load people. Please try again.");
-  }
-  return result.data ?? [];
+  return rowsOrThrow(result, "people", "Could not load people. Please try again.");
 }
 
 export type YearRef = { id: string; label: string };
@@ -317,15 +313,38 @@ export async function getLearner(id: string, yearId: string | null): Promise<Lea
   };
 }
 
+/** The Data API returns at most this many rows a request (`max_rows` in supabase/config.toml). */
+const PAGE_SIZE = 1000;
+
+/**
+ * Every row of a query, a page at a time, so a school past 1,000 guardians
+ * or learners is checked against all of them (D28). `page` must order by a
+ * unique column.
+ */
+async function allRows<T>(
+  page: (
+    from: number,
+    to: number,
+  ) => PromiseLike<{ data: T[] | null; error: { code?: string } | null }>,
+): Promise<T[]> {
+  const all: T[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const batch = rows(await page(from, from + PAGE_SIZE - 1));
+    all.push(...batch);
+    if (batch.length < PAGE_SIZE) return all;
+  }
+}
+
 /** The school's guardians, for matching by phone or email. */
 export async function listGuardians(schoolId: string): Promise<ExistingGuardian[]> {
   const supabase = await createClient();
-  const data = rows(
-    await supabase
+  const data = await allRows((from, to) =>
+    supabase
       .from("guardians")
       .select("id, full_name, phone, email")
       .eq("school_id", schoolId)
-      .limit(20000),
+      .order("id")
+      .range(from, to),
   );
   return data.map((g) => ({ id: g.id, fullName: g.full_name, phone: g.phone, email: g.email }));
 }
@@ -333,8 +352,13 @@ export async function listGuardians(schoolId: string): Promise<ExistingGuardian[
 /** Every learner number used in the school, for the import's uniqueness check. */
 export async function listLearnerNumbers(schoolId: string): Promise<string[]> {
   const supabase = await createClient();
-  const data = rows(
-    await supabase.from("learners").select("learner_number").eq("school_id", schoolId).limit(20000),
+  const data = await allRows((from, to) =>
+    supabase
+      .from("learners")
+      .select("id, learner_number")
+      .eq("school_id", schoolId)
+      .order("id")
+      .range(from, to),
   );
   return data.map((l) => l.learner_number);
 }

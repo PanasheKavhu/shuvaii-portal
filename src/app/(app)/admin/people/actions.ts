@@ -17,7 +17,7 @@ import {
   sendInviteEmail,
   unprovedMessage,
 } from "@/lib/auth/staff-accounts";
-import { getActiveSchool, getViewer } from "@/lib/auth/viewer";
+import { schoolAdminContext } from "@/lib/auth/viewer";
 import { STAFF_ROLE_LABELS, isStaffRole } from "@/lib/people/fields";
 import {
   GuardianMatcher,
@@ -39,7 +39,7 @@ import { readUpload, uploadContentType } from "@/lib/people/upload";
 import { isUuid } from "@/lib/setup/structure";
 import type { Json } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
-import type { FormState } from "../../platform/form-state";
+import { failed, notAllowed, saved, type FormState } from "../../platform/form-state";
 import type { SecretState } from "./secret-state";
 import {
   currentYear,
@@ -62,27 +62,8 @@ import { sendStaffInvites } from "./staff-accounts";
  * gets a status, a staff member who leaves is disabled.
  */
 
-const NOT_ALLOWED: FormState = {
-  status: "error",
-  message: "Only a school admin can do this.",
-  errors: {},
-};
-const saved = (message: string): FormState => ({ status: "saved", message, errors: {} });
-const failed = (message: string | null, errors: FormState["errors"] = {}): FormState => ({
-  status: "error",
-  message,
-  errors,
-});
+const NOT_ALLOWED = notAllowed("a school admin");
 const TRY_AGAIN = "Could not save. Please try again.";
-
-async function adminContext(): Promise<{ schoolId: string; userId: string } | null> {
-  const viewer = await getViewer();
-  if (!viewer) return null;
-  const school = await getActiveSchool(viewer);
-  return school?.roles.includes("school_admin")
-    ? { schoolId: school.schoolId, userId: viewer.userId }
-    : null;
-}
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -153,7 +134,7 @@ function guardianErrors(errors: Record<string, string | undefined>): FormState["
 
 /** US-3.3: add one learner, with this year's class and optionally a guardian. */
 export async function addLearner(_prev: FormState, formData: FormData): Promise<FormState> {
-  const ctx = await adminContext();
+  const ctx = await schoolAdminContext();
   if (!ctx) return NOT_ALLOWED;
   const learner = parseLearnerForm(learnerFields(formData), today());
   if (!learner.ok) return failed("Check the learner's details.", learner.errors);
@@ -215,7 +196,7 @@ export async function updateLearner(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const ctx = await adminContext();
+  const ctx = await schoolAdminContext();
   if (!ctx || !isUuid(learnerId)) return NOT_ALLOWED;
   const parsed = parseLearnerForm({ ...learnerFields(formData), classId: "" }, today());
   if (!parsed.ok) return failed("Check the learner's details.", parsed.errors);
@@ -266,7 +247,7 @@ export async function setLearnerClass(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const ctx = await adminContext();
+  const ctx = await schoolAdminContext();
   if (!ctx || !isUuid(learnerId)) return NOT_ALLOWED;
   const classId = formData.get("classId");
   const year = await currentYear(ctx.schoolId);
@@ -291,12 +272,21 @@ export async function saveLearnerSubjects(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const ctx = await adminContext();
+  const ctx = await schoolAdminContext();
   if (!ctx || !isUuid(learnerId) || !isUuid(enrolmentId)) return NOT_ALLOWED;
   const choices = parseSubjectChoices(formData.getAll("classSubjectId"));
   if (!choices) return failed("Choose subjects from the list.");
 
   const supabase = await createClient();
+  const enrolment = await supabase
+    .from("enrolments")
+    .select("id")
+    .eq("id", enrolmentId)
+    .eq("learner_id", learnerId)
+    .eq("school_id", ctx.schoolId)
+    .maybeSingle();
+  if (enrolment.error) return failed(TRY_AGAIN);
+  if (!enrolment.data) return NOT_ALLOWED;
   const { error } = await supabase.rpc("set_learner_subjects", {
     p_enrolment_id: enrolmentId,
     p_class_subject_ids: choices,
@@ -309,17 +299,23 @@ export async function saveLearnerSubjects(
 
 // Guardians ---------------------------------------------------------------------------
 
-/** Makes one link the learner's primary guardian, clearing the others first. */
-async function makePrimary(learnerId: string, linkId: string): Promise<boolean> {
+/** Makes one link the learner's only primary guardian, in one database call (D28). */
+async function makePrimary(linkId: string): Promise<boolean> {
   const supabase = await createClient();
-  const cleared = await supabase
-    .from("guardian_links")
-    .update({ is_primary: false })
-    .eq("learner_id", learnerId)
-    .neq("id", linkId);
-  if (cleared.error) return false;
-  const set = await supabase.from("guardian_links").update({ is_primary: true }).eq("id", linkId);
-  return !set.error;
+  const { error } = await supabase.rpc("set_primary_guardian", { p_link_id: linkId });
+  return !error;
+}
+
+/** Whether the learner is one of the active school's (ids from the page are not trusted). */
+async function isSchoolLearner(schoolId: string, learnerId: string): Promise<boolean> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("learners")
+    .select("id")
+    .eq("id", learnerId)
+    .eq("school_id", schoolId)
+    .maybeSingle();
+  return Boolean(data);
 }
 
 /**
@@ -331,11 +327,12 @@ export async function addGuardian(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const ctx = await adminContext();
+  const ctx = await schoolAdminContext();
   if (!ctx || !isUuid(learnerId)) return NOT_ALLOWED;
   const parsed = parseGuardianForm(guardianFields(formData));
   if (!parsed.ok) return failed("Check the guardian's details.", guardianErrors(parsed.errors));
   const g = parsed.value;
+  if (!(await isSchoolLearner(ctx.schoolId, learnerId))) return NOT_ALLOWED;
 
   const matched = new GuardianMatcher(await listGuardians(ctx.schoolId)).match(
     g.fullName,
@@ -374,10 +371,7 @@ export async function addGuardian(
     .single();
   if (link.error?.code === "23505") return failed("This guardian is already linked.");
   if (link.error) return failed(TRY_AGAIN);
-  if (
-    (g.isPrimary || existingLinks.data.length === 0) &&
-    !(await makePrimary(learnerId, link.data.id))
-  )
+  if ((g.isPrimary || existingLinks.data.length === 0) && !(await makePrimary(link.data.id)))
     return failed(TRY_AGAIN);
 
   revalidatePath(learnerPath(learnerId));
@@ -396,7 +390,7 @@ export async function saveGuardian(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const ctx = await adminContext();
+  const ctx = await schoolAdminContext();
   if (!ctx || !isUuid(learnerId) || !isUuid(linkId) || !isUuid(guardianId)) return NOT_ALLOWED;
   const parsed = parseGuardianForm(guardianFields(formData));
   if (!parsed.ok) return failed("Check the guardian's details.", guardianErrors(parsed.errors));
@@ -427,7 +421,7 @@ export async function saveGuardian(
     .eq("learner_id", learnerId)
     .select("id, is_primary");
   if (link.error || link.data.length !== 1) return failed(TRY_AGAIN);
-  if (g.isPrimary && !link.data[0]!.is_primary && !(await makePrimary(learnerId, linkId)))
+  if (g.isPrimary && !link.data[0]!.is_primary && !(await makePrimary(linkId)))
     return failed(TRY_AGAIN);
 
   revalidatePath(learnerPath(learnerId));
@@ -436,7 +430,7 @@ export async function saveGuardian(
 
 /** Removes a wrong guardian link; the guardian themselves is kept (D23). */
 export async function removeGuardianLink(learnerId: string, linkId: string): Promise<FormState> {
-  const ctx = await adminContext();
+  const ctx = await schoolAdminContext();
   if (!ctx || !isUuid(learnerId) || !isUuid(linkId)) return NOT_ALLOWED;
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -469,7 +463,7 @@ async function activeStaffIds(schoolId: string): Promise<Set<string>> {
 
 /** US-3.3: add one staff member with an invite, as the staff import does. */
 export async function addStaff(_prev: FormState, formData: FormData): Promise<FormState> {
-  const ctx = await adminContext();
+  const ctx = await schoolAdminContext();
   if (!ctx) return NOT_ALLOWED;
   const parsed = parseStaffForm({
     fullName: formData.get("fullName"),
@@ -527,7 +521,7 @@ export async function updateStaffDetails(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const ctx = await adminContext();
+  const ctx = await schoolAdminContext();
   if (!ctx || !isUuid(userId)) return NOT_ALLOWED;
   const parsed = parseStaffProfile({
     fullName: formData.get("fullName"),
@@ -563,7 +557,7 @@ export async function setMembershipStatus(
   membershipId: string,
   next: "active" | "disabled",
 ): Promise<FormState> {
-  const ctx = await adminContext();
+  const ctx = await schoolAdminContext();
   if (!ctx || !isUuid(userId) || !isUuid(membershipId)) return NOT_ALLOWED;
   if (userId === ctx.userId) return failed("You cannot change your own access.");
 
@@ -594,7 +588,7 @@ export async function addStaffRole(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const ctx = await adminContext();
+  const ctx = await schoolAdminContext();
   if (!ctx || !isUuid(userId)) return NOT_ALLOWED;
   if (userId === ctx.userId) return failed("You cannot add a role for yourself.");
   const role = formData.get("role");
@@ -614,7 +608,7 @@ export async function addStaffRole(
 
 /** Sends a staff member's invite email again while it is not accepted (D14). */
 export async function resendStaffInviteAction(userId: string): Promise<FormState> {
-  const ctx = await adminContext();
+  const ctx = await schoolAdminContext();
   if (!ctx || !isUuid(userId)) return NOT_ALLOWED;
   const person = (await listStaff(ctx.schoolId)).find((p) => p.userId === userId);
   const pending = person?.memberships.find((m) => m.status === "invited");
@@ -677,7 +671,7 @@ export async function uploadImport(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const ctx = await adminContext();
+  const ctx = await schoolAdminContext();
   if (!ctx || (kind !== "staff" && kind !== "learners")) return NOT_ALLOWED;
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {
@@ -724,7 +718,7 @@ export async function uploadImport(
  * it is now, then everything is added in one transaction (D24), or nothing.
  */
 export async function commitImport(jobId: string): Promise<FormState> {
-  const ctx = await adminContext();
+  const ctx = await schoolAdminContext();
   if (!ctx || !isUuid(jobId)) return NOT_ALLOWED;
   const job = await getImportJob(ctx.schoolId, jobId);
   const path = `/admin/people/import/${jobId}`;
@@ -851,7 +845,7 @@ export async function createParentCode(
   learnerId: string,
   guardianId: string,
 ): Promise<SecretState> {
-  const ctx = await adminContext();
+  const ctx = await schoolAdminContext();
   if (!ctx || !isUuid(learnerId) || !isUuid(guardianId)) {
     return secretFailed(NOT_ALLOWED.message!);
   }
@@ -897,7 +891,7 @@ export async function createParentCode(
  * in. The PIN is shown once and recorded in the audit log without its value.
  */
 export async function resetLearnerPin(learnerId: string): Promise<SecretState> {
-  const ctx = await adminContext();
+  const ctx = await schoolAdminContext();
   if (!ctx || !isUuid(learnerId)) return secretFailed(NOT_ALLOWED.message!);
   const supabase = await createClient();
   const [learner, school] = await Promise.all([

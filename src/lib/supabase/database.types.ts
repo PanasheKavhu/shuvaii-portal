@@ -1176,6 +1176,7 @@ export type Database = {
         Args: { p_class_subject_ids: string[]; p_enrolment_id: string }
         Returns: undefined
       }
+      set_primary_guardian: { Args: { p_link_id: string }; Returns: undefined }
       sign_in_schools: {
         Args: never
         Returns: {

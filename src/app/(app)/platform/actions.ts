@@ -21,7 +21,7 @@ import {
 } from "@/lib/platform/school-input";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import type { FormState } from "./form-state";
+import { notAllowed, type FormState } from "./form-state";
 
 /**
  * Super-admin console actions (SPEC US-10.1, US-1.5). Each one checks the
@@ -35,11 +35,7 @@ import type { FormState } from "./form-state";
  * `log_invite_event()`, since an email leaves no row change of its own.
  */
 
-const NOT_ALLOWED: FormState = {
-  status: "error",
-  message: "Only a platform admin can do this.",
-  errors: {},
-};
+const NOT_ALLOWED = notAllowed("a platform admin");
 const FAILED = (what: string): FormState => ({
   status: "error",
   message: `Could not ${what}. Please try again.`,

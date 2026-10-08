@@ -6,13 +6,16 @@ import {
   LEARNER_LABELS,
   LearnerFields,
 } from "@/components/people/person-fields";
+import { OneTimeSecretForm } from "@/components/people/one-time-secret-form";
 import { StatusPill } from "@/components/people/status-pill";
 import { ActionForm } from "@/components/setup/action-form";
 import { CheckboxField, SelectField } from "@/components/setup/fields";
 import { LEARNER_STATUS_LABELS } from "@/lib/people/person-input";
 import {
   addGuardian,
+  createParentCode,
   removeGuardianLink,
+  resetLearnerPin,
   saveGuardian,
   saveLearnerSubjects,
   setLearnerClass,
@@ -84,6 +87,29 @@ export default async function LearnerPage({
         >
           <LearnerFields prefix="learner" learner={learner} showStatus />
         </ActionForm>
+      </section>
+
+      <section aria-labelledby="sign-in" className="bg-card rounded-2xl border p-4">
+        <h3 id="sign-in" className="mb-1 font-semibold">
+          Sign in
+        </h3>
+        <p className="text-muted-foreground mb-4 text-sm">
+          {learner.hasLogin
+            ? `${learner.firstName} signs in with their learner number and a PIN. If they forget it, give them a new one.`
+            : `${learner.firstName} cannot sign in yet. A PIN lets them sign in with their learner number.`}
+        </p>
+        {learner.status === "active" ? (
+          <OneTimeSecretForm
+            action={resetLearnerPin.bind(null, learner.id)}
+            submitLabel={learner.hasLogin ? "Reset PIN" : "Create PIN"}
+            pendingLabel="Setting PIN…"
+            label="Learner PIN"
+          />
+        ) : (
+          <p className="bg-muted/40 rounded-xl border border-dashed p-4 text-sm">
+            Only active learners can sign in.
+          </p>
+        )}
       </section>
 
       <section aria-labelledby="class" className="bg-card rounded-2xl border p-4">
@@ -190,6 +216,22 @@ export default async function LearnerPage({
                   . Changes to their details show there too.
                 </p>
               )}
+              <div className="bg-muted/30 flex flex-col gap-3 rounded-xl border p-3">
+                <p className="text-sm">
+                  {g.hasAccount
+                    ? `${g.fullName} has a parent account and sees every child linked to them.`
+                    : g.codeExpiresAt
+                      ? `A parent code is waiting to be used. Making a new one stops the old one.`
+                      : `${g.fullName} has no parent account yet. Give them a one-time code to set one up.`}
+                </p>
+                {!g.hasAccount && (
+                  <OneTimeSecretForm
+                    action={createParentCode.bind(null, learner.id, g.guardianId)}
+                    submitLabel={g.codeExpiresAt ? "Make a new parent code" : "Make a parent code"}
+                    label={`Parent code for ${g.fullName}`}
+                  />
+                )}
+              </div>
               <ActionForm
                 action={saveGuardian.bind(null, learner.id, g.linkId, g.guardianId)}
                 submitLabel={`Save ${g.fullName}`}

@@ -150,6 +150,10 @@ export type GuardianOnLearner = {
   email: string | null;
   relationship: string;
   isPrimary: boolean;
+  /** Whether a parent has claimed this guardian record (US-1.3). */
+  hasAccount: boolean;
+  /** When the latest unused parent code for this guardian expires, if one is waiting. */
+  codeExpiresAt: string | null;
   /** Other learners this guardian is linked to (siblings). */
   otherLearners: { id: string; name: string }[];
 };
@@ -163,6 +167,8 @@ export type LearnerDetail = {
   sex: "F" | "M" | null;
   admissionDate: string | null;
   status: LearnerStatus;
+  /** Whether the learner has their own sign in (US-1.2). */
+  hasLogin: boolean;
   enrolment: {
     id: string;
     classId: string;
@@ -179,7 +185,9 @@ export async function getLearner(id: string, yearId: string | null): Promise<Lea
   const supabase = await createClient();
   const learner = await supabase
     .from("learners")
-    .select("id, learner_number, first_name, last_name, date_of_birth, sex, admission_date, status")
+    .select(
+      "id, learner_number, first_name, last_name, date_of_birth, sex, admission_date, status, user_id",
+    )
     .eq("id", id)
     .maybeSingle();
   if (learner.error) rows({ data: null, error: learner.error });
@@ -237,14 +245,29 @@ export async function getLearner(id: string, yearId: string | null): Promise<Lea
   let guardians: GuardianOnLearner[] = [];
   if (links.length) {
     const guardianIds = links.map((g) => g.guardian_id);
-    const [people, siblingLinks] = await Promise.all([
-      supabase.from("guardians").select("id, full_name, phone, email").in("id", guardianIds),
+    const [people, siblingLinks, codes] = await Promise.all([
+      supabase
+        .from("guardians")
+        .select("id, full_name, phone, email, user_id")
+        .in("id", guardianIds),
       supabase
         .from("guardian_links")
         .select("guardian_id, learner_id")
         .in("guardian_id", guardianIds)
         .neq("learner_id", id),
+      supabase
+        .from("invites")
+        .select("guardian_id, expires_at")
+        .in("guardian_id", guardianIds)
+        .is("accepted_at", null)
+        .gt("expires_at", new Date().toISOString()),
     ]);
+    const codeExpiry = new Map<string, string>();
+    for (const c of rows(codes)) {
+      if (!c.guardian_id) continue;
+      const known = codeExpiry.get(c.guardian_id);
+      if (!known || c.expires_at > known) codeExpiry.set(c.guardian_id, c.expires_at);
+    }
     const siblings = rows(siblingLinks);
     const siblingNames = new Map<string, string>();
     if (siblings.length) {
@@ -270,6 +293,8 @@ export async function getLearner(id: string, yearId: string | null): Promise<Lea
         email: g?.email ?? null,
         relationship: link.relationship,
         isPrimary: link.is_primary,
+        hasAccount: Boolean(g?.user_id),
+        codeExpiresAt: codeExpiry.get(link.guardian_id) ?? null,
         otherLearners: siblings
           .filter((s) => s.guardian_id === link.guardian_id)
           .map((s) => ({ id: s.learner_id, name: siblingNames.get(s.learner_id) ?? "" })),
@@ -286,6 +311,7 @@ export async function getLearner(id: string, yearId: string | null): Promise<Lea
     sex: l.sex,
     admissionDate: l.admission_date,
     status: l.status,
+    hasLogin: l.user_id !== null,
     enrolment,
     guardians,
   };

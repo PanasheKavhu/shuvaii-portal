@@ -1,7 +1,16 @@
 "use server";
 
+import { randomInt } from "node:crypto";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import {
+  formatInviteCode,
+  generateInviteCode,
+  hashInviteCode,
+  inviteLink,
+} from "@/lib/auth/invite-code";
+import { issueLearnerPin } from "@/lib/auth/learner-accounts";
 import { getActiveSchool, getViewer } from "@/lib/auth/viewer";
 import { STAFF_ROLE_LABELS, isStaffRole } from "@/lib/people/fields";
 import {
@@ -25,6 +34,7 @@ import { isUuid } from "@/lib/setup/structure";
 import type { Json } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 import type { FormState } from "../../platform/form-state";
+import type { SecretState } from "./secret-state";
 import {
   currentYear,
   existingStaffFor,
@@ -764,4 +774,131 @@ export async function commitImport(jobId: string): Promise<FormState> {
       : saved(`${accounts.length} staff added and invited.`);
   }
   return failed(TRY_AGAIN);
+}
+
+// Parent codes and learner PINs ---------------------------------------------------------
+
+/** The portal's address as the admin reached it, for links printed on slips. */
+async function portalOrigin(): Promise<string> {
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
+  const local = /^(localhost|127\.0\.0\.1)(:|$)/.test(host);
+  return `${h.get("x-forwarded-proto") ?? (local ? "http" : "https")}://${host}`;
+}
+
+function formatDay(iso: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "Africa/Harare",
+  }).format(new Date(iso));
+}
+
+const secretFailed = (message: string): SecretState => ({
+  status: "error",
+  message,
+  secret: null,
+});
+
+/**
+ * US-1.3: a one-time code (and link) for a guardian of this learner to set
+ * up their parent account. Only the code's hash is stored; any older code
+ * for the guardian stops working (D25).
+ */
+export async function createParentCode(
+  learnerId: string,
+  guardianId: string,
+): Promise<SecretState> {
+  const ctx = await adminContext();
+  if (!ctx || !isUuid(learnerId) || !isUuid(guardianId)) {
+    return secretFailed(NOT_ALLOWED.message!);
+  }
+  const supabase = await createClient();
+  const link = await supabase
+    .from("guardian_links")
+    .select("guardians!inner(full_name)")
+    .eq("learner_id", learnerId)
+    .eq("guardian_id", guardianId)
+    .eq("school_id", ctx.schoolId)
+    .maybeSingle();
+  if (link.error || !link.data) return secretFailed("This guardian is no longer linked.");
+
+  const code = generateInviteCode(randomInt);
+  const { data, error } = await supabase.rpc("create_parent_invite", {
+    p_guardian_id: guardianId,
+    p_code_hash: hashInviteCode(code),
+  });
+  if (error?.message === "this guardian already has an account") {
+    revalidatePath(learnerPath(learnerId));
+    return secretFailed("This guardian already has a parent account.");
+  }
+  if (error || !data[0]) return secretFailed("Could not make a code. Please try again.");
+
+  revalidatePath(learnerPath(learnerId));
+  return {
+    status: "saved",
+    message: null,
+    secret: {
+      label: `Parent code for ${link.data.guardians.full_name}`,
+      value: formatInviteCode(code),
+      details: [
+        `Or open ${inviteLink(await portalOrigin(), code)}`,
+        `Works once, until ${formatDay(data[0].expires_at)}. Making a new code stops this one.`,
+      ],
+    },
+  };
+}
+
+/**
+ * US-1.2 and US-1.7 for learners: gives the learner a new random PIN (and
+ * their account, the first time). They choose their own at their next sign
+ * in. The PIN is shown once and recorded in the audit log without its value.
+ */
+export async function resetLearnerPin(learnerId: string): Promise<SecretState> {
+  const ctx = await adminContext();
+  if (!ctx || !isUuid(learnerId)) return secretFailed(NOT_ALLOWED.message!);
+  const supabase = await createClient();
+  const [learner, school] = await Promise.all([
+    supabase
+      .from("learners")
+      .select("id, learner_number, first_name, last_name, status, user_id")
+      .eq("id", learnerId)
+      .eq("school_id", ctx.schoolId)
+      .maybeSingle(),
+    supabase.from("schools").select("slug").eq("id", ctx.schoolId).maybeSingle(),
+  ]);
+  if (learner.error || !learner.data || school.error || !school.data) {
+    return secretFailed(TRY_AGAIN);
+  }
+  const l = learner.data;
+  if (l.status !== "active") return secretFailed("Only active learners can sign in.");
+
+  const fullName = `${l.first_name} ${l.last_name}`;
+  const issued = await issueLearnerPin({
+    id: l.id,
+    schoolId: ctx.schoolId,
+    userId: l.user_id,
+    fullName,
+  });
+  if (!issued) return secretFailed("Could not set a PIN. Please try again.");
+  const linked = await supabase.rpc("link_learner_login", {
+    p_learner_id: l.id,
+    p_user_id: issued.userId,
+  });
+  if (linked.error) return secretFailed("Could not set a PIN. Please try again.");
+
+  revalidatePath(learnerPath(learnerId));
+  return {
+    status: "saved",
+    message: null,
+    secret: {
+      label: `PIN for ${fullName}`,
+      value: issued.pin,
+      details: [
+        `Learner number ${l.learner_number}. Sign in at ${await portalOrigin()}/sign-in/learner?school=${school.data.slug}`,
+        "They choose their own PIN when they first sign in. Any earlier PIN stops working.",
+      ],
+    },
+  };
 }

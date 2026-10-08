@@ -21,7 +21,9 @@ const LABELS = { fullName: "Full name", phone: "Phone", role: "Role" };
 
 const ADDED: Record<string, string> = {
   invited: "Added. An invite email is on its way.",
-  active: "Added. They already have an account, so they have access now.",
+  "has-account":
+    "Added. They already have an account, so they will be asked to accept when they next sign in.",
+  active: "Role added. They already work here, so they have access now.",
 };
 
 /**

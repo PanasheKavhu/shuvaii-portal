@@ -2,6 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import {
+  findOrCreateAccounts,
+  resendProblem,
+  sendInviteEmail,
+  unprovedMessage,
+} from "@/lib/auth/staff-accounts";
 import { getViewer } from "@/lib/auth/viewer";
 import { parseBrandColors } from "@/lib/branding/brand-colors";
 import { BRANDING_BUCKET } from "@/lib/branding/theme";
@@ -21,7 +27,8 @@ import type { FormState } from "./form-state";
  * Super-admin console actions (SPEC US-10.1, US-1.5). Each one checks the
  * caller is a platform admin; the writes then go through the user-scoped
  * client, so RLS and the write guards apply as well. The service-role
- * client is used only to create the invitee's Auth account.
+ * client is used only for the invitee's Auth account and invite email
+ * (src/lib/auth/staff-accounts.ts, shared with /admin/people).
  *
  * Audit (D18): creating a school and changing its colours or logo are
  * recorded by a trigger on `schools`; invites are recorded here through
@@ -137,10 +144,11 @@ export async function uploadLogo(
 }
 
 /**
- * Invites a school's first admin (US-10.1). A new person gets a Supabase
- * Auth invite email and an `invited` membership, activated when they set
- * their password (/auth/confirm, then /welcome). Someone who already has an
- * account is given an active membership straight away. See D14.
+ * Invites a school's first admin (US-10.1). The membership starts
+ * `invited`. A new person gets a Supabase Auth invite email and accepts
+ * by setting their password (/auth/confirm, then /welcome); someone who
+ * already has an account accepts on /welcome when they next sign in. See
+ * D14, D27.
  */
 export async function inviteSchoolAdmin(
   schoolId: string,
@@ -170,37 +178,42 @@ export async function inviteSchoolAdmin(
     return { status: "error", message: "This school already has an admin.", errors: {} };
   }
 
-  const admin = createAdminClient();
-  let userId: string;
-  let status: "invited" | "active";
-
-  const invited = await admin.auth.admin.inviteUserByEmail(email, {
-    data: { full_name: fullName },
-  });
-  if (invited.data.user) {
-    userId = invited.data.user.id;
-    status = "invited";
-  } else if (invited.error?.code === "email_exists") {
-    const existing = await admin.from("profiles").select("id").eq("email", email).maybeSingle();
-    if (existing.error || !existing.data) return FAILED("send the invite");
-    userId = existing.data.id;
-    status = "active";
-  } else {
-    return FAILED("send the invite");
+  const found = await findOrCreateAccounts([{ email, fullName }]);
+  if (!found.ok) {
+    return found.unproved
+      ? { status: "error", message: null, errors: { email: unprovedMessage(found.unproved) } }
+      : FAILED("send the invite");
   }
+  const account = found.accounts[0]!;
 
   const membership = await supabase
     .from("memberships")
-    .insert({ school_id: schoolId, user_id: userId, role: "school_admin", status })
+    .insert({
+      school_id: schoolId,
+      user_id: account.userId,
+      role: "school_admin",
+      status: "invited",
+    })
     .select("id")
     .single();
   if (membership.error) return FAILED("add the school admin");
-
   revalidatePath(`/platform/schools/${schoolId}`);
-  const message =
-    status === "invited"
-      ? `Invite sent to ${email}.`
-      : `${email} already has an account, so they are now this school's admin.`;
+
+  if (account.hasAccount) {
+    return logInviteEvent(
+      membership.data.id,
+      "admin_invited",
+      `${email} already has an account, so they will be asked to accept when they next sign in.`,
+    );
+  }
+  if ((await sendInviteEmail(email, fullName)) !== "sent") {
+    return {
+      status: "error",
+      message: `${email} was added, but the invite email could not be sent. Use Resend invite.`,
+      errors: {},
+    };
+  }
+  const message = `Invite sent to ${email}.`;
   return logInviteEvent(membership.data.id, "admin_invited", message);
 }
 
@@ -228,8 +241,7 @@ export async function resendInvite(schoolId: string, membershipId: string): Prom
     return { status: "error", message: "This invite is no longer waiting.", errors: {} };
   }
 
-  const admin = createAdminClient();
-  const profile = await admin
+  const profile = await createAdminClient()
     .from("profiles")
     .select("email")
     .eq("id", pending.data.user_id)
@@ -237,22 +249,9 @@ export async function resendInvite(schoolId: string, membershipId: string): Prom
   if (profile.error || !profile.data?.email) return FAILED("resend the invite");
   const email = profile.data.email;
 
-  const invited = await admin.auth.admin.inviteUserByEmail(email);
-  if (invited.error?.code === "email_exists") {
-    return {
-      status: "error",
-      message: `${email} has already set a password. Ask them to sign in.`,
-      errors: {},
-    };
-  }
-  if (invited.error?.code === "over_email_send_rate_limit") {
-    return {
-      status: "error",
-      message: "An invite was sent moments ago. Please wait a minute and try again.",
-      errors: {},
-    };
-  }
-  if (invited.error) return FAILED("resend the invite");
+  const outcome = await sendInviteEmail(email);
+  if (outcome !== "sent")
+    return { status: "error", message: resendProblem(outcome, email), errors: {} };
 
   return logInviteEvent(pending.data.id, "invite_resent", `Invite sent again to ${email}.`);
 }

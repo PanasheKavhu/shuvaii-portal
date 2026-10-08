@@ -107,23 +107,35 @@ export async function auditEventsAs(
 }
 
 /**
- * A fresh account with no school, made through the public sign-up API, so a
- * test can change its password without touching the seed users.
+ * A confirmed test account with the demo password. Public sign-up is off
+ * (D27), so tests make accounts with the local service-role key, as
+ * scripts/seed.mjs does; this never runs in the app.
  */
-export async function createLoneUser(prefix: string): Promise<string> {
+export async function createTestAccount(email: string, fullName?: string): Promise<string> {
   try {
     process.loadEnvFile(".env.local");
   } catch {
     // Already in the environment (CI).
   }
-  const email = `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@demo.spportal.test`;
-  const supabase = createClient<Database>(
+  const admin = createClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { persistSession: false } },
   );
-  const { error } = await supabase.auth.signUp({ email, password: PASSWORD });
-  if (error) throw new Error("Could not create a test user");
+  const { data, error } = await admin.auth.admin.createUser({
+    email,
+    password: PASSWORD,
+    email_confirm: true,
+    ...(fullName && { user_metadata: { full_name: fullName } }),
+  });
+  if (error || !data.user) throw new Error("Could not create a test user");
+  return data.user.id;
+}
+
+/** A fresh account with no school, so a test can change its password without touching the seed users. */
+export async function createLoneUser(prefix: string): Promise<string> {
+  const email = `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@demo.spportal.test`;
+  await createTestAccount(email);
   return email;
 }
 
@@ -160,6 +172,7 @@ export async function resetEmailFor(to: string): Promise<{ tokenHash: string; co
 export async function createEmptySchool(prefix: string): Promise<{
   schoolId: string;
   adminEmail: string;
+  teacherEmail: string;
   teacherName: string;
   hodName: string;
 }> {
@@ -178,13 +191,7 @@ export async function createEmptySchool(prefix: string): Promise<{
 
   async function newUser(role: string, fullName: string) {
     const email = `${prefix}-${role}-${stamp}@demo.spportal.test`;
-    const { data, error } = await client().auth.signUp({
-      email,
-      password: PASSWORD,
-      options: { data: { full_name: fullName } },
-    });
-    if (error || !data.user) throw new Error("Could not create a test user");
-    return { id: data.user.id, email };
+    return { id: await createTestAccount(email, fullName), email };
   }
 
   const platform = client();
@@ -211,7 +218,13 @@ export async function createEmptySchool(prefix: string): Promise<{
     { school_id: school.id, user_id: hod.id, role: "hod", status: "active" },
   ]);
   if (memberError) throw new Error("Could not add the test school's staff");
-  return { schoolId: school.id, adminEmail: admin.email, teacherName, hodName };
+  return {
+    schoolId: school.id,
+    adminEmail: admin.email,
+    teacherEmail: teacher.email,
+    teacherName,
+    hodName,
+  };
 }
 
 /**

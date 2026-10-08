@@ -24,7 +24,7 @@ export default async function NewStaffPage() {
       <h2 className="text-xl font-semibold">Add a staff member</h2>
       <p className="text-muted-foreground text-sm">
         They get an email invite to set their password. Someone who already has an SP Portal account
-        (for example at another school) gets access straight away.
+        (for example at another school) accepts when they next sign in.
       </p>
       <div className="bg-card rounded-2xl border p-4">
         <ActionForm

@@ -2,6 +2,7 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { EMAIL_UNVERIFIED } from "@/lib/auth/account-trust";
 import { SCHOOL_COOKIE } from "@/lib/auth/active-school";
 import { parseNewPassword } from "@/lib/auth/new-password";
 import { endResetSession, hasResetSession } from "@/lib/auth/reset-session";
@@ -45,7 +46,12 @@ export async function resetPassword(_prev: ResetState, formData: FormData): Prom
   // Anyone who knew the old password is signed out everywhere else.
   await supabase.auth.signOut({ scope: "others" });
   await endResetSession();
-  if (user.email) await recordAttempt(createAdminClient(), emailHash(user.email), true);
+  const admin = createAdminClient();
+  if (user.email) await recordAttempt(admin, emailHash(user.email), true);
+  // The reset link or code reached this inbox, so the address is proved (D27).
+  if (user.app_metadata?.[EMAIL_UNVERIFIED] === true) {
+    await admin.auth.admin.updateUserById(user.id, { app_metadata: { [EMAIL_UNVERIFIED]: null } });
+  }
 
   (await cookies()).delete(SCHOOL_COOKIE);
   const viewer = await loadViewer(supabase, user.id);

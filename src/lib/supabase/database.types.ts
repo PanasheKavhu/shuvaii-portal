@@ -1081,6 +1081,7 @@ export type Database = {
         }[]
       }
       current_school_ids: { Args: never; Returns: string[] }
+      decline_my_invites: { Args: never; Returns: number }
       grading_scale_is_complete: {
         Args: { p_scale_id: string }
         Returns: boolean
@@ -1126,6 +1127,13 @@ export type Database = {
           last_name: string
           learner_id: string
           learner_number: string
+        }[]
+      }
+      my_pending_invites: {
+        Args: never
+        Returns: {
+          role: Database["public"]["Enums"]["app_role"]
+          school_name: string
         }[]
       }
       parent_invite_preview: {

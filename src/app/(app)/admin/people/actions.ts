@@ -11,6 +11,12 @@ import {
   inviteLink,
 } from "@/lib/auth/invite-code";
 import { issueLearnerPin } from "@/lib/auth/learner-accounts";
+import {
+  findOrCreateAccounts,
+  resendProblem,
+  sendInviteEmail,
+  unprovedMessage,
+} from "@/lib/auth/staff-accounts";
 import { getActiveSchool, getViewer } from "@/lib/auth/viewer";
 import { STAFF_ROLE_LABELS, isStaffRole } from "@/lib/people/fields";
 import {
@@ -45,12 +51,7 @@ import {
   listYearClasses,
   type ImportReport,
 } from "./data";
-import {
-  findOrCreateAccounts,
-  hasConfirmedAccount,
-  resendStaffInvite,
-  sendStaffInvites,
-} from "./staff-accounts";
+import { sendStaffInvites } from "./staff-accounts";
 
 /**
  * School admin actions for /admin/people (SPEC US-3.1 to US-3.4, D24).
@@ -455,6 +456,17 @@ function staffPath(userId: string): string {
   return `/admin/people/staff/${userId}`;
 }
 
+/**
+ * People who already accepted a role in this school. A new role for them
+ * starts active; anyone else's starts `invited` until they accept (D27).
+ */
+async function activeStaffIds(schoolId: string): Promise<Set<string>> {
+  const staff = await listStaff(schoolId);
+  return new Set(
+    staff.filter((p) => p.memberships.some((m) => m.status === "active")).map((p) => p.userId),
+  );
+}
+
 /** US-3.3: add one staff member with an invite, as the staff import does. */
 export async function addStaff(_prev: FormState, formData: FormData): Promise<FormState> {
   const ctx = await adminContext();
@@ -478,26 +490,35 @@ export async function addStaff(_prev: FormState, formData: FormData): Promise<Fo
     });
   }
 
-  const accounts = await findOrCreateAccounts([p]);
-  if (!accounts) return failed(TRY_AGAIN);
-  const account = accounts[0]!;
+  const found = await findOrCreateAccounts([p]);
+  if (!found.ok)
+    return found.unproved
+      ? failed(null, { email: unprovedMessage(found.unproved) })
+      : failed(TRY_AGAIN);
+  const account = found.accounts[0]!;
   if (account.userId === ctx.userId) return failed("You cannot add a role for yourself.");
 
+  const status = (await activeStaffIds(ctx.schoolId)).has(account.userId) ? "active" : "invited";
   const supabase = await createClient();
   const { error } = await supabase.from("memberships").insert({
     school_id: ctx.schoolId,
     user_id: account.userId,
     role: p.role,
-    status: account.status,
+    status,
   });
   if (error) return failed(TRY_AGAIN);
 
-  const notSent = await sendStaffInvites(ctx.schoolId, accounts);
+  const notSent = await sendStaffInvites(
+    ctx.schoolId,
+    found.accounts,
+    new Map([[p.email, p.fullName]]),
+  );
   revalidatePath("/admin/people/staff");
   if (notSent.length) {
     redirect(`${staffPath(account.userId)}?invite=failed`);
   }
-  redirect(`${staffPath(account.userId)}?added=${account.status}`);
+  const added = status === "active" ? "active" : account.hasAccount ? "has-account" : "invited";
+  redirect(`${staffPath(account.userId)}?added=${added}`);
 }
 
 /** US-3.3: a staff member's name and phone. */
@@ -522,6 +543,9 @@ export async function updateStaffDetails(
     // The function takes null for "no phone"; the generated type says string.
     p_phone: parsed.value.phone as string,
   });
+  if (error?.message === "staff_shared") {
+    return failed("They also belong to another school, so they change their own details.");
+  }
   if (error) return failed(TRY_AGAIN);
   revalidatePath(staffPath(userId));
   revalidatePath("/admin/people/staff");
@@ -530,8 +554,9 @@ export async function updateStaffDetails(
 
 /**
  * US-3.3: disable a role (a leaver) or re-enable it. Nobody disables their
- * own role. Re-enabling someone who never set a password puts them back
- * to `invited`, so "Resend invite" works for them.
+ * own role. Re-enabling gives access back at once only to someone with
+ * another active role here; anyone else goes back to `invited` and
+ * accepts again (D27), so "Resend invite" works for them.
  */
 export async function setMembershipStatus(
   userId: string,
@@ -543,7 +568,11 @@ export async function setMembershipStatus(
   if (userId === ctx.userId) return failed("You cannot change your own access.");
 
   const status =
-    next === "disabled" ? "disabled" : (await hasConfirmedAccount(userId)) ? "active" : "invited";
+    next === "disabled"
+      ? "disabled"
+      : (await activeStaffIds(ctx.schoolId)).has(userId)
+        ? "active"
+        : "invited";
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("memberships")
@@ -571,7 +600,7 @@ export async function addStaffRole(
   const role = formData.get("role");
   if (!isStaffRole(role)) return failed(null, { role: "Choose a role." });
 
-  const status = (await hasConfirmedAccount(userId)) ? "active" : "invited";
+  const status = (await activeStaffIds(ctx.schoolId)).has(userId) ? "active" : "invited";
   const supabase = await createClient();
   const { error } = await supabase
     .from("memberships")
@@ -594,12 +623,8 @@ export async function resendStaffInviteAction(userId: string): Promise<FormState
     return failed("This invite is no longer waiting.");
   }
 
-  const outcome = await resendStaffInvite(person.email);
-  if (outcome === "accepted")
-    return failed(`${person.email} has already set a password. Ask them to sign in.`);
-  if (outcome === "too-soon")
-    return failed("An invite was sent moments ago. Please wait a minute and try again.");
-  if (outcome === "failed") return failed("Could not resend the invite. Please try again.");
+  const outcome = await sendInviteEmail(person.email);
+  if (outcome !== "sent") return failed(resendProblem(outcome, person.email));
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("log_staff_invite_event", {
@@ -745,19 +770,35 @@ export async function commitImport(jobId: string): Promise<FormState> {
   }
 
   if ("staff" in checked && checked.staff) {
-    const accounts = await findOrCreateAccounts(checked.staff.staff);
-    if (!accounts) return failed("Nothing was imported. Please try again.");
+    const rows = checked.staff.staff;
+    const found = await findOrCreateAccounts(rows);
+    if (!found.ok) {
+      return failed(
+        found.unproved
+          ? `Nothing was imported. ${unprovedMessage(found.unproved)}`
+          : "Nothing was imported. Please try again.",
+      );
+    }
+    const userIdByEmail = new Map(found.accounts.map((a) => [a.email, a.userId]));
+    const activeHere = await activeStaffIds(ctx.schoolId);
     const { error } = await supabase.rpc("commit_staff_import", {
       p_job_id: jobId,
-      p_members: accounts.map((a) => ({
-        user_id: a.userId,
-        role: a.role,
-        status: a.status,
-      })) as Json,
+      p_members: rows.map((row) => {
+        const userId = userIdByEmail.get(row.email)!;
+        return {
+          user_id: userId,
+          role: row.role,
+          status: activeHere.has(userId) ? "active" : "invited",
+        };
+      }) as Json,
     });
     if (error) return failed("Nothing was imported. Please try again.");
 
-    const notSent = await sendStaffInvites(ctx.schoolId, accounts);
+    const notSent = await sendStaffInvites(
+      ctx.schoolId,
+      found.accounts,
+      new Map(rows.map((row) => [row.email, row.fullName])),
+    );
     if (notSent.length) {
       const current = await getImportJob(ctx.schoolId, jobId);
       await supabase
@@ -769,9 +810,9 @@ export async function commitImport(jobId: string): Promise<FormState> {
     revalidatePath("/admin/people/staff");
     return notSent.length
       ? failed(
-          `${accounts.length} staff added, but ${notSent.length} invite emails could not be sent. Use "Resend invite" on their pages.`,
+          `${rows.length} staff added, but ${notSent.length} invite emails could not be sent. Use "Resend invite" on their pages.`,
         )
-      : saved(`${accounts.length} staff added and invited.`);
+      : saved(`${rows.length} staff added and invited.`);
   }
   return failed(TRY_AGAIN);
 }

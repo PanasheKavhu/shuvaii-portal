@@ -48,6 +48,15 @@ export async function getActiveSchool(viewer: Viewer): Promise<SchoolMembership 
 
 /** Where a signed-in viewer should go from "/" or after choosing a school. */
 export async function landingPathFor(viewer: Viewer): Promise<string> {
+  // A staff role waiting for their answer comes first (D27).
+  const supabase = await createClient();
+  const { count } = await supabase
+    .from("memberships")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", viewer.userId)
+    .eq("status", "invited");
+  if (count) return "/welcome";
+
   const school = await getActiveSchool(viewer);
   if (school) return homeFor(school.roles, viewer.isPlatformAdmin) ?? "/no-access";
   if (viewer.schools.length > 1) return "/select-school";

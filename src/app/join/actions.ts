@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { EMAIL_UNVERIFIED, matchesEmailOnFile } from "@/lib/auth/account-trust";
 import { hashInviteCode, normalizeInviteCode } from "@/lib/auth/invite-code";
 import { parseParentSignUp } from "@/lib/auth/parent-sign-up";
 import { rememberSchool } from "@/lib/auth/school-cookie";
@@ -76,17 +77,22 @@ export async function claimWithNewAccount(
   const preview = await supabase.rpc("parent_invite_preview", {
     p_code_hash: hashInviteCode(code),
   });
-  const status = preview.data?.[0]?.status;
-  if (preview.error || !status) return fail(TRY_AGAIN);
-  if (status !== "valid") return fail(redeemError(`invite_${status}`));
+  const invite = preview.data?.[0];
+  if (preview.error || !invite?.status) return fail(TRY_AGAIN);
+  if (invite.status !== "valid") return fail(redeemError(`invite_${invite.status}`));
 
-  // The code proves the school knows this parent, so the address is
-  // confirmed here; a mistyped one can be fixed by the school later (D25).
+  // The code proves the school knows this parent, so they can sign in with
+  // the address straight away (D25). Only the address the school has on
+  // file counts as proved; any other is flagged so it can never become a
+  // staff account until a password reset proves the inbox (D27).
   const created = await createAdminClient().auth.admin.createUser({
     email,
     password,
     email_confirm: true,
     user_metadata: { full_name: fullName },
+    ...(!matchesEmailOnFile(email, invite.guardian_email) && {
+      app_metadata: { [EMAIL_UNVERIFIED]: true },
+    }),
   });
   if (created.error?.code === "email_exists") {
     return fail(null, {

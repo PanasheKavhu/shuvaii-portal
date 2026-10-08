@@ -231,6 +231,110 @@ export type Database = {
           },
         ]
       }
+      enrolment_subjects: {
+        Row: {
+          class_subject_id: string
+          created_at: string
+          enrolment_id: string
+          id: string
+          school_id: string
+          updated_at: string
+        }
+        Insert: {
+          class_subject_id: string
+          created_at?: string
+          enrolment_id: string
+          id?: string
+          school_id: string
+          updated_at?: string
+        }
+        Update: {
+          class_subject_id?: string
+          created_at?: string
+          enrolment_id?: string
+          id?: string
+          school_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enrolment_subjects_class_subject_id_school_id_fkey"
+            columns: ["class_subject_id", "school_id"]
+            isOneToOne: false
+            referencedRelation: "class_subjects"
+            referencedColumns: ["id", "school_id"]
+          },
+          {
+            foreignKeyName: "enrolment_subjects_enrolment_id_school_id_fkey"
+            columns: ["enrolment_id", "school_id"]
+            isOneToOne: false
+            referencedRelation: "enrolments"
+            referencedColumns: ["id", "school_id"]
+          },
+          {
+            foreignKeyName: "enrolment_subjects_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      enrolments: {
+        Row: {
+          academic_year_id: string
+          class_id: string
+          created_at: string
+          id: string
+          learner_id: string
+          school_id: string
+          status: Database["public"]["Enums"]["enrolment_status"]
+          updated_at: string
+        }
+        Insert: {
+          academic_year_id: string
+          class_id: string
+          created_at?: string
+          id?: string
+          learner_id: string
+          school_id: string
+          status?: Database["public"]["Enums"]["enrolment_status"]
+          updated_at?: string
+        }
+        Update: {
+          academic_year_id?: string
+          class_id?: string
+          created_at?: string
+          id?: string
+          learner_id?: string
+          school_id?: string
+          status?: Database["public"]["Enums"]["enrolment_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enrolments_class_id_academic_year_id_school_id_fkey"
+            columns: ["class_id", "academic_year_id", "school_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id", "academic_year_id", "school_id"]
+          },
+          {
+            foreignKeyName: "enrolments_learner_id_school_id_fkey"
+            columns: ["learner_id", "school_id"]
+            isOneToOne: false
+            referencedRelation: "learners"
+            referencedColumns: ["id", "school_id"]
+          },
+          {
+            foreignKeyName: "enrolments_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       grade_levels: {
         Row: {
           created_at: string
@@ -367,6 +471,220 @@ export type Database = {
             columns: ["school_id"]
             isOneToOne: false
             referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      guardian_links: {
+        Row: {
+          created_at: string
+          guardian_id: string
+          id: string
+          is_primary: boolean
+          learner_id: string
+          relationship: string
+          school_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          guardian_id: string
+          id?: string
+          is_primary?: boolean
+          learner_id: string
+          relationship: string
+          school_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          guardian_id?: string
+          id?: string
+          is_primary?: boolean
+          learner_id?: string
+          relationship?: string
+          school_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guardian_links_guardian_id_school_id_fkey"
+            columns: ["guardian_id", "school_id"]
+            isOneToOne: false
+            referencedRelation: "guardians"
+            referencedColumns: ["id", "school_id"]
+          },
+          {
+            foreignKeyName: "guardian_links_learner_id_school_id_fkey"
+            columns: ["learner_id", "school_id"]
+            isOneToOne: false
+            referencedRelation: "learners"
+            referencedColumns: ["id", "school_id"]
+          },
+          {
+            foreignKeyName: "guardian_links_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      guardians: {
+        Row: {
+          created_at: string
+          email: string | null
+          full_name: string
+          id: string
+          phone: string | null
+          school_id: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          full_name: string
+          id?: string
+          phone?: string | null
+          school_id: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          full_name?: string
+          id?: string
+          phone?: string | null
+          school_id?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guardians_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guardians_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      import_jobs: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          error_report: Json | null
+          file_path: string | null
+          id: string
+          kind: Database["public"]["Enums"]["import_kind"]
+          school_id: string
+          status: Database["public"]["Enums"]["import_status"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          error_report?: Json | null
+          file_path?: string | null
+          id?: string
+          kind: Database["public"]["Enums"]["import_kind"]
+          school_id: string
+          status?: Database["public"]["Enums"]["import_status"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          error_report?: Json | null
+          file_path?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["import_kind"]
+          school_id?: string
+          status?: Database["public"]["Enums"]["import_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_jobs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_jobs_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      learners: {
+        Row: {
+          admission_date: string | null
+          created_at: string
+          date_of_birth: string | null
+          first_name: string
+          id: string
+          last_name: string
+          learner_number: string
+          school_id: string
+          sex: Database["public"]["Enums"]["sex"] | null
+          status: Database["public"]["Enums"]["learner_status"]
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          admission_date?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          first_name: string
+          id?: string
+          last_name: string
+          learner_number: string
+          school_id: string
+          sex?: Database["public"]["Enums"]["sex"] | null
+          status?: Database["public"]["Enums"]["learner_status"]
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          admission_date?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          first_name?: string
+          id?: string
+          last_name?: string
+          learner_number?: string
+          school_id?: string
+          sex?: Database["public"]["Enums"]["sex"] | null
+          status?: Database["public"]["Enums"]["learner_status"]
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "learners_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "learners_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -683,6 +1001,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_class_teacher: { Args: { p_class_id: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
       is_staff: { Args: { p_school_id: string }; Returns: boolean }
       log_invite_event: {
@@ -697,6 +1016,7 @@ export type Database = {
         Args: { p_year_id: string }
         Returns: undefined
       }
+      teaches: { Args: { p_class_subject_id: string }; Returns: boolean }
     }
     Enums: {
       app_role:
@@ -707,9 +1027,20 @@ export type Database = {
         | "parent"
         | "learner"
       audit_action: "insert" | "update" | "delete" | "event"
+      enrolment_status:
+        | "enrolled"
+        | "promoted"
+        | "repeating"
+        | "transferred"
+        | "left"
+        | "graduated"
+      import_kind: "staff" | "learners" | "marks"
+      import_status: "validated" | "committed" | "failed"
+      learner_status: "active" | "left" | "graduated"
       level_stage: "ecd" | "primary" | "o_level" | "a_level"
       membership_status: "invited" | "active" | "disabled"
       school_stage: "primary" | "secondary" | "combined"
+      sex: "F" | "M"
       term_kind: "term" | "vacation" | "mock"
       term_status: "planned" | "open" | "locked" | "closed"
     }
@@ -841,9 +1172,21 @@ export const Constants = {
     Enums: {
       app_role: ["school_admin", "head", "hod", "teacher", "parent", "learner"],
       audit_action: ["insert", "update", "delete", "event"],
+      enrolment_status: [
+        "enrolled",
+        "promoted",
+        "repeating",
+        "transferred",
+        "left",
+        "graduated",
+      ],
+      import_kind: ["staff", "learners", "marks"],
+      import_status: ["validated", "committed", "failed"],
+      learner_status: ["active", "left", "graduated"],
       level_stage: ["ecd", "primary", "o_level", "a_level"],
       membership_status: ["invited", "active", "disabled"],
       school_stage: ["primary", "secondary", "combined"],
+      sex: ["F", "M"],
       term_kind: ["term", "vacation", "mock"],
       term_status: ["planned", "open", "locked", "closed"],
     },

@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // Seeds the local Supabase stack from seed/*.csv: creates an auth user for
 // every row in profiles.csv (triggering public.handle_new_user), then loads
-// schools, platform_admins, memberships and the academic structure tables. See seed/README.md for the load
-// order and what is deliberately not seeded.
+// schools, platform_admins, memberships, the academic structure tables and
+// the people tables. See seed/README.md for the load order and what is
+// deliberately not seeded.
 //
 // Usage: npm run db:seed  (reads SUPABASE env vars from .env.local; see
 // package.json, which passes --env-file to Node).
@@ -224,14 +225,28 @@ async function seedAcademicStructure() {
   await upsertCsv("class_subjects");
 }
 
+/**
+ * People in the documented order: learners, enrolments, enrolment_subjects,
+ * guardians, guardian_links. import_jobs is not seeded (seed/README.md).
+ * Learner rows are audited (D18), so a re-run adds audit rows for them.
+ */
+async function seedPeople() {
+  await upsertCsv("learners");
+  await upsertCsv("enrolments");
+  await upsertCsv("enrolment_subjects");
+  await upsertCsv("guardians");
+  await upsertCsv("guardian_links");
+}
+
 async function main() {
   // Load order per seed/README.md: auth users (-> profiles), schools,
-  // platform_admins, memberships, then the academic structure.
+  // platform_admins, memberships, the academic structure, then people.
   await seedAuthUsersAndProfiles();
   await seedSchools();
   await seedPlatformAdmins();
   await seedMemberships();
   await seedAcademicStructure();
+  await seedPeople();
   console.log("Seed complete.");
 }
 

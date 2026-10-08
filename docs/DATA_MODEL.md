@@ -112,8 +112,8 @@ id, school_id, name ('Form 4'), stage level_stage, sort_order, grading_scale_id 
 **academic_years**
 
 ```
-id, school_id, label ('2026'), starts_on, ends_on, is_current
-unique (school_id, label); at most one is_current per school
+id, school_id, label ('2026'), starts_on, ends_on, is_current, setup_completed_at (null while the setup wizard is in progress, D22)
+unique (school_id, label); at most one is_current per school (set_current_academic_year()); finishing is refused while academic_year_setup_gaps() returns rows (D22)
 ```
 
 **terms**: reporting periods.
@@ -141,7 +141,7 @@ unique (school_id, code)
 **class_subjects**: a subject taught to a class, with its teacher.
 
 ```
-id, school_id, class_id, subject_id, teacher_id fk profiles not null
+id, school_id, class_id, subject_id, teacher_id fk profiles (null only while the year's setup is in progress, D22)
 unique (class_id, subject_id); teacher and class teacher must be active teacher or hod (D20)
 ```
 
@@ -195,7 +195,8 @@ One guardian linked to two learners is how siblings appear under one parent logi
 id, school_id, scale_id, grade, min_mark int, max_mark int, remark, sort_order
 check min_mark <= max_mark; a validation function proves a scale covers 0 to 100
 with no gaps or overlaps before it can be set default
-(grading_scale_problems, grading_scale_is_complete; D21).
+(grading_scale_problems, grading_scale_is_complete; D21). The band editor replaces a
+scale's bands in one call, save_grading_bands() (D22).
 ```
 
 **assessments**

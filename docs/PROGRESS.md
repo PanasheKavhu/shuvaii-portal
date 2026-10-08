@@ -4,7 +4,7 @@ Update at the end of every story (definition of done, `SPEC.md` section 6).
 
 ## Current phase
 
-Phase 1 (E1: access, tenancy, branding). Tenancy schema, staff sign in, password reset, role-based navigation, school theming and a minimal super-admin console done. Phase 2 schema started: academic structure tables are in; the setup wizard (US-2.1) is not built yet.
+Phase 1 (E1: access, tenancy, branding). Tenancy schema, staff sign in, password reset, role-based navigation, school theming and a minimal super-admin console done. Phase 2 started: academic structure tables and the school admin setup area (US-2.1 to US-2.4) are in.
 
 ## Done
 
@@ -22,6 +22,8 @@ Phase 1 (E1: access, tenancy, branding). Tenancy schema, staff sign in, password
 
 - 2026-10-07: Academic structure tables (migration order step 3): `grading_scales`, `grading_bands`, `grade_levels`, `academic_years`, `terms`, `classes`, `subjects`, `class_subjects`, each with `school_id`, same-school foreign keys and RLS (staff read, school admin writes, D20). `grading_scale_problems()` and `grading_scale_is_complete()` check a scale covers 0 to 100 with no gaps or overlaps, and a scale cannot be default unless it does (D21). One teacher per class subject; class and subject teachers must be active teaching staff of the school. `scripts/seed.mjs` loads these CSVs in the documented order; types regenerated. pgTAP (`08_academic_structure.test.sql`, 104 tests): cross-school read and write for every table, a teacher who reads but cannot write any of them, head and parent reads, gap, overlap, good and empty scales, the default guard, teacher checks and cross-school references.
 
+- 2026-10-08: School admin setup area at `/admin/setup` (US-2.1 setup wizard, US-2.2 assign teachers, US-2.3 grading scale editor, US-2.4 term status and marks deadline). A new year is proposed with three terms and the April vacation school; a new scale starts from the O-level bands. Steps for terms, scales and the band editor (names each gap, overlap and out-of-range band as you type), grade levels, subjects, classes with class teachers, and class subjects with one teacher each; a teacher (or HOD) may take many subjects across classes and grades, and the class subjects step shows who teaches what. Finishing is blocked, with a linked list of gaps, while a class has no class teacher or a class subject has no teacher (D22). Migration `setup_wizard`: class subject teacher optional until finish, `academic_years.setup_completed_at`, `academic_year_setup_gaps()`, `save_grading_bands()`, `set_current_academic_year()`. Pure rules in `src/lib/setup` with unit tests; pgTAP `09_setup_wizard.test.sql` (24 tests); Playwright at 360 px: an admin of a new school sets up a year from scratch, finishing is refused until the gaps are fixed, and a teacher gets 403 on `/admin/setup`.
+
 ## In progress
 
 _None._
@@ -30,7 +32,7 @@ _None._
 
 - US-1.2 learner sign in (learner number and PIN), with the admin PIN reset that completes US-1.7 for learners.
 - `invites` table with US-1.3 parent accounts (D7).
-- People tables (migration order step 4: learners, enrolments, enrolment_subjects, guardians, guardian_links) and the US-2.1 setup wizard screens on top of the structure tables.
+- People tables (migration order step 4: learners, enrolments, enrolment_subjects, guardians, guardian_links).
 - US-10.3 feature flags and US-10.4 usage in the console.
 
 ## Known gaps
@@ -39,6 +41,7 @@ _None._
 - `sign_in_attempts` rows are never pruned (D8).
 - Password reset by phone code (US-1.7) waits for an SMS provider (D19).
 - Two-factor sign in for super admin, school admin and head (SPEC section 5) is not built yet.
+- Setup area: terms, classes, grade levels, subjects and scales can be added and edited but not removed from the screens yet (class subjects can). Locking marks after the deadline and unlocking with a reason (US-2.4) come with marks entry in Phase 3 (D22).
 
 ## Go-live checklist
 

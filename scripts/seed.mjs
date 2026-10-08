@@ -256,7 +256,9 @@ async function seedLearnerLogins() {
   const learners = readCsv("learners").filter((row) => row.user_id);
   for (const row of learners) {
     const { error } = await admin.auth.admin.updateUserById(row.user_id, {
-      password: createHmac("sha256", secret).update(`${row.user_id}:${DEMO_PIN}`).digest("base64url"),
+      password: createHmac("sha256", secret)
+        .update(`${row.user_id}:${DEMO_PIN}`)
+        .digest("base64url"),
       app_metadata: { learner_id: row.id, school_id: row.school_id, pin_must_change: false },
     });
     if (error) throw new Error(`setting learner login ${row.id} failed: ${error.message}`);

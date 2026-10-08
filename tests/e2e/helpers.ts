@@ -151,3 +151,65 @@ export async function resetEmailFor(to: string): Promise<{ tokenHash: string; co
   if (!tokenHash || !code) throw new Error("Reset email has no link or code");
   return { tokenHash, code };
 }
+
+/**
+ * A brand-new school with an active school admin, a teacher and a head of
+ * department, made through the API as the platform admin (who may create
+ * schools and memberships, D3). Returns the admin's email and the staff names.
+ */
+export async function createEmptySchool(prefix: string): Promise<{
+  schoolId: string;
+  adminEmail: string;
+  teacherName: string;
+  hodName: string;
+}> {
+  try {
+    process.loadEnvFile(".env.local");
+  } catch {
+    // Already in the environment (CI).
+  }
+  const client = () =>
+    createClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { auth: { persistSession: false } },
+    );
+  const stamp = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+
+  async function newUser(role: string, fullName: string) {
+    const email = `${prefix}-${role}-${stamp}@demo.spportal.test`;
+    const { data, error } = await client().auth.signUp({
+      email,
+      password: PASSWORD,
+      options: { data: { full_name: fullName } },
+    });
+    if (error || !data.user) throw new Error("Could not create a test user");
+    return { id: data.user.id, email };
+  }
+
+  const platform = client();
+  const signedIn = await platform.auth.signInWithPassword({
+    email: PLATFORM_ADMIN,
+    password: PASSWORD,
+  });
+  if (signedIn.error) throw new Error("Could not sign in as the platform admin");
+  const { data: school, error } = await platform
+    .from("schools")
+    .insert({ name: `Setup School ${stamp}`, slug: `setup-${stamp}`, stage: "secondary" })
+    .select("id")
+    .single();
+  if (error) throw new Error("Could not create a test school");
+
+  const teacherName = `Tendai Teacher ${stamp}`;
+  const hodName = `Hazel Hod ${stamp}`;
+  const admin = await newUser("admin", `Ada Admin ${stamp}`);
+  const teacher = await newUser("teacher", teacherName);
+  const hod = await newUser("hod", hodName);
+  const { error: memberError } = await platform.from("memberships").insert([
+    { school_id: school.id, user_id: admin.id, role: "school_admin", status: "active" },
+    { school_id: school.id, user_id: teacher.id, role: "teacher", status: "active" },
+    { school_id: school.id, user_id: hod.id, role: "hod", status: "active" },
+  ]);
+  if (memberError) throw new Error("Could not add the test school's staff");
+  return { schoolId: school.id, adminEmail: admin.email, teacherName, hodName };
+}

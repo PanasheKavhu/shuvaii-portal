@@ -4,7 +4,7 @@ Update at the end of every story (definition of done, `SPEC.md` section 6).
 
 ## Current phase
 
-Phase 1 (E1: access, tenancy, branding). Tenancy schema, staff, learner and parent sign in, password reset, role-based navigation, school theming and a minimal super-admin console done. Phase 2 (E2, E3: school setup and people) done and tagged `v0.2.0` after its gate: academic structure tables, the school admin setup area (US-2.1 to US-2.4), the people tables and the people admin area (US-3.1 to US-3.4), and parent and learner sign in. Phase 3 (marks) started: assessment and mark tables with locking in the database (D30), and subject results, averages and positions computed in the database (D31).
+Phase 1 (E1: access, tenancy, branding). Tenancy schema, staff, learner and parent sign in, password reset, role-based navigation, school theming and a minimal super-admin console done. Phase 2 (E2, E3: school setup and people) done and tagged `v0.2.0` after its gate: academic structure tables, the school admin setup area (US-2.1 to US-2.4), the people tables and the people admin area (US-3.1 to US-3.4), and parent and learner sign in. Phase 3 (marks) started: assessment and mark tables with locking in the database (D30), subject results, averages and positions computed in the database (D31), and the marks entry screens for teachers, school admins and heads (D32).
 
 ## Done
 
@@ -33,13 +33,15 @@ Phase 1 (E1: access, tenancy, branding). Tenancy schema, staff, learner and pare
 
 - 2026-10-09: Subject results, averages and positions (migration order step 5, second half; D31). `public.subject_results(class, term)` gives every learner's weighted percent, rounded mark, grade and complete or incomplete (with the reason: weights not 100, absent, excused, missing mark) for a whole class in one call; `public.class_positions(class, term)` gives averages of completed subjects (one decimal) and competition-ranked positions, leaving out learners who transferred or left, with no positions in vacation terms. All numeric, rounded half up, exact at 69.5. School admin, head and class teacher read the whole class; a subject teacher or hod reads only their subjects and no positions; parents and learners nothing yet. The same rules in TypeScript (`src/lib/grading`, exact fractions, no floats) for the live marks grid. Tests: both seed fixture files reproduced exactly, every row including the tie and the absences, in TypeScript (`tests/unit/grading/fixtures.test.ts`) and in SQL (`16_grade_fixtures.test.sql`, generated from the CSVs by `scripts/grade-fixture-test.mjs`, with a unit test that it is up to date); pgTAP `17_grade_calculations.test.sql` (41 tests): 69.5, 70, 69.49, 39.5 and 0, a non-terminating 69.5, weights adding up to 90, absent, excused and missing marks, a tie, a leaver, a vacation term, each role's access, cross-school, and a class of 45 learners with 10 subjects (about 70 ms, fails above 1 s). Both test files were seen failing with a broken rounding function.
 
+- 2026-10-09: Marks entry screens (US-4.1, US-4.2, US-4.4, US-4.5; D32). `/teaching` (now also in the hod menu) lists the teacher's class subjects for the current term with marks entered and a weights warning; school admin and head get `/marks`, every class subject by class with its teacher. Each opens the assessments screen (name, type, maximum, weight, a running total that must reach 100, and the usual Test 1, Test 2 and Exam as one tap) and the marks grid: autosave per cell with saving, saved or not saved; scores above the maximum or below 0 refused in the cell; A for absent and E for excused; arrow keys and Enter move between cells; only learners who take the subject and are still in the class, with leavers' existing marks read-only; each row's live result and grade from `src/lib/grading` with "incomplete" and the reason, and the saved figure from `subject_results()` after each save; one assessment at a time with large inputs and Absent and Excused buttons on a phone. Locked marks show a read-only grid with the reason and the names of the school admin and head to ask; admin and head can still edit (audited), unlock with a reason and relock. A teacher gets 403 on another teacher's grid. Migration `marks_entry`: `marks_progress()`, `marks_lock()`, `marks_unlockers()`; pgTAP `18_marks_entry.test.sql` (27 tests, cross-school checks seen failing with the access check removed); pure rules in `src/lib/marks` with unit tests; Playwright `marks.spec.ts` at 360 px and desktop (usual set, marks and grade, 31 out of 30 refused, absent and incomplete, weights not 100, Enter moves down, 403 on another teacher's grid, lock notice, admin edit with audit row, unlock with and without a reason, relock) and `marks-load.perf.spec.ts` (45 learners under 2 s; 0.6 to 0.9 s on a production build).
+
 ## In progress
 
 _None._
 
 ## Next
 
-- Marks entry screens (Phase 3), including unlock and relock for admin and head.
+- US-4.3 marks upload from Excel, US-4.8 completion tracking for admin, head and HOD, and subject and class comments (E5).
 - US-3.5 promotion and year rollover.
 - US-10.3 feature flags and US-10.4 usage in the console.
 
@@ -49,10 +51,12 @@ _None._
 - `sign_in_attempts` rows are never pruned (D8).
 - Password reset by phone code (US-1.7) waits for an SMS provider (D19).
 - Two-factor sign in for super admin, school admin and head (SPEC section 5) is not built yet.
-- Setup area: terms, classes, grade levels, subjects and scales can be added and edited but not removed from the screens yet (class subjects can). Locking marks after the deadline and unlocking with a reason (US-2.4) are in the database (D30); the screens for them come with marks entry.
+- Setup area: terms, classes, grade levels, subjects and scales can be added and edited but not removed from the screens yet (class subjects can). Locking marks after the deadline is in the database (D30); unlock and relock with a reason are on each marks grid for school admin and head (D32).
 - Full e2e runs on the dev server are occasionally flaky under load: on 2026-10-08 the setup year test (a class subjects step page) and one branding sign-in ("This page couldn't load", ECONNRESET) failed once and passed on rerun. Watch the setup test, which failed the same way earlier. In the Phase 2 gate's three full runs the setup test passed every time; one full run had the mobile parent-code test miss its "Use at least 8 characters." message once, and it passed on the rerun and the final full run (72 of 72).
 - Parent codes and learner PINs (D25, D26): `/join` code tries are not rate limited; codes are handed over by the school (no email or SMS sending); an admin PIN reset does not end a session the learner already has open. Parent and learner areas are placeholders until Phase 4 (the parent home lists linked children).
 - People admin (D24): imports are not rate limited yet; stored import files are not deleted after 30 days yet; one guardian per import row (add more on the learner's page); a file cannot update existing learners or guardians; the learners list shows the first 100 matches.
+
+- Marks screens (D32): the usual assessment set is fixed in code (Test 1, Test 2, Exam) until Q5 is confirmed or schools need their own; a class teacher cannot open the grid of a subject they do not teach (their class view comes with comments and reports); the grid has no Excel upload yet (US-4.3).
 
 ## Go-live checklist
 

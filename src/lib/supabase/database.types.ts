@@ -1289,6 +1289,19 @@ export type Database = {
         Args: { p_class_subject_id: string; p_term_id: string }
         Returns: boolean
       }
+      class_positions: {
+        Args: { p_class_id: string; p_term_id: string }
+        Returns: {
+          average: number
+          class_id: string
+          class_size: number
+          enrolment_id: string
+          position: number
+          school_id: string
+          subjects_counted: number
+          term_id: string
+        }[]
+      }
       commit_learner_import: {
         Args: { p_guardians: Json; p_job_id: string; p_learners: Json }
         Returns: Json
@@ -1411,6 +1424,23 @@ export type Database = {
           id: string
           name: string
           slug: string
+        }[]
+      }
+      subject_results: {
+        Args: { p_class_id: string; p_term_id: string }
+        Returns: {
+          class_id: string
+          class_subject_id: string
+          enrolment_id: string
+          grade: string
+          grade_remark: string
+          incomplete_reason: string
+          result_status: string
+          rounded_mark: number
+          school_id: string
+          subject_id: string
+          term_id: string
+          weighted_percent: number
         }[]
       }
       teaches: { Args: { p_class_subject_id: string }; Returns: boolean }

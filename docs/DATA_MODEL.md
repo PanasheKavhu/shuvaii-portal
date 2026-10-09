@@ -215,9 +215,11 @@ scale's bands in one call, save_grading_bands() (D22).
 ```
 id, school_id, term_id, class_subject_id, name, type assessment_type,
 max_mark numeric, weight_percent numeric, sort_order, assessed_on, is_locked boolean
+term and class subject in the same year; an assessment with marks cannot move, and max_mark cannot drop below an entered score
+is_locked: set only by school admin or head; blocks teachers until the class subject is unlocked (D30)
 ```
 
-A validation function checks `sum(weight_percent) = 100` per (term, class_subject); report generation refuses otherwise.
+`assessment_weights_are_complete(term, class_subject)` checks `sum(weight_percent) = 100`; `assessment_weight_problems(term)` lists the class subjects whose total is not 100 (D30). Report generation refuses otherwise.
 
 **marks**
 
@@ -226,7 +228,19 @@ id, school_id, assessment_id, enrolment_id, score numeric null,
 status mark_status, entered_by fk profiles
 unique (assessment_id, enrolment_id)
 check: (status = 'present' and score between 0 and max_mark) or (status <> 'present' and score is null)
+check: the enrolment takes the assessment's class subject (enrolment_subjects, trigger); never deleted; entered_by = whoever saved it
 ```
+
+Teachers cannot write assessments or marks once the term is locked or closed, the marks deadline has passed or the assessment is locked, unless the class subject is unlocked for the term (trigger, D30).
+
+**class_subject_unlocks**: marks unlocked after the lock (US-2.4, US-4.5; D30).
+
+```
+id, school_id, term_id, class_subject_id, reason text not null, unlocked_by, unlocked_at, relocked_by null, relocked_at null
+at most one open (relocked_at is null) per (term_id, class_subject_id); never deleted
+```
+
+Written only by `unlock_class_subject(class_subject, term, reason)` and `relock_class_subject(class_subject, term)` (school admin or head), which write `marks_unlocked` (with the reason in `audit_log.reason`) and `marks_relocked` audit events. Read by admin, head and the class subject's teacher.
 
 **subject_comments**
 
@@ -331,19 +345,19 @@ Fixtures: `seed/expected_subject_results.csv` and `seed/expected_class_positions
 
 Helper functions (security definer, stable): `current_school_ids()`, `has_role(school_id, role)`, `teaches(class_subject_id)`, `is_class_teacher(class_id)`, `is_guardian_of(learner_id)`, `is_own_learner(learner_id)`, `is_platform_admin()`.
 
-| Tables                                                                             | Read                                                                                         | Write                                                                             |
-| ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| schools                                                                            | members of that school                                                                       | super admin (branding), school admin (limited fields)                             |
-| memberships, invites                                                               | school admin, head                                                                           | school admin (invites only through create_parent_invite(), D25)                   |
-| import_jobs                                                                        | school admin, head                                                                           | school admin, head (D23)                                                          |
-| structure (levels, years, terms, classes, subjects, class_subjects, scales, bands) | staff of the school (D20)                                                                    | school admin                                                                      |
-| learners, enrolments, enrolment_subjects, guardians, guardian_links                | admin, head; teachers and hods for classes they teach (D23); parents and learners in Phase 4 | school admin, head                                                                |
-| assessments, marks                                                                 | admin, head; hod for department; teacher for own class subjects                              | teacher for own class subjects while term is open and not locked; admin (audited) |
-| subject_comments                                                                   | as marks; parents and learners only when the report is published                             | assigned teacher; admin                                                           |
-| class_comments                                                                     | as above                                                                                     | class teacher                                                                     |
-| reports                                                                            | admin, head, class teacher for draft to approved; parents and learners only when `published` | class teacher (draft, submit); head (approve, publish, withdraw)                  |
-| announcements                                                                      | members in the audience while published                                                      | school admin, head                                                                |
-| audit_log                                                                          | admin, head                                                                                  | triggers only                                                                     |
+| Tables                                                                             | Read                                                                                         | Write                                                                            |
+| ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| schools                                                                            | members of that school                                                                       | super admin (branding), school admin (limited fields)                            |
+| memberships, invites                                                               | school admin, head                                                                           | school admin (invites only through create_parent_invite(), D25)                  |
+| import_jobs                                                                        | school admin, head                                                                           | school admin, head (D23)                                                         |
+| structure (levels, years, terms, classes, subjects, class_subjects, scales, bands) | staff of the school (D20)                                                                    | school admin                                                                     |
+| learners, enrolments, enrolment_subjects, guardians, guardian_links                | admin, head; teachers and hods for classes they teach (D23); parents and learners in Phase 4 | school admin, head                                                               |
+| assessments, marks                                                                 | admin, head; teacher and hod for own class subjects; class teacher for their class (D30)     | teacher and hod for own class subjects until locked (D30); admin, head (audited) |
+| subject_comments                                                                   | as marks; parents and learners only when the report is published                             | assigned teacher; admin                                                          |
+| class_comments                                                                     | as above                                                                                     | class teacher                                                                    |
+| reports                                                                            | admin, head, class teacher for draft to approved; parents and learners only when `published` | class teacher (draft, submit); head (approve, publish, withdraw)                 |
+| announcements                                                                      | members in the audience while published                                                      | school admin, head                                                               |
+| audit_log                                                                          | admin, head                                                                                  | triggers only                                                                    |
 
 Default is deny. Each policy has a test in each direction (allowed and blocked) and a cross-school test.
 

@@ -4,7 +4,7 @@ Update at the end of every story (definition of done, `SPEC.md` section 6).
 
 ## Current phase
 
-Phase 1 (E1: access, tenancy, branding). Tenancy schema, staff, learner and parent sign in, password reset, role-based navigation, school theming and a minimal super-admin console done. Phase 2 (E2, E3: school setup and people) done and tagged `v0.2.0` after its gate: academic structure tables, the school admin setup area (US-2.1 to US-2.4), the people tables and the people admin area (US-3.1 to US-3.4), and parent and learner sign in.
+Phase 1 (E1: access, tenancy, branding). Tenancy schema, staff, learner and parent sign in, password reset, role-based navigation, school theming and a minimal super-admin console done. Phase 2 (E2, E3: school setup and people) done and tagged `v0.2.0` after its gate: academic structure tables, the school admin setup area (US-2.1 to US-2.4), the people tables and the people admin area (US-3.1 to US-3.4), and parent and learner sign in. Phase 3 (marks) started: assessment and mark tables with locking in the database (D30).
 
 ## Done
 
@@ -29,12 +29,16 @@ Phase 1 (E1: access, tenancy, branding). Tenancy schema, staff, learner and pare
 
 - 2026-10-08: **Phase 2 gate** (tag `v0.2.0`). A separate review session read the Phase 2 diff (`4fce018..1f806c4`) for security problems, missing tests and duplicated code; all 15 findings are fixed (D27, D28). The serious one: anyone could register a future teacher's or admin's email and later sign in as them. Now public sign-up is off, an address a parent claimed without proof can never become staff until a password reset proves it, and every new staff role waits for the person to accept on `/welcome` (pgTAP `13_staff_consent`, e2e `staff-consent.spec.ts`). Also fixed: leavers could still sign in; PIN guessing across many learners; a parent code re-activating a disabled parent; writes not scoped to the active school; guardian, link and enrolment changes not audited; import checks capped at 1,000 rows; parent codes left in the address bar; duplicated action and data helpers (pgTAP `14_leavers_and_people_audit`, unit and e2e tests). The new 1,000-row import e2e test first failed on the API's 8-second statement timeout (each row re-ran the RLS helpers, 3.7 s for 1,000 learners on an idle database); `import_learners()` now runs as its owner after its own checks (1.2 s). Gate checks: typecheck, lint, format, unit, `test:db` and `test:e2e` pass locally; each Phase 2 table's cross-school pgTAP test was seen failing when a permissive policy was added to that table (all 15 tables); learner and membership changes are in the audit log (pgTAP 07, 10, 14); the setup wizard e2e test at 360 px passed on every full run in this gate. `main` and the tag are pushed to GitHub (`PanasheKavhu/shuvaii-portal`) and CI is green on `main` (typecheck, lint, unit tests).
 
+- 2026-10-09: Assessments and marks (migration order step 5, first half; D30). Enums `assessment_type` and `mark_status`; `assessments`, `marks` and `class_subject_unlocks` with `school_id`, same-school foreign keys, the section 9 indexes and RLS. A teacher or hod reads and writes only class subjects they teach, a class teacher reads every mark in their class, school admin and head read and write the whole school; parents and learners get nothing yet. Locking is in the database: teachers cannot write once the term is locked or closed, the marks deadline has passed or the assessment is locked, unless a school admin or head has unlocked that class subject for the term with `unlock_class_subject()` (reason required, audited with the reason) until `relock_class_subject()`. A mark's learner must take the subject (trigger), scores are checked against `max_mark`, marks are never deleted, and assessments and marks are audited. Weights check functions `assessment_weights_are_complete()` and `assessment_weight_problems()`. `scripts/seed.mjs` loads assessments and marks; types regenerated. pgTAP `15_assessments_and_marks.test.sql` (101 tests): cross-school read and write for all three tables, teacher, hod, class teacher, head, parent, learner and anonymous access, the subject check, the score check, deadline, term-status and assessment locks, unlock and relock with and without a reason by a teacher (refused) and a head, the weights check, and one audit row with old and new values per mark change. Each cross-school test was seen failing when a permissive policy was added to its table.
+
 ## In progress
 
 _None._
 
 ## Next
 
+- Migration order step 5, second half: calculation functions (subject results, grades, averages, positions) tested against the seed fixtures.
+- Marks entry screens (Phase 3), including unlock and relock for admin and head.
 - US-3.5 promotion and year rollover.
 - US-10.3 feature flags and US-10.4 usage in the console.
 
@@ -44,7 +48,7 @@ _None._
 - `sign_in_attempts` rows are never pruned (D8).
 - Password reset by phone code (US-1.7) waits for an SMS provider (D19).
 - Two-factor sign in for super admin, school admin and head (SPEC section 5) is not built yet.
-- Setup area: terms, classes, grade levels, subjects and scales can be added and edited but not removed from the screens yet (class subjects can). Locking marks after the deadline and unlocking with a reason (US-2.4) come with marks entry in Phase 3 (D22).
+- Setup area: terms, classes, grade levels, subjects and scales can be added and edited but not removed from the screens yet (class subjects can). Locking marks after the deadline and unlocking with a reason (US-2.4) are in the database (D30); the screens for them come with marks entry.
 - Full e2e runs on the dev server are occasionally flaky under load: on 2026-10-08 the setup year test (a class subjects step page) and one branding sign-in ("This page couldn't load", ECONNRESET) failed once and passed on rerun. Watch the setup test, which failed the same way earlier. In the Phase 2 gate's three full runs the setup test passed every time; one full run had the mobile parent-code test miss its "Use at least 8 characters." message once, and it passed on the rerun and the final full run (72 of 72).
 - Parent codes and learner PINs (D25, D26): `/join` code tries are not rate limited; codes are handed over by the school (no email or SMS sending); an admin PIN reset does not end a session the learner already has open. Parent and learner areas are placeholders until Phase 4 (the parent home lists linked children).
 - People admin (D24): imports are not rate limited yet; stored import files are not deleted after 30 days yet; one guardian per import row (add more on the learner's page); a file cannot update existing learners or guardians; the learners list shows the first 100 matches.

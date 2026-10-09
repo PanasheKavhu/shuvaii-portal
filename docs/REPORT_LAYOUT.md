@@ -65,6 +65,7 @@ Each section can be switched on or off per school and per report type (`report_t
 
 - Header band uses the school's primary colour; accent colour only for thin rules and the grade column highlight. Text stays black on white so it prints legibly in black and white.
 - Only the learner's own subjects are listed (no blank pre-printed rows). Subjects sort by `subjects.sort_order`.
+- Comment lengths are capped so they fit (D34): a subject comment at most 100 characters (two lines of the comment column at 9 pt), a class teacher's comment at most 300 (three lines across the page). The column is labelled "Teacher's comment" by default (Q28).
 - Long comments wrap inside the cell; if a report would exceed one page, it continues on a second page with the header repeated (secondary learners can take 10 or more subjects).
 - A subject with an incomplete result never appears on a published report: the report cannot be approved until it is resolved or the head approves an explicit "result not available" line.
 - Font: a legible sans-serif at 9 to 10 pt for the table, 11 pt for headings; embedded in the PDF.

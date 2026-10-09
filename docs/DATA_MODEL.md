@@ -249,19 +249,30 @@ Written only by `unlock_class_subject(class_subject, term, reason)` and `relock_
 id, school_id, term_id, enrolment_id, class_subject_id, teacher_id,
 comment text, status comment_status, signed_at
 unique (term_id, enrolment_id, class_subject_id)
+comment at most 100 characters (two report lines); submitted needs text and signed_at
+the learner takes the class subject (trigger); never deleted; audited
+teacher_id: the class subject's teacher when last written; signed_at set when marked done, cleared on draft (trigger, D34)
 ```
+
+Teachers cannot write once the class subject's marks are locked (`private.marks_are_locked()`, so an unlock of the class subject reopens its comments too); the school admin is never locked (D34).
 
 **class_comments**
 
 ```
 id, school_id, term_id, enrolment_id, author_id, comment, status comment_status
 unique (term_id, enrolment_id)
+comment at most 300 characters (three report lines); submitted needs text
+not in a vacation term (Q8); the learner is enrolled in the term's year; never deleted; audited
+author_id: whoever last wrote it (trigger)
 ```
+
+Teachers cannot write once the term is locked or closed or its marks deadline has passed (`private.term_marks_are_locked()`); there is no unlock, the school admin writes them after the lock. `public.class_comment_lock(class, term)` tells the screen (D34).
 
 **comment_bank**
 
 ```
 id, school_id, owner_id, subject_id null, grade null, text, is_shared boolean
+text at most 300 characters; owner_id defaults to the signed-in user; may be deleted by its owner (not about a learner)
 ```
 
 **attendance_summaries** (feature-flagged, Q25)
@@ -349,19 +360,20 @@ Fixtures: `seed/expected_subject_results.csv` and `seed/expected_class_positions
 
 Helper functions (security definer, stable): `current_school_ids()`, `has_role(school_id, role)`, `teaches(class_subject_id)`, `is_class_teacher(class_id)`, `is_guardian_of(learner_id)`, `is_own_learner(learner_id)`, `is_platform_admin()`.
 
-| Tables                                                                             | Read                                                                                         | Write                                                                            |
-| ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| schools                                                                            | members of that school                                                                       | super admin (branding), school admin (limited fields)                            |
-| memberships, invites                                                               | school admin, head                                                                           | school admin (invites only through create_parent_invite(), D25)                  |
-| import_jobs                                                                        | school admin, head; a teacher or hod their own marks uploads (D33)                           | school admin, head (D23); teacher or hod marks uploads for own class subjects    |
-| structure (levels, years, terms, classes, subjects, class_subjects, scales, bands) | staff of the school (D20)                                                                    | school admin                                                                     |
-| learners, enrolments, enrolment_subjects, guardians, guardian_links                | admin, head; teachers and hods for classes they teach (D23); parents and learners in Phase 4 | school admin, head                                                               |
-| assessments, marks                                                                 | admin, head; teacher and hod for own class subjects; class teacher for their class (D30)     | teacher and hod for own class subjects until locked (D30); admin, head (audited) |
-| subject_comments                                                                   | as marks; parents and learners only when the report is published                             | assigned teacher; admin                                                          |
-| class_comments                                                                     | as above                                                                                     | class teacher                                                                    |
-| reports                                                                            | admin, head, class teacher for draft to approved; parents and learners only when `published` | class teacher (draft, submit); head (approve, publish, withdraw)                 |
-| announcements                                                                      | members in the audience while published                                                      | school admin, head                                                               |
-| audit_log                                                                          | admin, head                                                                                  | triggers only                                                                    |
+| Tables                                                                             | Read                                                                                                                     | Write                                                                            |
+| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| schools                                                                            | members of that school                                                                                                   | super admin (branding), school admin (limited fields)                            |
+| memberships, invites                                                               | school admin, head                                                                                                       | school admin (invites only through create_parent_invite(), D25)                  |
+| import_jobs                                                                        | school admin, head; a teacher or hod their own marks uploads (D33)                                                       | school admin, head (D23); teacher or hod marks uploads for own class subjects    |
+| structure (levels, years, terms, classes, subjects, class_subjects, scales, bands) | staff of the school (D20)                                                                                                | school admin                                                                     |
+| learners, enrolments, enrolment_subjects, guardians, guardian_links                | admin, head; teachers and hods for classes they teach (D23); parents and learners in Phase 4                             | school admin, head                                                               |
+| assessments, marks                                                                 | admin, head; teacher and hod for own class subjects; class teacher for their class (D30)                                 | teacher and hod for own class subjects until locked (D30); admin, head (audited) |
+| subject_comments                                                                   | as marks (admin, head, class subject's teacher, class teacher); parents and learners through published reports (Phase 4) | class subject's teacher until locked; school admin (D34)                         |
+| class_comments                                                                     | admin, head, class teacher                                                                                               | class teacher until locked; school admin (D34)                                   |
+| comment_bank                                                                       | owner; the school's active staff when shared                                                                             | owner                                                                            |
+| reports                                                                            | admin, head, class teacher for draft to approved; parents and learners only when `published`                             | class teacher (draft, submit); head (approve, publish, withdraw)                 |
+| announcements                                                                      | members in the audience while published                                                                                  | school admin, head                                                               |
+| audit_log                                                                          | admin, head                                                                                                              | triggers only                                                                    |
 
 Default is deny. Each policy has a test in each direction (allowed and blocked) and a cross-school test.
 
@@ -382,7 +394,7 @@ Object paths start with the school id (`{school_id}/...`) so storage policies ca
 - `marks (assessment_id, enrolment_id)` unique, `marks (enrolment_id)`.
 - `enrolments (class_id)`, `enrolments (learner_id, academic_year_id)` unique.
 - `class_subjects (teacher_id)`, `assessments (term_id, class_subject_id)`.
-- `subject_comments (term_id, enrolment_id)`.
+- `subject_comments (term_id, enrolment_id)`, `subject_comments (class_subject_id)`, `class_comments (enrolment_id)`, `comment_bank (owner_id)`.
 - `reports (term_id, status)`, `reports (reference_code)`, `reports (verification_code)`.
 - `audit_log (school_id, created_at desc)`, `audit_log (table_name, row_id)`.
 - `guardian_links (learner_id)`, `announcements (school_id, status, published_at desc)`.

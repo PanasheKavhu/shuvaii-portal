@@ -15,7 +15,7 @@ All names, numbers, marks and comments are invented. School names are fictional;
 | Terms | Term 1 (with marks), Term 2, Term 3, plus April 2026 Vacation School (Msasa only) |
 | Assessments | Term 1: Test 1 (/30, 20%), Test 2 (/50, 20%), Exam (/100, 60%) for every class subject; vacation: single mark at 100% for four subjects of 4 Blue |
 | Marks | 1,386 including 8 absences (4 per school) |
-| Comments | 486 subject comments, 60 class teacher comments |
+| Comments | 486 subject comments, 60 class teacher comments (loaded by `scripts/seed.mjs`, D34) |
 
 Teaching patterns covered: one teacher per subject (secondary, some teachers with two subjects) and one class teacher for almost all subjects plus a specialist (primary, PEA).
 

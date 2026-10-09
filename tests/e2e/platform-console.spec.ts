@@ -148,7 +148,9 @@ test("a teacher in school A cannot see school B's data through any page", async 
   page,
   context,
 }) => {
-  test.setTimeout(120_000);
+  // Visits every page twice (94 loads with the comment pages); on a busy dev
+  // server that compiles pages on first visit, 120 s was not always enough.
+  test.setTimeout(240_000);
   const paths = allPagePaths();
   expect(paths).toContain("/platform/schools/" + KUDZAI.id);
   expect(paths).toContain("/teaching");

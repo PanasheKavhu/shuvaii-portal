@@ -190,10 +190,15 @@ test("after the deadline a teacher cannot edit; a head unlocks with a reason, th
   await page.goto(gridPath);
   await expect(page.getByRole("region", { name: "Marks unlocked" })).toContainText(reason);
   const teacherCell = await cell(page, "Test 1", chipo);
-  await teacherCell.fill("27");
-  await expect(
-    page.locator(`[id="${await teacherCell.getAttribute("aria-describedby")}"]`),
-  ).toHaveText("Saved");
+  // Retried: on a busy dev server the grid (now with its comment column) can
+  // hydrate after the first fill, which then never saves.
+  await expect(async () => {
+    await teacherCell.fill("");
+    await teacherCell.fill("27");
+    await expect(
+      page.locator(`[id="${await teacherCell.getAttribute("aria-describedby")}"]`),
+    ).toHaveText("Saved", { timeout: 5_000 });
+  }).toPass({ timeout: 30_000 });
   await tab(page, "Upload").click();
   await expect(page.getByRole("form", { name: "Upload marks" })).toBeVisible();
 

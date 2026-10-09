@@ -2,7 +2,11 @@
 
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { saveMark } from "@/app/(app)/marks/actions";
+import { saveSubjectComment, saveToBank } from "@/app/(app)/marks/comment-actions";
+import type { SavedComment } from "@/app/(app)/marks/comment-data";
 import type { GridLearner, SavedMark, SavedResult } from "@/app/(app)/marks/data";
+import { CommentBox } from "@/components/comments/comment-box";
+import type { BankEntry } from "@/lib/comments/rules";
 import { subjectResult, type SubjectResult } from "@/lib/grading/results";
 import { cellMark, cellText, describeIncomplete, parseCell } from "@/lib/marks/cell";
 import { arrowLeavesInput, moveFrom, type NavKey } from "@/lib/marks/grid-nav";
@@ -16,6 +20,19 @@ export type GridAssessment = {
   weightPercent: string;
   /** False when the viewer may not change this assessment's marks (locked). */
   writable: boolean;
+};
+
+/** The subject comment column beside the marks (US-5.1, US-5.2; D34). */
+export type GridComments = {
+  label: string;
+  max: number;
+  /** The viewer may not write these comments (head, or locked for the teacher). */
+  readOnly: boolean;
+  saved: Record<string, SavedComment>;
+  bank: readonly BankEntry[];
+  subjectId: string;
+  classSubjectId: string;
+  termId: string;
 };
 
 type CellState =
@@ -37,7 +54,9 @@ const key = (assessmentId: string, enrolmentId: string) => `${assessmentId}:${en
  * saved in the database (public.subject_results()) once saved.
  *
  * Below 768px one assessment is shown at a time, with large inputs and
- * Absent and Excused buttons.
+ * Absent and Excused buttons. With `comments`, a subject comment column
+ * follows the result (on a phone, as one more choice beside the
+ * assessments); its bank suggestions follow each row's live grade.
  */
 export function MarksGrid({
   assessments,
@@ -46,6 +65,7 @@ export function MarksGrid({
   bands,
   saved,
   readOnly,
+  comments,
 }: {
   assessments: readonly GridAssessment[];
   learners: readonly GridLearner[];
@@ -54,6 +74,7 @@ export function MarksGrid({
   saved: Record<string, SavedResult>;
   /** The whole grid is read-only (locked for this teacher). */
   readOnly: boolean;
+  comments?: GridComments;
 }) {
   const [texts, setTexts] = useState<Record<string, string>>(() => {
     const initial: Record<string, string> = {};
@@ -200,6 +221,8 @@ export function MarksGrid({
   }
 
   const current = assessments[col] ?? assessments[0];
+  const commentCol = assessments.length;
+  const columns = assessments.length + (comments ? 1 : 0);
 
   return (
     <div className="flex flex-col gap-3">
@@ -209,7 +232,7 @@ export function MarksGrid({
           : "Type a mark, A for absent or E for excused. Marks save as you type. Arrow keys and Enter move between cells."}
       </p>
 
-      {assessments.length > 1 && (
+      {columns > 1 && (
         <div role="group" aria-label="Assessment" className="flex flex-wrap gap-2 md:hidden">
           {assessments.map((a, i) => (
             <button
@@ -225,6 +248,21 @@ export function MarksGrid({
               {a.name} <span className="opacity-80">/{a.maxMark}</span>
             </button>
           ))}
+          {comments && (
+            <button
+              type="button"
+              aria-pressed={col === commentCol}
+              onClick={() => setCol(commentCol)}
+              className={cn(
+                "min-h-11 rounded-full border px-4 text-sm font-medium",
+                col === commentCol
+                  ? "bg-primary text-primary-foreground border-transparent"
+                  : "bg-card",
+              )}
+            >
+              {comments.label}
+            </button>
+          )}
         </div>
       )}
 
@@ -250,9 +288,30 @@ export function MarksGrid({
                   </span>
                 </th>
               ))}
-              <th scope="col" className="bg-muted/60 rounded-tr-xl p-3 font-semibold">
+              <th
+                scope="col"
+                className={cn(
+                  "bg-muted/60 p-3 font-semibold",
+                  comments ? "" : "rounded-tr-xl",
+                  comments && col === commentCol && "hidden md:table-cell",
+                )}
+              >
                 Result
               </th>
+              {comments && (
+                <th
+                  scope="col"
+                  className={cn(
+                    "bg-muted/60 rounded-tr-xl p-3 align-bottom font-semibold",
+                    col === commentCol ? "" : "hidden md:table-cell",
+                  )}
+                >
+                  {comments.label}
+                  <span className="text-muted-foreground block text-xs font-normal">
+                    up to {comments.max} characters
+                  </span>
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -322,7 +381,12 @@ export function MarksGrid({
                       </td>
                     );
                   })}
-                  <td className="border-b p-3">
+                  <td
+                    className={cn(
+                      "border-b p-3",
+                      comments && col === commentCol && "hidden md:table-cell",
+                    )}
+                  >
                     <output aria-label={`Result for ${learner.name}`} className="flex flex-col">
                       <ResultText result={live} />
                       {savedResult && (
@@ -335,6 +399,40 @@ export function MarksGrid({
                       )}
                     </output>
                   </td>
+                  {comments && (
+                    <td
+                      className={cn(
+                        "border-b p-2",
+                        col === commentCol ? "" : "hidden md:table-cell",
+                      )}
+                    >
+                      <CommentBox
+                        label={`${comments.label} for ${learner.name}`}
+                        initial={comments.saved[learner.enrolmentId]}
+                        max={comments.max}
+                        readOnly={comments.readOnly || !learner.stillInClass}
+                        bank={comments.bank}
+                        subjectId={comments.subjectId}
+                        grade={live?.status === "complete" ? live.grade : null}
+                        save={(text, done) =>
+                          saveSubjectComment({
+                            classSubjectId: comments.classSubjectId,
+                            termId: comments.termId,
+                            enrolmentId: learner.enrolmentId,
+                            text,
+                            done,
+                          })
+                        }
+                        saveToBank={(text) =>
+                          saveToBank({
+                            text,
+                            subjectId: comments.subjectId,
+                            grade: live?.status === "complete" ? live.grade : null,
+                          })
+                        }
+                      />
+                    </td>
+                  )}
                 </tr>
               );
             })}

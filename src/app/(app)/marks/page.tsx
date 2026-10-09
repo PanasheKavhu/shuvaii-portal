@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ClassSubjectList, TermTabs } from "@/components/marks/class-subject-list";
+import { listClassesForTerm } from "./comment-data";
 import { listOpenUnlocks, listProgress, requireMarksActor, resolveTerm } from "./data";
 
 export const metadata: Metadata = { title: "Marks" };
@@ -15,9 +17,14 @@ export default async function MarksPage({ searchParams }: PageProps<"/marks">) {
   if (!actor.isAdminOrHead) redirect("/teaching");
   const { term: wanted } = await searchParams;
   const { terms, term } = await resolveTerm(actor.schoolId, wanted);
-  const [progress, unlocks] = term
-    ? await Promise.all([listProgress(term.id), listOpenUnlocks([term.id])])
-    : [[], []];
+  const [progress, unlocks, allClasses] = term
+    ? await Promise.all([
+        listProgress(term.id),
+        listOpenUnlocks([term.id]),
+        listClassesForTerm(actor, term.id, false),
+      ])
+    : [[], [], []];
+  const classIds = new Map(allClasses.map((c) => [c.name, c.id]));
   const unlocked = new Set(unlocks.map((u) => u.classSubjectId));
   const items = progress.map((i) => ({ ...i, unlocked: unlocked.has(i.classSubjectId) }));
   const classes = [...new Set(items.map((i) => i.className))];
@@ -41,7 +48,17 @@ export default async function MarksPage({ searchParams }: PageProps<"/marks">) {
       {term &&
         classes.map((className) => (
           <section key={className} className="flex flex-col gap-3">
-            <h2 className="text-lg font-semibold">{className}</h2>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-lg font-semibold">{className}</h2>
+              {classIds.has(className) && (
+                <Link
+                  href={`/marks/classes/${classIds.get(className)}/${term.id}`}
+                  className="flex min-h-11 items-center text-sm font-medium underline"
+                >
+                  Results and class comments<span className="sr-only"> for {className}</span>
+                </Link>
+              )}
+            </div>
             <ClassSubjectList
               items={items.filter((i) => i.className === className)}
               termId={term.id}

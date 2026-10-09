@@ -178,6 +178,7 @@ export type ClassSubjectTerm = {
   classSubjectId: string;
   classId: string;
   className: string;
+  subjectId: string;
   subjectName: string;
   teacherId: string | null;
   teacherName: string | null;
@@ -201,7 +202,7 @@ export async function requireClassSubjectTerm(
     supabase
       .from("class_subjects")
       .select(
-        "id, class_id, teacher_id, subjects!inner(name), profiles(full_name, email), classes!inner(name, academic_year_id, grade_levels!inner(grading_scale_id))",
+        "id, class_id, subject_id, teacher_id, subjects!inner(name), profiles(full_name, email), classes!inner(name, academic_year_id, grade_levels!inner(grading_scale_id))",
       )
       .eq("id", classSubjectId)
       .eq("school_id", actor.schoolId)
@@ -223,6 +224,7 @@ export async function requireClassSubjectTerm(
     classSubjectId: cs.data.id,
     classId: cs.data.class_id,
     className: klass.name,
+    subjectId: cs.data.subject_id,
     subjectName: cs.data.subjects.name,
     teacherId: cs.data.teacher_id,
     teacherName: cs.data.profiles?.full_name ?? cs.data.profiles?.email ?? null,

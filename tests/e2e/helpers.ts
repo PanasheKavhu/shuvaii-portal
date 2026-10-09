@@ -172,8 +172,10 @@ export async function resetEmailFor(to: string): Promise<{ tokenHash: string; co
 export async function createEmptySchool(prefix: string): Promise<{
   schoolId: string;
   adminEmail: string;
+  adminName: string;
   teacherEmail: string;
   teacherName: string;
+  hodEmail: string;
   hodName: string;
 }> {
   try {
@@ -209,7 +211,8 @@ export async function createEmptySchool(prefix: string): Promise<{
 
   const teacherName = `Tendai Teacher ${stamp}`;
   const hodName = `Hazel Hod ${stamp}`;
-  const admin = await newUser("admin", `Ada Admin ${stamp}`);
+  const adminName = `Ada Admin ${stamp}`;
+  const admin = await newUser("admin", adminName);
   const teacher = await newUser("teacher", teacherName);
   const hod = await newUser("hod", hodName);
   const { error: memberError } = await platform.from("memberships").insert([
@@ -221,9 +224,275 @@ export async function createEmptySchool(prefix: string): Promise<{
   return {
     schoolId: school.id,
     adminEmail: admin.email,
+    adminName,
     teacherEmail: teacher.email,
     teacherName,
+    hodEmail: hod.email,
     hodName,
+  };
+}
+
+/** A client signed in as `email` with the demo password, through RLS. */
+export async function signedInClient(email: string) {
+  try {
+    process.loadEnvFile(".env.local");
+  } catch {
+    // Already in the environment (CI).
+  }
+  const supabase = createClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { persistSession: false } },
+  );
+  const signedIn = await supabase.auth.signInWithPassword({ email, password: PASSWORD });
+  if (signedIn.error) throw new Error("Could not sign in a test client");
+  return supabase;
+}
+
+/**
+ * A new school (createEmptySchool) with one class for marks entry, made
+ * through the API as its school admin: the O-level bands, a current year
+ * with one open term around today and no deadline, class "4 Blue" with
+ * Mathematics taught by the teacher and English by the hod, and `learners`
+ * learners who all take both. With `marks`, the usual three assessments
+ * for Mathematics and a mark for every learner in each.
+ */
+export async function createMarksClass(
+  prefix: string,
+  options: { learners?: number; marks?: boolean } = {},
+) {
+  const school = await createEmptySchool(prefix);
+  const db = await signedInClient(school.adminEmail);
+  const must = <T>(result: { data: T; error: unknown }, what: string): NonNullable<T> => {
+    if (result.error || result.data == null) throw new Error(`Could not create ${what}`);
+    return result.data;
+  };
+  const id = school.schoolId;
+  const day = (offset: number) =>
+    new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
+
+  const scale = must(
+    await db
+      .from("grading_scales")
+      .insert({ school_id: id, name: "O-Level", stage: "o_level" })
+      .select("id")
+      .single(),
+    "a scale",
+  );
+  must(
+    await db
+      .from("grading_bands")
+      .insert(
+        [
+          ["A", 70, 100],
+          ["B", 60, 69],
+          ["C", 50, 59],
+          ["D", 45, 49],
+          ["E", 40, 44],
+          ["U", 0, 39],
+        ].map(([grade, min, max], i) => ({
+          school_id: id,
+          scale_id: scale.id,
+          grade: grade as string,
+          min_mark: min as number,
+          max_mark: max as number,
+          sort_order: i + 1,
+        })),
+      )
+      .select("id"),
+    "bands",
+  );
+  const level = must(
+    await db
+      .from("grade_levels")
+      .insert({ school_id: id, name: "Form 4", stage: "o_level", grading_scale_id: scale.id })
+      .select("id")
+      .single(),
+    "a grade level",
+  );
+  const year = must(
+    await db
+      .from("academic_years")
+      .insert({
+        school_id: id,
+        label: "This year",
+        starts_on: day(-200),
+        ends_on: day(200),
+        is_current: true,
+      })
+      .select("id")
+      .single(),
+    "a year",
+  );
+  const term = must(
+    await db
+      .from("terms")
+      .insert({
+        school_id: id,
+        academic_year_id: year.id,
+        name: "Term Now",
+        kind: "term",
+        starts_on: day(-30),
+        ends_on: day(60),
+        status: "open",
+      })
+      .select("id")
+      .single(),
+    "a term",
+  );
+  const members = must(await db.rpc("school_staff", { p_school_id: id }), "the staff list");
+  const teacherId = members.find((m) => m.full_name === school.teacherName)!.user_id;
+  const hodId = members.find((m) => m.full_name === school.hodName)!.user_id;
+  const klass = must(
+    await db
+      .from("classes")
+      .insert({
+        school_id: id,
+        academic_year_id: year.id,
+        grade_level_id: level.id,
+        name: "4 Blue",
+        class_teacher_id: teacherId,
+      })
+      .select("id")
+      .single(),
+    "a class",
+  );
+  const subjects = must(
+    await db
+      .from("subjects")
+      .insert([
+        {
+          school_id: id,
+          code: "MATH",
+          name: "Mathematics",
+          stage_scope: "secondary",
+          sort_order: 1,
+        },
+        { school_id: id, code: "ENG", name: "English", stage_scope: "secondary", sort_order: 2 },
+      ])
+      .select("id, code"),
+    "subjects",
+  );
+  const classSubjects = must(
+    await db
+      .from("class_subjects")
+      .insert([
+        {
+          school_id: id,
+          class_id: klass.id,
+          subject_id: subjects.find((s) => s.code === "MATH")!.id,
+          teacher_id: teacherId,
+        },
+        {
+          school_id: id,
+          class_id: klass.id,
+          subject_id: subjects.find((s) => s.code === "ENG")!.id,
+          teacher_id: hodId,
+        },
+      ])
+      .select("id, teacher_id"),
+    "class subjects",
+  );
+  const maths = classSubjects.find((cs) => cs.teacher_id === teacherId)!.id;
+  const english = classSubjects.find((cs) => cs.teacher_id === hodId)!.id;
+
+  const count = options.learners ?? 3;
+  const names = ["Chipo", "Farai", "Tatenda", "Rumbi", "Kuda", "Nyasha", "Tendai", "Vimbai"];
+  const learners = must(
+    await db
+      .from("learners")
+      .insert(
+        Array.from({ length: count }, (_, i) => ({
+          school_id: id,
+          learner_number: `M${String(i + 1).padStart(3, "0")}`,
+          first_name: names[i % names.length]!,
+          last_name: `Learner${String(i + 1).padStart(2, "0")}`,
+        })),
+      )
+      .select("id, first_name, last_name, learner_number"),
+    "learners",
+  );
+  learners.sort((a, b) => a.learner_number.localeCompare(b.learner_number));
+  const enrolments = must(
+    await db
+      .from("enrolments")
+      .insert(
+        learners.map((l) => ({
+          school_id: id,
+          learner_id: l.id,
+          class_id: klass.id,
+          academic_year_id: year.id,
+        })),
+      )
+      .select("id, learner_id"),
+    "enrolments",
+  );
+  must(
+    await db
+      .from("enrolment_subjects")
+      .insert(
+        enrolments.flatMap((e) =>
+          [maths, english].map((cs) => ({
+            school_id: id,
+            enrolment_id: e.id,
+            class_subject_id: cs,
+          })),
+        ),
+      )
+      .select("id"),
+    "subject choices",
+  );
+
+  if (options.marks) {
+    const assessments = must(
+      await db
+        .from("assessments")
+        .insert(
+          [
+            { name: "Test 1", type: "test" as const, max_mark: 30, weight_percent: 20 },
+            { name: "Test 2", type: "test" as const, max_mark: 50, weight_percent: 20 },
+            { name: "Exam", type: "exam" as const, max_mark: 100, weight_percent: 60 },
+          ].map((a, i) => ({
+            ...a,
+            school_id: id,
+            term_id: term.id,
+            class_subject_id: maths,
+            sort_order: i + 1,
+          })),
+        )
+        .select("id, max_mark"),
+      "assessments",
+    );
+    must(
+      await db
+        .from("marks")
+        .insert(
+          assessments.flatMap((a, ai) =>
+            enrolments.map((e, ei) => ({
+              school_id: id,
+              assessment_id: a.id,
+              enrolment_id: e.id,
+              score: (ei * 7 + ai * 3) % (Number(a.max_mark) + 1),
+              status: "present" as const,
+            })),
+          ),
+        )
+        .select("id"),
+      "marks",
+    );
+  }
+
+  return {
+    ...school,
+    termId: term.id,
+    classId: klass.id,
+    mathsId: maths,
+    englishId: english,
+    learners: learners.map((l) => ({
+      id: l.id,
+      name: `${l.first_name} ${l.last_name}`,
+      enrolmentId: enrolments.find((e) => e.learner_id === l.id)!.id,
+    })),
   };
 }
 

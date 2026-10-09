@@ -180,6 +180,71 @@ export type Database = {
           },
         ]
       }
+      class_comments: {
+        Row: {
+          author_id: string | null
+          comment: string
+          created_at: string
+          enrolment_id: string
+          id: string
+          school_id: string
+          status: Database["public"]["Enums"]["comment_status"]
+          term_id: string
+          updated_at: string
+        }
+        Insert: {
+          author_id?: string | null
+          comment?: string
+          created_at?: string
+          enrolment_id: string
+          id?: string
+          school_id: string
+          status?: Database["public"]["Enums"]["comment_status"]
+          term_id: string
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string | null
+          comment?: string
+          created_at?: string
+          enrolment_id?: string
+          id?: string
+          school_id?: string
+          status?: Database["public"]["Enums"]["comment_status"]
+          term_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "class_comments_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_comments_enrolment_id_school_id_fkey"
+            columns: ["enrolment_id", "school_id"]
+            isOneToOne: false
+            referencedRelation: "enrolments"
+            referencedColumns: ["id", "school_id"]
+          },
+          {
+            foreignKeyName: "class_comments_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_comments_term_id_school_id_fkey"
+            columns: ["term_id", "school_id"]
+            isOneToOne: false
+            referencedRelation: "terms"
+            referencedColumns: ["id", "school_id"]
+          },
+        ]
+      }
       class_subject_unlocks: {
         Row: {
           class_subject_id: string
@@ -376,6 +441,64 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "schools"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      comment_bank: {
+        Row: {
+          created_at: string
+          grade: string | null
+          id: string
+          is_shared: boolean
+          owner_id: string
+          school_id: string
+          subject_id: string | null
+          text: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          grade?: string | null
+          id?: string
+          is_shared?: boolean
+          owner_id?: string
+          school_id: string
+          subject_id?: string | null
+          text: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          grade?: string | null
+          id?: string
+          is_shared?: boolean
+          owner_id?: string
+          school_id?: string
+          subject_id?: string | null
+          text?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comment_bank_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comment_bank_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comment_bank_subject_id_school_id_fkey"
+            columns: ["subject_id", "school_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id", "school_id"]
           },
         ]
       }
@@ -1183,6 +1306,84 @@ export type Database = {
         }
         Relationships: []
       }
+      subject_comments: {
+        Row: {
+          class_subject_id: string
+          comment: string
+          created_at: string
+          enrolment_id: string
+          id: string
+          school_id: string
+          signed_at: string | null
+          status: Database["public"]["Enums"]["comment_status"]
+          teacher_id: string | null
+          term_id: string
+          updated_at: string
+        }
+        Insert: {
+          class_subject_id: string
+          comment?: string
+          created_at?: string
+          enrolment_id: string
+          id?: string
+          school_id: string
+          signed_at?: string | null
+          status?: Database["public"]["Enums"]["comment_status"]
+          teacher_id?: string | null
+          term_id: string
+          updated_at?: string
+        }
+        Update: {
+          class_subject_id?: string
+          comment?: string
+          created_at?: string
+          enrolment_id?: string
+          id?: string
+          school_id?: string
+          signed_at?: string | null
+          status?: Database["public"]["Enums"]["comment_status"]
+          teacher_id?: string | null
+          term_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subject_comments_class_subject_id_school_id_fkey"
+            columns: ["class_subject_id", "school_id"]
+            isOneToOne: false
+            referencedRelation: "class_subjects"
+            referencedColumns: ["id", "school_id"]
+          },
+          {
+            foreignKeyName: "subject_comments_enrolment_id_school_id_fkey"
+            columns: ["enrolment_id", "school_id"]
+            isOneToOne: false
+            referencedRelation: "enrolments"
+            referencedColumns: ["id", "school_id"]
+          },
+          {
+            foreignKeyName: "subject_comments_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subject_comments_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subject_comments_term_id_school_id_fkey"
+            columns: ["term_id", "school_id"]
+            isOneToOne: false
+            referencedRelation: "terms"
+            referencedColumns: ["id", "school_id"]
+          },
+        ]
+      }
       subjects: {
         Row: {
           code: string
@@ -1308,6 +1509,14 @@ export type Database = {
       assessment_weights_are_complete: {
         Args: { p_class_subject_id: string; p_term_id: string }
         Returns: boolean
+      }
+      class_comment_lock: {
+        Args: { p_class_id: string; p_term_id: string }
+        Returns: {
+          lock_reason: string
+          marks_deadline: string
+          teachers_locked: boolean
+        }[]
       }
       class_positions: {
         Args: { p_class_id: string; p_term_id: string }
@@ -1530,6 +1739,7 @@ export type Database = {
         | "learner"
       assessment_type: "test" | "assignment" | "exam" | "practical" | "vacation"
       audit_action: "insert" | "update" | "delete" | "event"
+      comment_status: "draft" | "submitted"
       enrolment_status:
         | "enrolled"
         | "promoted"
@@ -1677,6 +1887,7 @@ export const Constants = {
       app_role: ["school_admin", "head", "hod", "teacher", "parent", "learner"],
       assessment_type: ["test", "assignment", "exam", "practical", "vacation"],
       audit_action: ["insert", "update", "delete", "event"],
+      comment_status: ["draft", "submitted"],
       enrolment_status: [
         "enrolled",
         "promoted",

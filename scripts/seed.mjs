@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Seeds the local Supabase stack from seed/*.csv: creates an auth user for
 // every row in profiles.csv (triggering public.handle_new_user), then loads
-// schools, platform_admins, memberships, the academic structure tables and
-// the people tables. See seed/README.md for the load order and what is
+// schools, platform_admins, memberships, the academic structure tables, the
+// people tables, and assessments and marks. See seed/README.md for the load order and what is
 // deliberately not seeded.
 //
 // Usage: npm run db:seed  (reads SUPABASE env vars from .env.local; see
@@ -243,6 +243,17 @@ async function seedPeople() {
 }
 
 /**
+ * Assessments, then marks. The seed's terms are closed or past their
+ * deadline, which locks teachers out, not this script: the service role has
+ * no user, so the lock does not apply (D30). Marks are audited (D18), so a
+ * re-run adds audit rows for them.
+ */
+async function seedAssessments() {
+  await upsertCsv("assessments");
+  await upsertCsv("marks");
+}
+
+/**
  * Seeded learner logins (learners.user_id set) become learner-number-and-PIN
  * accounts, as src/lib/auth/learner-accounts.ts makes them: app_metadata
  * names the learner and the password is an HMAC of DEMO_PIN keyed by
@@ -268,13 +279,15 @@ async function seedLearnerLogins() {
 
 async function main() {
   // Load order per seed/README.md: auth users (-> profiles), schools,
-  // platform_admins, memberships, the academic structure, then people.
+  // platform_admins, memberships, the academic structure, people, then
+  // assessments and marks.
   await seedAuthUsersAndProfiles();
   await seedSchools();
   await seedPlatformAdmins();
   await seedMemberships();
   await seedAcademicStructure();
   await seedPeople();
+  await seedAssessments();
   await seedLearnerLogins();
   console.log("Seed complete.");
 }

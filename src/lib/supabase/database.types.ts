@@ -53,6 +53,76 @@ export type Database = {
           },
         ]
       }
+      assessments: {
+        Row: {
+          assessed_on: string | null
+          class_subject_id: string
+          created_at: string
+          id: string
+          is_locked: boolean
+          max_mark: number
+          name: string
+          school_id: string
+          sort_order: number
+          term_id: string
+          type: Database["public"]["Enums"]["assessment_type"]
+          updated_at: string
+          weight_percent: number
+        }
+        Insert: {
+          assessed_on?: string | null
+          class_subject_id: string
+          created_at?: string
+          id?: string
+          is_locked?: boolean
+          max_mark: number
+          name: string
+          school_id: string
+          sort_order?: number
+          term_id: string
+          type: Database["public"]["Enums"]["assessment_type"]
+          updated_at?: string
+          weight_percent: number
+        }
+        Update: {
+          assessed_on?: string | null
+          class_subject_id?: string
+          created_at?: string
+          id?: string
+          is_locked?: boolean
+          max_mark?: number
+          name?: string
+          school_id?: string
+          sort_order?: number
+          term_id?: string
+          type?: Database["public"]["Enums"]["assessment_type"]
+          updated_at?: string
+          weight_percent?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessments_class_subject_id_school_id_fkey"
+            columns: ["class_subject_id", "school_id"]
+            isOneToOne: false
+            referencedRelation: "class_subjects"
+            referencedColumns: ["id", "school_id"]
+          },
+          {
+            foreignKeyName: "assessments_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assessments_term_id_school_id_fkey"
+            columns: ["term_id", "school_id"]
+            isOneToOne: false
+            referencedRelation: "terms"
+            referencedColumns: ["id", "school_id"]
+          },
+        ]
+      }
       audit_log: {
         Row: {
           action: Database["public"]["Enums"]["audit_action"]
@@ -106,6 +176,84 @@ export type Database = {
             columns: ["school_id"]
             isOneToOne: false
             referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      class_subject_unlocks: {
+        Row: {
+          class_subject_id: string
+          created_at: string
+          id: string
+          reason: string
+          relocked_at: string | null
+          relocked_by: string | null
+          school_id: string
+          term_id: string
+          unlocked_at: string
+          unlocked_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          class_subject_id: string
+          created_at?: string
+          id?: string
+          reason: string
+          relocked_at?: string | null
+          relocked_by?: string | null
+          school_id: string
+          term_id: string
+          unlocked_at?: string
+          unlocked_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          class_subject_id?: string
+          created_at?: string
+          id?: string
+          reason?: string
+          relocked_at?: string | null
+          relocked_by?: string | null
+          school_id?: string
+          term_id?: string
+          unlocked_at?: string
+          unlocked_by?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "class_subject_unlocks_class_subject_id_school_id_fkey"
+            columns: ["class_subject_id", "school_id"]
+            isOneToOne: false
+            referencedRelation: "class_subjects"
+            referencedColumns: ["id", "school_id"]
+          },
+          {
+            foreignKeyName: "class_subject_unlocks_relocked_by_fkey"
+            columns: ["relocked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_subject_unlocks_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_subject_unlocks_term_id_school_id_fkey"
+            columns: ["term_id", "school_id"]
+            isOneToOne: false
+            referencedRelation: "terms"
+            referencedColumns: ["id", "school_id"]
+          },
+          {
+            foreignKeyName: "class_subject_unlocks_unlocked_by_fkey"
+            columns: ["unlocked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -773,6 +921,71 @@ export type Database = {
           },
         ]
       }
+      marks: {
+        Row: {
+          assessment_id: string
+          created_at: string
+          enrolment_id: string
+          entered_by: string | null
+          id: string
+          school_id: string
+          score: number | null
+          status: Database["public"]["Enums"]["mark_status"]
+          updated_at: string
+        }
+        Insert: {
+          assessment_id: string
+          created_at?: string
+          enrolment_id: string
+          entered_by?: string | null
+          id?: string
+          school_id: string
+          score?: number | null
+          status?: Database["public"]["Enums"]["mark_status"]
+          updated_at?: string
+        }
+        Update: {
+          assessment_id?: string
+          created_at?: string
+          enrolment_id?: string
+          entered_by?: string | null
+          id?: string
+          school_id?: string
+          score?: number | null
+          status?: Database["public"]["Enums"]["mark_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marks_assessment_id_school_id_fkey"
+            columns: ["assessment_id", "school_id"]
+            isOneToOne: false
+            referencedRelation: "assessments"
+            referencedColumns: ["id", "school_id"]
+          },
+          {
+            foreignKeyName: "marks_enrolment_id_school_id_fkey"
+            columns: ["enrolment_id", "school_id"]
+            isOneToOne: false
+            referencedRelation: "enrolments"
+            referencedColumns: ["id", "school_id"]
+          },
+          {
+            foreignKeyName: "marks_entered_by_fkey"
+            columns: ["entered_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marks_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       memberships: {
         Row: {
           created_at: string
@@ -1065,6 +1278,17 @@ export type Database = {
         }[]
       }
       accept_my_invites: { Args: never; Returns: number }
+      assessment_weight_problems: {
+        Args: { p_term_id: string }
+        Returns: {
+          class_subject_id: string
+          total_weight: number
+        }[]
+      }
+      assessment_weights_are_complete: {
+        Args: { p_class_subject_id: string; p_term_id: string }
+        Returns: boolean
+      }
       commit_learner_import: {
         Args: { p_guardians: Json; p_job_id: string; p_learners: Json }
         Returns: Json
@@ -1147,6 +1371,10 @@ export type Database = {
         }[]
       }
       redeem_parent_invite: { Args: { p_code_hash: string }; Returns: string }
+      relock_class_subject: {
+        Args: { p_class_subject_id: string; p_term_id: string }
+        Returns: undefined
+      }
       save_grading_bands: {
         Args: { p_bands: Json; p_scale_id: string }
         Returns: undefined
@@ -1186,6 +1414,14 @@ export type Database = {
         }[]
       }
       teaches: { Args: { p_class_subject_id: string }; Returns: boolean }
+      unlock_class_subject: {
+        Args: {
+          p_class_subject_id: string
+          p_reason: string
+          p_term_id: string
+        }
+        Returns: string
+      }
       update_staff_profile: {
         Args: {
           p_full_name: string
@@ -1204,6 +1440,7 @@ export type Database = {
         | "teacher"
         | "parent"
         | "learner"
+      assessment_type: "test" | "assignment" | "exam" | "practical" | "vacation"
       audit_action: "insert" | "update" | "delete" | "event"
       enrolment_status:
         | "enrolled"
@@ -1216,6 +1453,7 @@ export type Database = {
       import_status: "validated" | "committed" | "failed"
       learner_status: "active" | "left" | "graduated"
       level_stage: "ecd" | "primary" | "o_level" | "a_level"
+      mark_status: "present" | "absent" | "excused"
       membership_status: "invited" | "active" | "disabled"
       school_stage: "primary" | "secondary" | "combined"
       sex: "F" | "M"
@@ -1349,6 +1587,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["school_admin", "head", "hod", "teacher", "parent", "learner"],
+      assessment_type: ["test", "assignment", "exam", "practical", "vacation"],
       audit_action: ["insert", "update", "delete", "event"],
       enrolment_status: [
         "enrolled",
@@ -1362,6 +1601,7 @@ export const Constants = {
       import_status: ["validated", "committed", "failed"],
       learner_status: ["active", "left", "graduated"],
       level_stage: ["ecd", "primary", "o_level", "a_level"],
+      mark_status: ["present", "absent", "excused"],
       membership_status: ["invited", "active", "disabled"],
       school_stage: ["primary", "secondary", "combined"],
       sex: ["F", "M"],

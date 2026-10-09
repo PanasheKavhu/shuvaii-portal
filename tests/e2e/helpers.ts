@@ -275,11 +275,13 @@ export async function signedInClient(email: string) {
  * with one open term around today and no deadline, class "4 Blue" with
  * Mathematics taught by the teacher and English by the hod, and `learners`
  * learners who all take both. With `marks`, the usual three assessments
- * for Mathematics and a mark for every learner in each.
+ * for Mathematics and a mark for every learner in each. With `secondClass`,
+ * also class "3 Green" with the hod as class teacher and Mathematics
+ * teacher, and one learner.
  */
 export async function createMarksClass(
   prefix: string,
-  options: { learners?: number; marks?: boolean; head?: boolean } = {},
+  options: { learners?: number; marks?: boolean; head?: boolean; secondClass?: boolean } = {},
 ) {
   const school = await createEmptySchool(prefix, { head: options.head });
   const db = await signedInClient(school.adminEmail);
@@ -502,10 +504,71 @@ export async function createMarksClass(
     );
   }
 
+  let secondClass: { classId: string; mathsId: string } | null = null;
+  if (options.secondClass) {
+    const green = must(
+      await db
+        .from("classes")
+        .insert({
+          school_id: id,
+          academic_year_id: year.id,
+          grade_level_id: level.id,
+          name: "3 Green",
+          class_teacher_id: hodId,
+        })
+        .select("id")
+        .single(),
+      "a second class",
+    );
+    const greenMaths = must(
+      await db
+        .from("class_subjects")
+        .insert({
+          school_id: id,
+          class_id: green.id,
+          subject_id: subjects.find((s) => s.code === "MATH")!.id,
+          teacher_id: hodId,
+        })
+        .select("id")
+        .single(),
+      "the second class's subject",
+    );
+    const greenLearner = must(
+      await db
+        .from("learners")
+        .insert({ school_id: id, learner_number: "G001", first_name: "Rudo", last_name: "Green" })
+        .select("id")
+        .single(),
+      "a second-class learner",
+    );
+    const greenEnrolment = must(
+      await db
+        .from("enrolments")
+        .insert({
+          school_id: id,
+          learner_id: greenLearner.id,
+          class_id: green.id,
+          academic_year_id: year.id,
+        })
+        .select("id")
+        .single(),
+      "a second-class enrolment",
+    );
+    must(
+      await db
+        .from("enrolment_subjects")
+        .insert({ school_id: id, enrolment_id: greenEnrolment.id, class_subject_id: greenMaths.id })
+        .select("id"),
+      "a second-class subject choice",
+    );
+    secondClass = { classId: green.id, mathsId: greenMaths.id };
+  }
+
   return {
     ...school,
     termId: term.id,
     classId: klass.id,
+    secondClass,
     mathsId: maths,
     englishId: english,
     learners: learners.map((l) => ({

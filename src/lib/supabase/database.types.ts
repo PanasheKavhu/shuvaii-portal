@@ -728,6 +728,7 @@ export type Database = {
       }
       import_jobs: {
         Row: {
+          class_subject_id: string | null
           created_at: string
           created_by: string | null
           error_report: Json | null
@@ -736,9 +737,11 @@ export type Database = {
           kind: Database["public"]["Enums"]["import_kind"]
           school_id: string
           status: Database["public"]["Enums"]["import_status"]
+          term_id: string | null
           updated_at: string
         }
         Insert: {
+          class_subject_id?: string | null
           created_at?: string
           created_by?: string | null
           error_report?: Json | null
@@ -747,9 +750,11 @@ export type Database = {
           kind: Database["public"]["Enums"]["import_kind"]
           school_id: string
           status?: Database["public"]["Enums"]["import_status"]
+          term_id?: string | null
           updated_at?: string
         }
         Update: {
+          class_subject_id?: string | null
           created_at?: string
           created_by?: string | null
           error_report?: Json | null
@@ -758,9 +763,17 @@ export type Database = {
           kind?: Database["public"]["Enums"]["import_kind"]
           school_id?: string
           status?: Database["public"]["Enums"]["import_status"]
+          term_id?: string | null
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "import_jobs_class_subject_fkey"
+            columns: ["class_subject_id", "school_id"]
+            isOneToOne: false
+            referencedRelation: "class_subjects"
+            referencedColumns: ["id", "school_id"]
+          },
           {
             foreignKeyName: "import_jobs_created_by_fkey"
             columns: ["created_by"]
@@ -774,6 +787,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "schools"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_jobs_term_fkey"
+            columns: ["term_id", "school_id"]
+            isOneToOne: false
+            referencedRelation: "terms"
+            referencedColumns: ["id", "school_id"]
           },
         ]
       }
@@ -1305,6 +1325,10 @@ export type Database = {
       commit_learner_import: {
         Args: { p_guardians: Json; p_job_id: string; p_learners: Json }
         Returns: Json
+      }
+      commit_marks_import: {
+        Args: { p_job_id: string; p_marks: Json }
+        Returns: number
       }
       commit_staff_import: {
         Args: { p_job_id: string; p_members: Json }

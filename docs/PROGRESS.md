@@ -40,7 +40,7 @@ _None._
 
 ## Known gaps
 
-- CI does not yet run `test:db` (needs Docker/Supabase) or `test:e2e`.
+- CI runs `test:db` (D29) but not `test:e2e`; run e2e locally before calling a story done.
 - `sign_in_attempts` rows are never pruned (D8).
 - Password reset by phone code (US-1.7) waits for an SMS provider (D19).
 - Two-factor sign in for super admin, school admin and head (SPEC section 5) is not built yet.

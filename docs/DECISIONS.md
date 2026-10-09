@@ -201,3 +201,10 @@ Format: **D#. Title** (date). Decision. Why. Alternatives.
 - Long lists: the Data API returns at most 1,000 rows a request (`max_rows`), so import checks read guardians and learner numbers a page at a time. An e2e test imports a 1,000-row learner file in one go, and the same file with one bad row imports nothing.
 - Duplicated helpers moved to one place: form results (`saved`, `failed`, `notAllowed` in `platform/form-state.ts`), the school-admin check for actions (`schoolAdminContext()` in `src/lib/auth/viewer.ts`) and `rowsOrThrow()` (`src/lib/supabase/rows.ts`).
 - Parent codes in links: `/join?code=...` is moved by the proxy into a short-lived httpOnly cookie and redirected to a clean `/join`, so the one-time code does not stay in the address bar, history or later links.
+
+## D29. CI runs the pgTAP database tests (2026-10-09)
+
+- A second CI job (`db` in `.github/workflows/ci.yml`) runs beside the typecheck, lint and unit job on the same triggers (pushes to `main`, every pull request). It starts the local Supabase stack with the Supabase CLI from `package-lock.json` (2.117.0, the same one `npm run db:start` uses), which applies the migrations, then runs `npm run test:db`.
+- Only Postgres, Auth and Storage are started (`supabase start -x` the rest): Auth creates the `auth` schema and Storage the `storage` schema that the branding and import tests use. Kong, PostgREST, Realtime, Studio, Mailpit, imgproxy, edge runtime, logflare, vector and supavisor are skipped.
+- Caching: npm through `setup-node`. Docker images are pulled each run rather than cached; saving and restoring them through the Actions cache is usually no faster than pulling.
+- e2e (Playwright) stays local for now.

@@ -1357,6 +1357,40 @@ export type Database = {
         Args: { p_event: string; p_membership_id: string }
         Returns: undefined
       }
+      marks_lock: {
+        Args: { p_class_subject_id: string; p_term_id: string }
+        Returns: {
+          lock_reason: string
+          marks_deadline: string
+          teachers_locked: boolean
+          unlock_reason: string
+          unlocked_at: string
+          unlocked_by_name: string
+        }[]
+      }
+      marks_progress: {
+        Args: { p_term_id: string }
+        Returns: {
+          assessments: number
+          class_id: string
+          class_name: string
+          class_subject_id: string
+          learners: number
+          marks_entered: number
+          subject_id: string
+          subject_name: string
+          teacher_id: string
+          teacher_name: string
+          total_weight: number
+        }[]
+      }
+      marks_unlockers: {
+        Args: { p_school_id: string }
+        Returns: {
+          full_name: string
+          role: Database["public"]["Enums"]["app_role"]
+        }[]
+      }
       my_children: {
         Args: { p_school_id: string }
         Returns: {

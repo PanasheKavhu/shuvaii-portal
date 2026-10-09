@@ -104,10 +104,11 @@ Written only by `create_parent_invite()` (school admin; 14 days; stops older wai
 
 ```
 id, school_id, kind import_kind, status import_status,
-file_path, error_report jsonb, created_by
+file_path, error_report jsonb, created_by,
+class_subject_id, term_id   -- marks uploads only (D33)
 ```
 
-`file_path` is the stored upload in the `imports` bucket. `error_report` holds `{fileName, errors: [{row, message}], summary, committed, notInvited}` (D24). A job is `validated` (clean, waiting), `committed` (by `commit_learner_import()` or `commit_staff_import()`, all or nothing) or `failed` (errors, nothing imported).
+`file_path` is the stored upload in the `imports` bucket. `error_report` holds `{fileName, errors: [{row, message}], summary, committed, notInvited}` (D24). A job is `validated` (clean, waiting), `committed` (by `commit_learner_import()`, `commit_staff_import()` or `commit_marks_import()`, all or nothing) or `failed` (errors, nothing imported). A `marks` job names its class subject and term (both required for marks, null otherwise); its kind, class subject, term and author never change (D33).
 
 ### 4.2 Academic structure
 
@@ -352,7 +353,7 @@ Helper functions (security definer, stable): `current_school_ids()`, `has_role(s
 | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | schools                                                                            | members of that school                                                                       | super admin (branding), school admin (limited fields)                            |
 | memberships, invites                                                               | school admin, head                                                                           | school admin (invites only through create_parent_invite(), D25)                  |
-| import_jobs                                                                        | school admin, head                                                                           | school admin, head (D23)                                                         |
+| import_jobs                                                                        | school admin, head; a teacher or hod their own marks uploads (D33)                           | school admin, head (D23); teacher or hod marks uploads for own class subjects    |
 | structure (levels, years, terms, classes, subjects, class_subjects, scales, bands) | staff of the school (D20)                                                                    | school admin                                                                     |
 | learners, enrolments, enrolment_subjects, guardians, guardian_links                | admin, head; teachers and hods for classes they teach (D23); parents and learners in Phase 4 | school admin, head                                                               |
 | assessments, marks                                                                 | admin, head; teacher and hod for own class subjects; class teacher for their class (D30)     | teacher and hod for own class subjects until locked (D30); admin, head (audited) |
@@ -366,12 +367,12 @@ Default is deny. Each policy has a test in each direction (allowed and blocked) 
 
 ## 8. Storage buckets (Supabase Storage)
 
-| Bucket        | Contents                  | Access                                                                          |
-| ------------- | ------------------------- | ------------------------------------------------------------------------------- |
-| `branding`    | logos, stamps, signatures | public read (logos only), write by school admin                                 |
-| `reports`     | published PDFs            | private; signed URLs for owners, share tokens for links                         |
-| `attachments` | newsletter files          | private; signed URLs for audience                                               |
-| `imports`     | uploaded CSV/Excel        | private; school admin and head (D24); deleted after 30 days (not yet automated) |
+| Bucket        | Contents                  | Access                                                                                                                                                 |
+| ------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `branding`    | logos, stamps, signatures | public read (logos only), write by school admin                                                                                                        |
+| `reports`     | published PDFs            | private; signed URLs for owners, share tokens for links                                                                                                |
+| `attachments` | newsletter files          | private; signed URLs for audience                                                                                                                      |
+| `imports`     | uploaded CSV/Excel        | private; school admin and head (D24); a class subject's teacher for `{school}/marks/{class_subject}/` (D33); deleted after 30 days (not yet automated) |
 
 Object paths start with the school id (`{school_id}/...`) so storage policies can check it.
 

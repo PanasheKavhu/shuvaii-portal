@@ -1,16 +1,24 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { parseAssessment, usualSet } from "@/lib/marks/assessments";
 import { parseCell } from "@/lib/marks/cell";
+import { planMarksUpload } from "@/lib/marks/upload";
+import { readUpload, uploadContentType } from "@/lib/people/upload";
 import { isUuid } from "@/lib/setup/structure";
+import type { Json } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 import { failed, saved, type FormState } from "../platform/form-state";
 import {
+  getLockState,
+  getMarksUpload,
   isStillInClass,
+  loadUploadContext,
   loadSavedResults,
   marksActor,
   mayEnterMarks,
+  requireClassSubjectTerm,
   type MarksActor,
   type SavedMark,
   type SavedResult,
@@ -44,6 +52,14 @@ function marksPath(classSubjectId: string, termId: string, rest = ""): string {
 function revalidateMarks(classSubjectId: string, termId: string) {
   revalidatePath(marksPath(classSubjectId, termId));
   revalidatePath(marksPath(classSubjectId, termId, "/assessments"));
+  revalidatePath(marksPath(classSubjectId, termId, "/upload"));
+}
+
+/** After an unlock or relock: the class subject's pages, the marks list and setup's terms. */
+function revalidateLock(classSubjectId: string, termId: string) {
+  revalidateMarks(classSubjectId, termId);
+  revalidatePath("/marks");
+  revalidatePath("/admin/setup", "layout");
 }
 
 /** The class subject, when the actor may enter its marks and it is in their school. */
@@ -326,7 +342,7 @@ export async function unlockMarks(
     p_reason: reason,
   });
   if (error) return failed(dbMessage(error));
-  revalidateMarks(classSubjectId, termId);
+  revalidateLock(classSubjectId, termId);
   return saved("Unlocked. The teacher can change these marks until you relock them.");
 }
 
@@ -340,6 +356,159 @@ export async function relockMarks(classSubjectId: string, termId: string): Promi
     p_term_id: termId,
   });
   if (error) return failed(dbMessage(error));
-  revalidateMarks(classSubjectId, termId);
+  revalidateLock(classSubjectId, termId);
   return saved("Relocked.");
+}
+
+// Upload (US-4.3; D33) --------------------------------------------------------------------
+
+const MAX_STORED_ERRORS = 500;
+
+function uploadPath(classSubjectId: string, termId: string, jobId = ""): string {
+  return marksPath(classSubjectId, termId, jobId ? `/upload/${jobId}` : "/upload");
+}
+
+/** The class subject and term of an upload, its lock, and the actor, or a message. */
+async function uploadTarget(classSubjectId: string, termId: string) {
+  const actor = await marksActor();
+  if (!actor || !(await classSubjectFor(actor, classSubjectId)) || !isUuid(termId)) return null;
+  const cst = await requireClassSubjectTerm(actor, classSubjectId, termId);
+  const lock = await getLockState(cst.classSubjectId, cst.term.id);
+  return { actor, cst, lock, locked: lock.teachersLocked && !actor.isAdminOrHead };
+}
+
+/** Reads a file and checks it against the class subject as it is now. */
+async function planUpload(
+  target: NonNullable<Awaited<ReturnType<typeof uploadTarget>>>,
+  bytes: Uint8Array,
+) {
+  const read = readUpload(bytes);
+  if (!read.ok) return { read, errors: [{ row: 0, message: read.error }], plan: null } as const;
+  const plan = planMarksUpload(
+    read.rows,
+    await loadUploadContext(target.actor, target.cst, target.lock),
+  );
+  const errors =
+    plan.errors.length || plan.marks.length
+      ? plan.errors
+      : [
+          {
+            row: 0,
+            message: "No marks changed: every mark in the file is already saved or blank.",
+          },
+        ];
+  return { read, errors, plan } as const;
+}
+
+/**
+ * Step 1: upload and check. The file is stored in the private `imports`
+ * bucket and the result recorded in import_jobs as `validated` or `failed`
+ * with every problem by row. Nothing is saved to the marks yet.
+ */
+export async function uploadMarks(
+  classSubjectId: string,
+  termId: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const target = await uploadTarget(classSubjectId, termId);
+  if (!target) return failed(NOT_ALLOWED);
+  if (target.locked) return failed(LOCKED);
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0)
+    return failed(null, { file: "Choose a CSV or Excel file to upload." });
+
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const checked = await planUpload(target, bytes);
+  const { actor, cst } = target;
+  const jobId = crypto.randomUUID();
+  const supabase = await createClient();
+
+  let filePath: string | null = null;
+  if (checked.read.ok) {
+    filePath = `${actor.schoolId}/marks/${cst.classSubjectId}/${jobId}.${checked.read.kind}`;
+    const upload = await supabase.storage
+      .from("imports")
+      .upload(filePath, bytes, { contentType: uploadContentType(checked.read.kind) });
+    if (upload.error) return failed("Could not store the file. Please try again.");
+  }
+
+  const { error } = await supabase.from("import_jobs").insert({
+    id: jobId,
+    school_id: actor.schoolId,
+    kind: "marks",
+    class_subject_id: cst.classSubjectId,
+    term_id: cst.term.id,
+    status: checked.errors.length ? "failed" : "validated",
+    file_path: filePath,
+    error_report: {
+      fileName: file.name.slice(0, 120),
+      errors: checked.errors.slice(0, MAX_STORED_ERRORS),
+      summary: checked.errors.length
+        ? { errorCount: checked.errors.length }
+        : (checked.plan?.summary ?? null),
+    } as Json,
+  });
+  if (error) return failed("Could not record the upload. Please try again.");
+
+  revalidatePath(uploadPath(cst.classSubjectId, cst.term.id));
+  redirect(uploadPath(cst.classSubjectId, cst.term.id, jobId));
+}
+
+/**
+ * Step 2: save. The stored file is checked again against the marks as they
+ * are now, then every mark is saved in one transaction by
+ * public.commit_marks_import(), through the same RLS, lock and audit rules
+ * as the grid, or nothing is.
+ */
+export async function commitMarksUpload(
+  classSubjectId: string,
+  termId: string,
+  jobId: string,
+): Promise<FormState> {
+  const target = await uploadTarget(classSubjectId, termId);
+  if (!target) return failed(NOT_ALLOWED);
+  const { cst } = target;
+  const job = await getMarksUpload(cst, jobId);
+  const path = uploadPath(cst.classSubjectId, cst.term.id, job.id);
+  if (job.status !== "validated" || !job.filePath) {
+    revalidatePath(path);
+    return failed("This upload is no longer waiting to be saved.");
+  }
+  if (target.locked) return failed(LOCKED);
+
+  const supabase = await createClient();
+  const download = await supabase.storage.from("imports").download(job.filePath);
+  if (download.error) return failed("Could not read the stored file. Please try again.");
+  const checked = await planUpload(target, new Uint8Array(await download.data.arrayBuffer()));
+
+  if (checked.errors.length || !checked.plan) {
+    await supabase
+      .from("import_jobs")
+      .update({
+        status: "failed",
+        error_report: {
+          fileName: job.fileName,
+          errors: checked.errors.slice(0, MAX_STORED_ERRORS),
+          summary: { errorCount: checked.errors.length },
+        } as Json,
+      })
+      .eq("id", job.id);
+    revalidatePath(path);
+    return failed("The marks changed since the check, so nothing was saved.");
+  }
+
+  const { data, error } = await supabase.rpc("commit_marks_import", {
+    p_job_id: job.id,
+    p_marks: checked.plan.marks.map((m) => ({
+      assessment_id: m.assessmentId,
+      enrolment_id: m.enrolmentId,
+      status: m.status,
+      score: m.score,
+    })) as Json,
+  });
+  if (error) return failed(`Nothing was saved. ${dbMessage(error)}`);
+  revalidatePath(path);
+  revalidateMarks(cst.classSubjectId, cst.term.id);
+  return saved(`${data} ${data === 1 ? "mark" : "marks"} saved.`);
 }

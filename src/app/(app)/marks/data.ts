@@ -6,10 +6,12 @@ import type { AppRole } from "@/lib/auth/roles";
 import { getActiveSchool, getViewer, requireArea } from "@/lib/auth/viewer";
 import type { MarkStatus } from "@/lib/grading/results";
 import type { AssessmentType } from "@/lib/marks/assessments";
+import type { ExistingMark, MarksUploadSummary, UploadContext } from "@/lib/marks/upload";
 import { pickCurrentTerm, todayIn } from "@/lib/marks/terms";
 import type { Band } from "@/lib/setup/bands";
 import type { TermKind, TermStatus } from "@/lib/setup/calendar";
 import { isUuid } from "@/lib/setup/structure";
+import type { Json } from "@/lib/supabase/database.types";
 import { rowsOrThrow } from "@/lib/supabase/rows";
 import { createClient } from "@/lib/supabase/server";
 
@@ -436,4 +438,186 @@ export async function loadSavedResults(
     };
   }
   return result;
+}
+
+// Marks upload (US-4.3; D33) ----------------------------------------------------------
+
+/**
+ * What the upload check and the template need: the term's assessments
+ * (writable unless their own lock applies to this person), every learner
+ * in the class with whether they take the subject, and the saved marks.
+ */
+export async function loadUploadContext(
+  actor: MarksActor,
+  cst: ClassSubjectTerm,
+  lock: LockState,
+): Promise<UploadContext> {
+  const supabase = await createClient();
+  const [assessments, enrolments] = await Promise.all([
+    listAssessments(cst.classSubjectId, cst.term.id),
+    supabase
+      .from("enrolments")
+      .select(
+        "id, status, learners!inner(learner_number, first_name, last_name), enrolment_subjects(class_subject_id)",
+      )
+      .eq("class_id", cst.classId)
+      .eq("enrolment_subjects.class_subject_id", cst.classSubjectId),
+  ]);
+  const marks = assessments.length
+    ? await supabase
+        .from("marks")
+        .select("assessment_id, enrolment_id, score, status")
+        .in(
+          "assessment_id",
+          assessments.map((x) => x.id),
+        )
+    : { data: [], error: null };
+
+  const existing: Record<string, ExistingMark> = {};
+  for (const m of rows(marks)) {
+    existing[`${m.assessment_id}:${m.enrolment_id}`] = {
+      status: m.status,
+      score: m.score === null ? null : Number(m.score),
+    };
+  }
+  return {
+    subjectName: cst.subjectName,
+    className: cst.className,
+    assessments: assessments.map((a) => ({
+      id: a.id,
+      name: a.name,
+      maxMark: a.maxMark,
+      writable: actor.isAdminOrHead || !a.isLocked || lock.unlock !== null,
+    })),
+    learners: rows(enrolments)
+      .map((e) => ({
+        enrolmentId: e.id,
+        learnerNumber: e.learners.learner_number,
+        name: `${e.learners.first_name} ${e.learners.last_name}`,
+        lastName: e.learners.last_name,
+        takesSubject: e.enrolment_subjects.length > 0,
+        stillInClass: isStillInClass(e.status),
+      }))
+      .sort((a, b) => a.lastName.localeCompare(b.lastName) || a.name.localeCompare(b.name)),
+    existing,
+  };
+}
+
+export type MarksUploadJob = {
+  id: string;
+  status: "validated" | "committed" | "failed";
+  filePath: string | null;
+  fileName: string | null;
+  errors: { row: number; message: string }[];
+  errorCount: number;
+  summary: MarksUploadSummary | null;
+  createdAt: string;
+};
+
+type JobRow = {
+  id: string;
+  status: MarksUploadJob["status"];
+  file_path: string | null;
+  error_report: Json;
+  created_at: string;
+};
+
+function toUploadJob(j: JobRow): MarksUploadJob {
+  const report = (j.error_report ?? {}) as {
+    fileName?: string;
+    errors?: { row: number; message: string }[];
+    summary?: MarksUploadSummary | { errorCount: number };
+  };
+  const errors = report.errors ?? [];
+  const failedSummary = j.status === "failed" ? (report.summary as { errorCount?: number }) : null;
+  return {
+    id: j.id,
+    status: j.status,
+    filePath: j.file_path,
+    fileName: report.fileName ?? null,
+    errors,
+    errorCount: failedSummary?.errorCount ?? errors.length,
+    summary: j.status === "failed" ? null : ((report.summary as MarksUploadSummary) ?? null),
+    createdAt: j.created_at,
+  };
+}
+
+const JOB_COLUMNS = "id, status, file_path, error_report, created_at";
+
+/** The latest uploads for this class subject and term that the viewer may see. */
+export async function listMarksUploads(cst: ClassSubjectTerm): Promise<MarksUploadJob[]> {
+  const supabase = await createClient();
+  return rows(
+    await supabase
+      .from("import_jobs")
+      .select(JOB_COLUMNS)
+      .eq("kind", "marks")
+      .eq("class_subject_id", cst.classSubjectId)
+      .eq("term_id", cst.term.id)
+      .order("created_at", { ascending: false })
+      .limit(5),
+  ).map(toUploadJob);
+}
+
+/** One upload of this class subject and term, or 404. */
+export async function getMarksUpload(
+  cst: ClassSubjectTerm,
+  jobId: string,
+): Promise<MarksUploadJob> {
+  if (!isUuid(jobId)) notFound();
+  const supabase = await createClient();
+  const job = await supabase
+    .from("import_jobs")
+    .select(JOB_COLUMNS)
+    .eq("id", jobId)
+    .eq("kind", "marks")
+    .eq("class_subject_id", cst.classSubjectId)
+    .eq("term_id", cst.term.id)
+    .maybeSingle();
+  if (job.error) rows({ data: null, error: job.error });
+  if (!job.data) notFound();
+  return toUploadJob(job.data);
+}
+
+// Open unlocks (US-4.5; D33) ------------------------------------------------------------
+
+export type OpenUnlock = {
+  id: string;
+  termId: string;
+  classSubjectId: string;
+  className: string;
+  subjectName: string;
+  reason: string;
+  unlockedAt: string;
+  unlockedBy: string | null;
+};
+
+/** Class subjects unlocked for these terms and not relocked yet, by class then subject. */
+export async function listOpenUnlocks(termIds: readonly string[]): Promise<OpenUnlock[]> {
+  if (termIds.length === 0) return [];
+  const supabase = await createClient();
+  return rows(
+    await supabase
+      .from("class_subject_unlocks")
+      .select(
+        "id, term_id, class_subject_id, reason, unlocked_at, unlocker:profiles!class_subject_unlocks_unlocked_by_fkey(full_name, email), class_subjects!inner(classes!inner(name), subjects!inner(name))",
+      )
+      .in("term_id", [...termIds])
+      .is("relocked_at", null)
+      .order("unlocked_at"),
+  )
+    .map((u) => ({
+      id: u.id,
+      termId: u.term_id,
+      classSubjectId: u.class_subject_id,
+      className: u.class_subjects.classes.name,
+      subjectName: u.class_subjects.subjects.name,
+      reason: u.reason,
+      unlockedAt: u.unlocked_at,
+      unlockedBy: u.unlocker?.full_name ?? u.unlocker?.email ?? null,
+    }))
+    .sort(
+      (a, b) =>
+        a.className.localeCompare(b.className) || a.subjectName.localeCompare(b.subjectName),
+    );
 }

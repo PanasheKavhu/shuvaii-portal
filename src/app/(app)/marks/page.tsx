@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { ClassSubjectList, TermTabs } from "@/components/marks/class-subject-list";
-import { listProgress, requireMarksActor, resolveTerm } from "./data";
+import { listOpenUnlocks, listProgress, requireMarksActor, resolveTerm } from "./data";
 
 export const metadata: Metadata = { title: "Marks" };
 
@@ -15,7 +15,11 @@ export default async function MarksPage({ searchParams }: PageProps<"/marks">) {
   if (!actor.isAdminOrHead) redirect("/teaching");
   const { term: wanted } = await searchParams;
   const { terms, term } = await resolveTerm(actor.schoolId, wanted);
-  const items = term ? await listProgress(term.id) : [];
+  const [progress, unlocks] = term
+    ? await Promise.all([listProgress(term.id), listOpenUnlocks([term.id])])
+    : [[], []];
+  const unlocked = new Set(unlocks.map((u) => u.classSubjectId));
+  const items = progress.map((i) => ({ ...i, unlocked: unlocked.has(i.classSubjectId) }));
   const classes = [...new Set(items.map((i) => i.className))];
 
   return (

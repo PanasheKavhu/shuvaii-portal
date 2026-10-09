@@ -168,8 +168,12 @@ export async function resetEmailFor(to: string): Promise<{ tokenHash: string; co
  * A brand-new school with an active school admin, a teacher and a head of
  * department, made through the API as the platform admin (who may create
  * schools and memberships, D3). Returns the admin's email and the staff names.
+ * With `head`, also an active head (headEmail and headName).
  */
-export async function createEmptySchool(prefix: string): Promise<{
+export async function createEmptySchool(
+  prefix: string,
+  options: { head?: boolean } = {},
+): Promise<{
   schoolId: string;
   adminEmail: string;
   adminName: string;
@@ -177,6 +181,8 @@ export async function createEmptySchool(prefix: string): Promise<{
   teacherName: string;
   hodEmail: string;
   hodName: string;
+  headEmail: string | null;
+  headName: string | null;
 }> {
   try {
     process.loadEnvFile(".env.local");
@@ -215,10 +221,22 @@ export async function createEmptySchool(prefix: string): Promise<{
   const admin = await newUser("admin", adminName);
   const teacher = await newUser("teacher", teacherName);
   const hod = await newUser("hod", hodName);
+  const headName = options.head ? `Hope Head ${stamp}` : null;
+  const head = headName ? await newUser("head", headName) : null;
   const { error: memberError } = await platform.from("memberships").insert([
     { school_id: school.id, user_id: admin.id, role: "school_admin", status: "active" },
     { school_id: school.id, user_id: teacher.id, role: "teacher", status: "active" },
     { school_id: school.id, user_id: hod.id, role: "hod", status: "active" },
+    ...(head
+      ? [
+          {
+            school_id: school.id,
+            user_id: head.id,
+            role: "head" as const,
+            status: "active" as const,
+          },
+        ]
+      : []),
   ]);
   if (memberError) throw new Error("Could not add the test school's staff");
   return {
@@ -229,6 +247,8 @@ export async function createEmptySchool(prefix: string): Promise<{
     teacherName,
     hodEmail: hod.email,
     hodName,
+    headEmail: head?.email ?? null,
+    headName,
   };
 }
 
@@ -259,9 +279,9 @@ export async function signedInClient(email: string) {
  */
 export async function createMarksClass(
   prefix: string,
-  options: { learners?: number; marks?: boolean } = {},
+  options: { learners?: number; marks?: boolean; head?: boolean } = {},
 ) {
-  const school = await createEmptySchool(prefix);
+  const school = await createEmptySchool(prefix, { head: options.head });
   const db = await signedInClient(school.adminEmail);
   const must = <T>(result: { data: T; error: unknown }, what: string): NonNullable<T> => {
     if (result.error || result.data == null) throw new Error(`Could not create ${what}`);

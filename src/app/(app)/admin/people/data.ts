@@ -472,6 +472,7 @@ export async function getImportJob(schoolId: string, id: string): Promise<Import
     .select("id, kind, status, file_path, error_report, created_at")
     .eq("id", id)
     .eq("school_id", schoolId)
+    .in("kind", ["staff", "learners"])
     .maybeSingle();
   if (job.error) rows({ data: null, error: job.error });
   if (!job.data) notFound();

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { OpenUnlocks } from "@/components/marks/open-unlocks";
 import { ActionForm } from "@/components/setup/action-form";
 import { SelectField, TextField } from "@/components/setup/fields";
 import { NextStep } from "@/components/setup/step-nav";
@@ -8,6 +9,8 @@ import {
   TERM_STATUSES,
   TERM_STATUS_LABELS,
 } from "@/lib/setup/calendar";
+import { relockMarks } from "../../../../marks/actions";
+import { listOpenUnlocks } from "../../../../marks/data";
 import { addTerm, saveTerm } from "../../actions";
 import { getYear, listTerms, requireSchoolAdmin, type TermRow } from "../../data";
 
@@ -24,18 +27,24 @@ const LABELS = {
   marksDeadline: "Marks deadline",
 };
 
-/** US-2.1 and US-2.4: terms with dates, status and marks deadline. */
+/**
+ * US-2.1 and US-2.4: terms with dates, status and marks deadline, and the
+ * class subjects whose marks are unlocked for their teacher in each term
+ * (US-4.5; D33), with Relock.
+ */
 export default async function TermsPage({ params }: PageProps<"/admin/setup/[yearId]/terms">) {
   const { schoolId } = await requireSchoolAdmin();
   const { yearId } = await params;
   const year = await getYear(schoolId, yearId);
   const terms = await listTerms(year.id);
+  const unlocks = await listOpenUnlocks(terms.map((t) => t.id));
 
   return (
     <div className="flex flex-col gap-6">
       <p className="text-muted-foreground">
-        {year.startsOn} to {year.endsOn}. Each term has a status and a marks deadline; locking and
-        unlocking marks arrive with marks entry.
+        {year.startsOn} to {year.endsOn}. Each term has a status and a marks deadline. Teachers
+        cannot change marks once a term is locked or closed or its deadline has passed, unless you
+        unlock a class subject from its marks page.
       </p>
 
       <ul aria-label="Terms" className="flex flex-col gap-4">
@@ -51,6 +60,10 @@ export default async function TermsPage({ params }: PageProps<"/admin/setup/[yea
             >
               <TermFields prefix={term.id} term={term} />
             </ActionForm>
+            <TermUnlocks
+              termName={term.name}
+              unlocks={unlocks.filter((u) => u.termId === term.id)}
+            />
           </li>
         ))}
       </ul>
@@ -70,6 +83,29 @@ export default async function TermsPage({ params }: PageProps<"/admin/setup/[yea
 
       <NextStep yearId={year.id} after="/terms" />
     </div>
+  );
+}
+
+function TermUnlocks({
+  termName,
+  unlocks,
+}: {
+  termName: string;
+  unlocks: Awaited<ReturnType<typeof listOpenUnlocks>>;
+}) {
+  return (
+    <section aria-label={`Unlocked marks in ${termName}`} className="mt-5 flex flex-col gap-2">
+      <h3 className="text-sm font-semibold">Unlocked marks</h3>
+      {unlocks.length === 0 ? (
+        <p className="text-muted-foreground text-sm">No class subjects are unlocked.</p>
+      ) : (
+        <OpenUnlocks
+          unlocks={unlocks}
+          label={`Unlocked class subjects in ${termName}`}
+          relockAction={relockMarks}
+        />
+      )}
+    </section>
   );
 }
 

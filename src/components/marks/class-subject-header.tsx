@@ -2,7 +2,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 /**
- * Title, back link and the Marks / Assessments tabs of one class subject's
+ * Title, back link and the Marks / Assessments / Upload tabs of one class subject's
  * marks pages for a term.
  */
 export function ClassSubjectHeader({
@@ -24,12 +24,13 @@ export function ClassSubjectHeader({
   teacherName: string | null;
   backHref: string;
   backLabel: string;
-  current: "marks" | "assessments";
+  current: "marks" | "assessments" | "upload";
 }) {
   const base = `/marks/${classSubjectId}/${termId}`;
   const tabs = [
     { key: "marks", href: base, label: "Marks" },
     { key: "assessments", href: `${base}/assessments`, label: "Assessments" },
+    { key: "upload", href: `${base}/upload`, label: "Upload" },
   ] as const;
 
   return (
@@ -56,7 +57,7 @@ export function ClassSubjectHeader({
                 href={tab.href}
                 aria-current={tab.key === current ? "page" : undefined}
                 className={cn(
-                  "flex min-h-11 items-center rounded-full px-5 text-sm font-medium",
+                  "flex min-h-11 items-center rounded-full px-4 text-sm font-medium sm:px-5",
                   tab.key === current
                     ? "bg-background text-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground",

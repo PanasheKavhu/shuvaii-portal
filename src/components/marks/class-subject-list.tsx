@@ -11,6 +11,8 @@ export type ClassSubjectItem = {
   assessments: number;
   totalWeight: number;
   marksEntered: number;
+  /** Unlocked for the teacher after the lock (admin and head list only). */
+  unlocked?: boolean;
 };
 
 /**
@@ -74,6 +76,11 @@ export function ClassSubjectList({
                   ? `No assessments yet · ${item.learners} learners`
                   : `${progress.entered} of ${progress.expected} marks · ${item.learners} learners`}
               </span>
+              {item.unlocked && (
+                <span className="w-fit rounded-full bg-sky-500/15 px-2.5 py-1 text-xs font-semibold text-sky-900 dark:text-sky-200">
+                  Unlocked for the teacher
+                </span>
+              )}
               {item.assessments > 0 && !weightsOk && (
                 <span className="text-sm font-medium text-amber-800 dark:text-amber-300">
                   Weights add up to {item.totalWeight}, not 100

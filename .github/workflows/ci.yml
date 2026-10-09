@@ -18,3 +18,26 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
+
+  db:
+    # RLS and cross-school pgTAP tests against a local Supabase stack. The
+    # Supabase CLI is the pinned devDependency from package-lock.json, the same
+    # one `npm run db:start` uses locally. Only Postgres, Auth (creates the
+    # auth schema) and Storage (creates the storage schema the branding and
+    # import tests use) are started; `supabase start` applies the migrations.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx supabase --version
+      - name: Start Supabase (database, auth, storage only)
+        run: >-
+          npx supabase start
+          -x realtime,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+      - run: npm run test:db
+      - if: always()
+        run: npx supabase stop --no-backup

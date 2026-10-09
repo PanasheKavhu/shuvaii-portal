@@ -8,8 +8,13 @@ describe("navFor", () => {
     expect(hrefs(navFor(["teacher"], false))).toEqual(["/teaching"]);
   });
 
-  it("shows a school admin only the admin area", () => {
-    expect(hrefs(navFor(["school_admin"], false))).toEqual(["/admin"]);
+  it("shows a school admin the admin area and marks", () => {
+    expect(hrefs(navFor(["school_admin"], false))).toEqual(["/admin", "/marks"]);
+    expect(hrefs(navFor(["head"], false))).toEqual(["/head", "/marks"]);
+  });
+
+  it("shows a head of department their department and classes, without a marks entry", () => {
+    expect(hrefs(navFor(["hod"], false))).toEqual(["/department", "/teaching"]);
   });
 
   it("combines areas for someone with two roles", () => {
@@ -53,6 +58,14 @@ describe("canUseArea", () => {
   it("denies a teacher the admin and head areas", () => {
     expect(canUseArea(AREAS.admin, ["teacher"], false)).toBe(false);
     expect(canUseArea(AREAS.head, ["teacher"], false)).toBe(false);
+  });
+
+  it("lets teaching staff, admin and head use the marks screens, but not parents or learners", () => {
+    for (const role of ["teacher", "hod", "school_admin", "head"] as const)
+      expect(canUseArea(AREAS.marks, [role], false)).toBe(true);
+    expect(canUseArea(AREAS.marks, ["parent"], false)).toBe(false);
+    expect(canUseArea(AREAS.marks, ["learner"], false)).toBe(false);
+    expect(canUseArea(AREAS.teaching, ["school_admin"], false)).toBe(false);
   });
 
   it("denies a school admin the platform console", () => {

@@ -59,7 +59,7 @@ export function TextField({
   hint?: string;
   type?: "text" | "date" | "number" | "email" | "tel";
   className?: string;
-  inputMode?: "numeric" | "text" | "email" | "tel";
+  inputMode?: "numeric" | "decimal" | "text" | "email" | "tel";
   maxLength?: number;
 }) {
   return (

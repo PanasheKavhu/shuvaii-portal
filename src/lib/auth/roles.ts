@@ -15,6 +15,8 @@ export type Area = {
   label: string;
   /** School roles that may use the area; empty for platform-only areas. */
   roles: readonly AppRole[];
+  /** Roles that get a menu entry, when not every role in `roles` should. */
+  menuRoles?: readonly AppRole[];
   platformOnly?: boolean;
 };
 
@@ -22,7 +24,16 @@ export const AREAS = {
   admin: { href: "/admin", label: "School admin", roles: ["school_admin"] },
   head: { href: "/head", label: "Head's office", roles: ["head"] },
   department: { href: "/department", label: "Department", roles: ["hod"] },
-  teaching: { href: "/teaching", label: "My classes", roles: ["teacher"] },
+  // Heads of department teach too (D20).
+  teaching: { href: "/teaching", label: "My classes", roles: ["teacher", "hod"] },
+  // Assessments and marks grids (D32). Teachers reach their own from My
+  // classes; school admin and head open any class subject's from the menu.
+  marks: {
+    href: "/marks",
+    label: "Marks",
+    roles: ["school_admin", "head", "hod", "teacher"],
+    menuRoles: ["school_admin", "head"],
+  },
   children: { href: "/children", label: "My children", roles: ["parent"] },
   myReports: { href: "/my-reports", label: "My reports", roles: ["learner"] },
   platform: { href: "/platform", label: "Platform", roles: [], platformOnly: true },
@@ -45,7 +56,9 @@ export function canUseArea(
 
 /** Menu entries for this viewer, in display order. */
 export function navFor(roles: readonly AppRole[], isPlatformAdmin: boolean): Area[] {
-  return Object.values(AREAS).filter((area) => canUseArea(area, roles, isPlatformAdmin));
+  return Object.values(AREAS as Record<AreaKey, Area>).filter((area) =>
+    canUseArea({ ...area, roles: area.menuRoles ?? area.roles }, roles, isPlatformAdmin),
+  );
 }
 
 /** Where to send the viewer after sign in, or null if they have nowhere to go. */

@@ -24,14 +24,14 @@ test("a head lands on the head's office and sees only their menu", async ({ page
   await expect(page).toHaveURL("/head");
   await expect(page.getByRole("heading", { name: "Head's office" })).toBeVisible();
   await expect(page.getByTestId("school-name")).toHaveText("Msasa Demo High School");
-  await expect(mainNav(page).getByRole("link")).toHaveText(["Head's office"]);
+  await expect(mainNav(page).getByRole("link")).toHaveText(["Head's office", "Marks"]);
   await expect(page.getByRole("contentinfo")).toHaveText("Implemented by Panashe and Shuvai 2026");
 });
 
 test("a school admin lands on the admin area", async ({ page }) => {
   await signIn(page, ADMIN);
   await expect(page).toHaveURL("/admin");
-  await expect(mainNav(page).getByRole("link")).toHaveText(["School admin"]);
+  await expect(mainNav(page).getByRole("link")).toHaveText(["School admin", "Marks"]);
 });
 
 test("a teacher is told 'not allowed' on admin and head pages", async ({ page }) => {

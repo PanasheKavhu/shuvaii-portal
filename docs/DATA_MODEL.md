@@ -332,14 +332,17 @@ stateDiagram-v2
 
 ## 6. Calculations
 
-Implemented as SQL functions and views (and mirrored by pure TypeScript functions used in tests):
+Implemented as two set-based SQL functions that return a whole class for a term (D31), mirrored by pure TypeScript in `src/lib/grading` for the live marks grid:
 
-1. `subject_result(enrolment, class_subject, term)` = sum over assessments of `score / max_mark * weight_percent`. Returns `incomplete` if any assessment is `absent`, `excused` or has no mark (Q6).
-2. `subject_grade` = band lookup on `round_half_up(result)` (Q1, Q4).
-3. `class_average(enrolment, term)` = mean of the rounded results of completed subjects, one decimal.
-4. `class_position(enrolment, term)` = competition rank of `class_average` within the class (ties share a position, next rank skipped).
+- `public.subject_results(class, term)`: per enrolment and class subject (only class subjects with assessments in the term), `weighted_percent`, `rounded_mark`, `grade`, `grade_remark`, `result_status`, `incomplete_reason`.
+- `public.class_positions(class, term)`: per enrolment, `subjects_counted`, `average`, `position`, `class_size`.
 
-Fixtures: `seed/expected_subject_results.csv` and `seed/expected_class_positions.csv` were computed independently in Python from the seed marks; tests must reproduce them exactly.
+1. Subject result = sum over assessments of `score / max_mark * weight_percent`, numeric. `incomplete` if the weights do not add up to 100, or any assessment is `absent`, `excused` or has no mark (Q6).
+2. Grade = band lookup on the result rounded half up to a whole mark, from the scale of the class's grade level (Q1, Q4).
+3. Average = mean of the rounded results of completed subjects, one decimal, half up.
+4. Position = competition rank of the average within the class (ties share a position, next rank skipped), among learners not `transferred` or `left`. Vacation terms have no positions (Q8).
+
+Fixtures: `seed/expected_subject_results.csv` and `seed/expected_class_positions.csv` were computed independently in Python from the seed marks; tests reproduce them exactly (`tests/unit/grading/fixtures.test.ts`, `supabase/tests/16_grade_fixtures.test.sql`).
 
 ## 7. Row-level security approach
 

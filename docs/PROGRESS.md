@@ -4,7 +4,7 @@ Update at the end of every story (definition of done, `SPEC.md` section 6).
 
 ## Current phase
 
-Phase 1 (E1: access, tenancy, branding). Tenancy schema, staff, learner and parent sign in, password reset, role-based navigation, school theming and a minimal super-admin console done. Phase 2 (E2, E3: school setup and people) done and tagged `v0.2.0` after its gate: academic structure tables, the school admin setup area (US-2.1 to US-2.4), the people tables and the people admin area (US-3.1 to US-3.4), and parent and learner sign in. Phase 3 (marks) started: assessment and mark tables with locking in the database (D30).
+Phase 1 (E1: access, tenancy, branding). Tenancy schema, staff, learner and parent sign in, password reset, role-based navigation, school theming and a minimal super-admin console done. Phase 2 (E2, E3: school setup and people) done and tagged `v0.2.0` after its gate: academic structure tables, the school admin setup area (US-2.1 to US-2.4), the people tables and the people admin area (US-3.1 to US-3.4), and parent and learner sign in. Phase 3 (marks) started: assessment and mark tables with locking in the database (D30), and subject results, averages and positions computed in the database (D31).
 
 ## Done
 
@@ -31,13 +31,14 @@ Phase 1 (E1: access, tenancy, branding). Tenancy schema, staff, learner and pare
 
 - 2026-10-09: Assessments and marks (migration order step 5, first half; D30). Enums `assessment_type` and `mark_status`; `assessments`, `marks` and `class_subject_unlocks` with `school_id`, same-school foreign keys, the section 9 indexes and RLS. A teacher or hod reads and writes only class subjects they teach, a class teacher reads every mark in their class, school admin and head read and write the whole school; parents and learners get nothing yet. Locking is in the database: teachers cannot write once the term is locked or closed, the marks deadline has passed or the assessment is locked, unless a school admin or head has unlocked that class subject for the term with `unlock_class_subject()` (reason required, audited with the reason) until `relock_class_subject()`. A mark's learner must take the subject (trigger), scores are checked against `max_mark`, marks are never deleted, and assessments and marks are audited. Weights check functions `assessment_weights_are_complete()` and `assessment_weight_problems()`. `scripts/seed.mjs` loads assessments and marks; types regenerated. pgTAP `15_assessments_and_marks.test.sql` (101 tests): cross-school read and write for all three tables, teacher, hod, class teacher, head, parent, learner and anonymous access, the subject check, the score check, deadline, term-status and assessment locks, unlock and relock with and without a reason by a teacher (refused) and a head, the weights check, and one audit row with old and new values per mark change. Each cross-school test was seen failing when a permissive policy was added to its table.
 
+- 2026-10-09: Subject results, averages and positions (migration order step 5, second half; D31). `public.subject_results(class, term)` gives every learner's weighted percent, rounded mark, grade and complete or incomplete (with the reason: weights not 100, absent, excused, missing mark) for a whole class in one call; `public.class_positions(class, term)` gives averages of completed subjects (one decimal) and competition-ranked positions, leaving out learners who transferred or left, with no positions in vacation terms. All numeric, rounded half up, exact at 69.5. School admin, head and class teacher read the whole class; a subject teacher or hod reads only their subjects and no positions; parents and learners nothing yet. The same rules in TypeScript (`src/lib/grading`, exact fractions, no floats) for the live marks grid. Tests: both seed fixture files reproduced exactly, every row including the tie and the absences, in TypeScript (`tests/unit/grading/fixtures.test.ts`) and in SQL (`16_grade_fixtures.test.sql`, generated from the CSVs by `scripts/grade-fixture-test.mjs`, with a unit test that it is up to date); pgTAP `17_grade_calculations.test.sql` (41 tests): 69.5, 70, 69.49, 39.5 and 0, a non-terminating 69.5, weights adding up to 90, absent, excused and missing marks, a tie, a leaver, a vacation term, each role's access, cross-school, and a class of 45 learners with 10 subjects (about 70 ms, fails above 1 s). Both test files were seen failing with a broken rounding function.
+
 ## In progress
 
 _None._
 
 ## Next
 
-- Migration order step 5, second half: calculation functions (subject results, grades, averages, positions) tested against the seed fixtures.
 - Marks entry screens (Phase 3), including unlock and relock for admin and head.
 - US-3.5 promotion and year rollover.
 - US-10.3 feature flags and US-10.4 usage in the console.

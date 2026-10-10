@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { dbErrorMessage, type DbError } from "@/lib/db-errors";
 import { parseAssessment, usualSet } from "@/lib/marks/assessments";
 import { parseCell } from "@/lib/marks/cell";
 import { planMarksUpload } from "@/lib/marks/upload";
@@ -36,13 +37,13 @@ const NOT_ALLOWED = "Only the subject's teacher, the school admin or the head ca
 const LOCKED = "Marks for this subject are locked. Ask the school admin or head to unlock them.";
 const TRY_AGAIN = "Could not save. Check your connection and try again.";
 
-function dbMessage(error: { code?: string; message: string }): string {
-  if (error.code === "42501") return error.message.includes("locked") ? LOCKED : NOT_ALLOWED;
-  if (error.code === "23514" || error.code === "22023" || error.code === "P0001") {
-    const m = error.message;
-    return m.charAt(0).toUpperCase() + m.slice(1) + (m.endsWith(".") ? "" : ".");
-  }
-  return TRY_AGAIN;
+function dbMessage(error: DbError): string {
+  return dbErrorMessage(error, {
+    notAllowed: NOT_ALLOWED,
+    locked: LOCKED,
+    duplicate: "This subject already has an assessment with that name this term.",
+    fallback: TRY_AGAIN,
+  });
 }
 
 function marksPath(classSubjectId: string, termId: string, rest = ""): string {

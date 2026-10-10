@@ -8,6 +8,7 @@ import {
   parseBankEntry,
   termHasClassComments,
 } from "@/lib/comments/rules";
+import { dbErrorMessage, type DbError } from "@/lib/db-errors";
 import { isUuid } from "@/lib/setup/structure";
 import { createClient } from "@/lib/supabase/server";
 import { failed, saved, type FormState } from "../platform/form-state";
@@ -24,13 +25,8 @@ import { isStillInClass, marksActor } from "./data";
 const TRY_AGAIN = "Could not save. Check your connection and try again.";
 const LOCKED = "Comments are locked. Ask the school admin to write or unlock them.";
 
-function dbMessage(error: { code?: string; message: string }, notAllowed: string): string {
-  if (error.code === "42501") return error.message.includes("locked") ? LOCKED : notAllowed;
-  if (error.code === "23514" || error.code === "P0001") {
-    const m = error.message;
-    return m.charAt(0).toUpperCase() + m.slice(1) + (m.endsWith(".") ? "" : ".");
-  }
-  return TRY_AGAIN;
+function dbMessage(error: DbError, notAllowed: string): string {
+  return dbErrorMessage(error, { notAllowed, locked: LOCKED, fallback: TRY_AGAIN });
 }
 
 export type SaveCommentResult =

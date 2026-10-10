@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { schoolAdminContext } from "@/lib/auth/viewer";
+import { dbErrorMessage, type DbError } from "@/lib/db-errors";
 import { SCALE_TEMPLATES, describeBandProblem, parseBands } from "@/lib/setup/bands";
 import { parseTerm, parseYear, termClashes, type TermDraft } from "@/lib/setup/calendar";
 import { describeGap } from "@/lib/setup/gaps";
@@ -28,16 +29,13 @@ import { getYear, listTerms, loadYearSetup } from "./data";
 const NOT_ALLOWED = notAllowed("a school admin");
 
 /** A readable message for a database refusal. */
-function dbMessage(error: { code?: string; message: string }, what: string): string {
-  if (error.code === "23505") return `That ${what} already exists. Use a different name or code.`;
-  if (error.code === "23503") return `That ${what} is still in use, so it cannot be removed.`;
-  if (error.code === "23514" || error.code === "P0001") return capitalise(error.message);
-  if (error.code === "42501") return NOT_ALLOWED.message!;
-  return `Could not save the ${what}. Please try again.`;
-}
-
-function capitalise(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1) + (s.endsWith(".") ? "" : ".");
+function dbMessage(error: DbError, what: string): string {
+  return dbErrorMessage(error, {
+    notAllowed: NOT_ALLOWED.message!,
+    duplicate: `That ${what} already exists. Use a different name or code.`,
+    inUse: `That ${what} is still in use, so it cannot be removed.`,
+    fallback: `Could not save the ${what}. Please try again.`,
+  });
 }
 
 function setupPath(yearId: string, rest = ""): string {

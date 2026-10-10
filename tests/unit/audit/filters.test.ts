@@ -57,8 +57,21 @@ describe("cursor", () => {
   });
 
   it("refuses a cursor that is not ours", () => {
-    for (const bad of ["", "42", "~2026-10-09T14:00:00Z", "x~2026-10-09T14:00:00Z", "1~now()"])
+    for (const bad of [
+      "",
+      "42",
+      "~2026-10-09T14:00:00Z",
+      "x~2026-10-09T14:00:00Z",
+      "1~now()",
+      "1~2026-13-45T99:99:99Z",
+      "1~2026-02-30T10:00:00Z",
+      "1~2026-10-09T24:00:00Z",
+    ])
       expect(decodeCursor(bad), bad).toBeNull();
+    expect(decodeCursor("1~2026-10-09 14:00:00+00")).toEqual({
+      id: 1,
+      createdAt: "2026-10-09 14:00:00+00",
+    });
   });
 });
 

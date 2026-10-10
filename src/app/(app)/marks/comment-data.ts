@@ -2,7 +2,8 @@ import "server-only";
 
 import { forbidden, notFound } from "next/navigation";
 import type { BankEntry, CommentStatus } from "@/lib/comments/rules";
-import { gradeFor, type Band } from "@/lib/setup/bands";
+import { averageGrade } from "@/lib/grading/results";
+import type { Band } from "@/lib/setup/bands";
 import { isUuid } from "@/lib/setup/structure";
 import { rowsOrThrow } from "@/lib/supabase/rows";
 import { createClient } from "@/lib/supabase/server";
@@ -239,7 +240,7 @@ export async function loadClassResults(ct: ClassTerm): Promise<{
             a.subjectName.localeCompare(b.subjectName),
         ),
         average,
-        averageGrade: average == null ? null : gradeFor(bands, Math.floor(average + 0.5)),
+        averageGrade: averageGrade(bands, average),
         position: p?.position ?? null,
         classSize: p?.class_size ?? null,
       };

@@ -107,6 +107,16 @@ export function classAverage(roundedMarks: readonly number[]): number | null {
 }
 
 /**
+ * The grade of an average as shown (one decimal), rounded half up to a whole
+ * mark: an average shown as 69.5 is graded as 70 (D34, D37). Used for the
+ * class comment suggestions.
+ */
+export function averageGrade(bands: readonly Band[], average: number | null): string | null {
+  const exact = average === null ? null : parseDecimal(average);
+  return exact ? gradeFor(bands, roundHalfUp(exact)) : null;
+}
+
+/**
  * Competition ranking, highest first: equal values share a position and the
  * next position is skipped (1, 2, 2, 4; Q7). null values get no position.
  */

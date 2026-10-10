@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseDecimal, roundHalfUp } from "@/lib/grading/decimal";
 import {
+  averageGrade,
   classAverage,
   classPositions,
   competitionRanks,
@@ -145,6 +146,18 @@ describe("classAverage", () => {
     expect(classAverage([70, 69])).toBe(69.5);
     expect(classAverage([1, 2, 2, 2])).toBe(1.8); // 1.75
     expect(classAverage([])).toBeNull();
+  });
+});
+
+describe("averageGrade", () => {
+  it("grades the average as shown, rounded half up to a whole mark", () => {
+    // 11 subjects summing to 764: the mean 69.4545... is shown as 69.5.
+    const shown = classAverage([70, 70, 70, 70, 70, 69, 69, 69, 69, 69, 69]);
+    expect(shown).toBe(69.5);
+    expect(averageGrade(O_LEVEL_BANDS, shown)).toBe("A");
+    expect(averageGrade(O_LEVEL_BANDS, 69.4)).toBe("B");
+    expect(averageGrade(O_LEVEL_BANDS, 39.5)).toBe("E");
+    expect(averageGrade(O_LEVEL_BANDS, null)).toBeNull();
   });
 });
 

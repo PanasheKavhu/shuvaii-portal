@@ -100,4 +100,16 @@ describe("gradeFor", () => {
     expect(gradeFor(O_LEVEL_BANDS, 45)).toBe("D");
     expect(gradeFor(O_LEVEL_BANDS, 0)).toBe("U");
   });
+
+  it("picks the highest band where bands overlap, in any order (as the database, D37)", () => {
+    const overlapping = [
+      { grade: "C", minMark: 50, maxMark: 60, remark: null },
+      { grade: "B", minMark: 60, maxMark: 69, remark: null },
+      { grade: "U", minMark: 0, maxMark: 49, remark: null },
+    ];
+    expect(gradeFor(overlapping, 60)).toBe("B");
+    expect(gradeFor([...overlapping].reverse(), 60)).toBe("B");
+    expect(gradeFor(overlapping, 59)).toBe("C");
+    expect(gradeFor(overlapping, 75)).toBeNull();
+  });
 });

@@ -45,7 +45,24 @@ export function encodeCursor(c: AuditCursor): string {
   return `${c.id}~${c.createdAt}`;
 }
 
-const TIMESTAMP = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}(:?\d{2})?)$/;
+const TIMESTAMP =
+  /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(\.\d{1,6})?(Z|[+-]\d{2}(:?\d{2})?)$/;
+
+/** A real date and time, not only the right shape: 2026-13-45 would make the query fail. */
+function isTimestamp(value: string): boolean {
+  const m = TIMESTAMP.exec(value);
+  if (!m) return false;
+  const [y, mo, d, h, mi, s] = m.slice(1, 7).map(Number) as [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+  ];
+  const day = new Date(Date.UTC(y, mo - 1, d));
+  return day.getUTCMonth() === mo - 1 && day.getUTCDate() === d && h < 24 && mi < 60 && s < 60;
+}
 
 export function decodeCursor(value: string | string[] | undefined): AuditCursor | null {
   const text = one(value);
@@ -53,7 +70,7 @@ export function decodeCursor(value: string | string[] | undefined): AuditCursor 
   if (at < 1) return null;
   const id = Number(text.slice(0, at));
   const createdAt = text.slice(at + 1);
-  if (!Number.isSafeInteger(id) || id < 1 || !TIMESTAMP.test(createdAt)) return null;
+  if (!Number.isSafeInteger(id) || id < 1 || !isTimestamp(createdAt)) return null;
   return { createdAt, id };
 }
 

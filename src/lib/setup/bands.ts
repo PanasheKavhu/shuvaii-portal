@@ -177,7 +177,21 @@ export function parseBands(
   return { ok: true, value };
 }
 
-/** The grade for a whole mark, or null if no band covers it. */
+/**
+ * The grade for a whole mark, or null if no band covers it. Where bands
+ * overlap (only a default scale must not, D21) the highest band wins, as in
+ * the database (D37), whatever order the bands were loaded in.
+ */
 export function gradeFor(bands: readonly Band[], mark: number): string | null {
-  return bands.find((b) => mark >= b.minMark && mark <= b.maxMark)?.grade ?? null;
+  let best: Band | undefined;
+  for (const b of bands) {
+    if (mark < b.minMark || mark > b.maxMark) continue;
+    if (
+      !best ||
+      b.minMark > best.minMark ||
+      (b.minMark === best.minMark && b.maxMark > best.maxMark)
+    )
+      best = b;
+  }
+  return best?.grade ?? null;
 }

@@ -324,10 +324,11 @@ status ('draft'|'published'|'archived'), published_at, expires_at, author_id
 
 ```
 id bigint identity, school_id, actor_id, table_name, row_id, action ('insert'|'update'|'delete'|'event'),
-event text null, old_data jsonb, new_data jsonb, reason text null, created_at
+event text null, old_data jsonb, new_data jsonb, reason text null, created_at,
+learner_id null, class_id null, class_subject_id null
 ```
 
-Written by triggers on `marks`, `subject_comments`, `class_comments`, `reports`, `assessments`, `memberships`, `learners` (one generic function, `private.audit_row_change()`). Console events (`school_created`, `branding_changed`, `admin_invited`, `invite_resent`) use action `event` with the event name, recorded against the school they changed (D18). Append-only: no update or delete policy for anyone, and a trigger rejects update, delete and truncate even for the table owner.
+Written by triggers on `marks`, `subject_comments`, `class_comments`, `reports`, `assessments`, `memberships`, `learners` (one generic function, `private.audit_row_change()`). Console events (`school_created`, `branding_changed`, `admin_invited`, `invite_resent`) use action `event` with the event name, recorded against the school they changed (D18). Append-only: no update or delete policy for anyone, and a trigger rejects update, delete and truncate even for the table owner. `learner_id`, `class_id` and `class_subject_id` say what a row is about (the class at the time of the change); a before-insert trigger fills them for every writer, and the audit screen filters on them through `public.audit_entries()` (D35).
 
 ## 5. Report state machine
 
@@ -396,7 +397,7 @@ Object paths start with the school id (`{school_id}/...`) so storage policies ca
 - `class_subjects (teacher_id)`, `assessments (term_id, class_subject_id)`.
 - `subject_comments (term_id, enrolment_id)`, `subject_comments (class_subject_id)`, `class_comments (enrolment_id)`, `comment_bank (owner_id)`.
 - `reports (term_id, status)`, `reports (reference_code)`, `reports (verification_code)`.
-- `audit_log (school_id, created_at desc)`, `audit_log (table_name, row_id)`.
+- `audit_log (school_id, created_at desc)`, `audit_log (table_name, row_id)`, and partial `(school_id, learner_id | class_id | actor_id, created_at desc, id desc)` for the audit screen's filters (D35).
 - `guardian_links (learner_id)`, `announcements (school_id, status, published_at desc)`.
 
 ## 10. Migration order

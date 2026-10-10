@@ -1,12 +1,17 @@
 import { pickActiveSchool, type SchoolMembership } from "./active-school";
 import { AREAS, canUseArea, type Area, type AreaKey } from "./roles";
 
-/** The role area a path belongs to, or null for pages outside every area. */
+/**
+ * The role area a path belongs to, or null for pages outside every area.
+ * The most specific area wins, so /admin/audit is the audit area, not admin.
+ */
 export function areaForPath(pathname: string): AreaKey | null {
+  let found: AreaKey | null = null;
   for (const [key, area] of Object.entries(AREAS) as [AreaKey, Area][]) {
-    if (pathname === area.href || pathname.startsWith(`${area.href}/`)) return key;
+    const matches = pathname === area.href || pathname.startsWith(`${area.href}/`);
+    if (matches && (!found || area.href.length > AREAS[found].href.length)) found = key;
   }
-  return null;
+  return found;
 }
 
 export type AccessDecision =

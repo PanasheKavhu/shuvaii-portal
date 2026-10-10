@@ -34,6 +34,15 @@ export const AREAS = {
     roles: ["school_admin", "head", "hod", "teacher"],
     menuRoles: ["school_admin", "head"],
   },
+  // What is still missing for the term (US-4.8, D36): every class subject
+  // for school admin and head, a teacher's own for a teacher or hod.
+  completion: {
+    href: "/marks/completion",
+    label: "Completion",
+    roles: ["school_admin", "head", "hod", "teacher"],
+  },
+  // The school's audit log (D35). Inside /admin, but heads may open it too.
+  audit: { href: "/admin/audit", label: "Audit log", roles: ["school_admin", "head"] },
   children: { href: "/children", label: "My children", roles: ["parent"] },
   myReports: { href: "/my-reports", label: "My reports", roles: ["learner"] },
   platform: { href: "/platform", label: "Platform", roles: [], platformOnly: true },

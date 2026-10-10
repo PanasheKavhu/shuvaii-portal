@@ -5,20 +5,29 @@ const hrefs = (items: { href: string }[]) => items.map((i) => i.href);
 
 describe("navFor", () => {
   it("shows a teacher only their classes", () => {
-    expect(hrefs(navFor(["teacher"], false))).toEqual(["/teaching"]);
+    expect(hrefs(navFor(["teacher"], false))).toEqual(["/teaching", "/marks/completion"]);
   });
 
-  it("shows a school admin the admin area and marks", () => {
-    expect(hrefs(navFor(["school_admin"], false))).toEqual(["/admin", "/marks"]);
-    expect(hrefs(navFor(["head"], false))).toEqual(["/head", "/marks"]);
+  it("shows a school admin and head their area, marks, completion and the audit log", () => {
+    const shared = ["/marks", "/marks/completion", "/admin/audit"];
+    expect(hrefs(navFor(["school_admin"], false))).toEqual(["/admin", ...shared]);
+    expect(hrefs(navFor(["head"], false))).toEqual(["/head", ...shared]);
   });
 
   it("shows a head of department their department and classes, without a marks entry", () => {
-    expect(hrefs(navFor(["hod"], false))).toEqual(["/department", "/teaching"]);
+    expect(hrefs(navFor(["hod"], false))).toEqual([
+      "/department",
+      "/teaching",
+      "/marks/completion",
+    ]);
   });
 
   it("combines areas for someone with two roles", () => {
-    expect(hrefs(navFor(["parent", "teacher"], false))).toEqual(["/teaching", "/children"]);
+    expect(hrefs(navFor(["parent", "teacher"], false))).toEqual([
+      "/teaching",
+      "/marks/completion",
+      "/children",
+    ]);
   });
 
   it("shows the platform console only to platform admins", () => {
@@ -66,6 +75,13 @@ describe("canUseArea", () => {
     expect(canUseArea(AREAS.marks, ["parent"], false)).toBe(false);
     expect(canUseArea(AREAS.marks, ["learner"], false)).toBe(false);
     expect(canUseArea(AREAS.teaching, ["school_admin"], false)).toBe(false);
+  });
+
+  it("lets only school admin and head use the audit log", () => {
+    expect(canUseArea(AREAS.audit, ["school_admin"], false)).toBe(true);
+    expect(canUseArea(AREAS.audit, ["head"], false)).toBe(true);
+    for (const role of ["teacher", "hod", "parent", "learner"] as const)
+      expect(canUseArea(AREAS.audit, [role], false)).toBe(false);
   });
 
   it("denies a school admin the platform console", () => {

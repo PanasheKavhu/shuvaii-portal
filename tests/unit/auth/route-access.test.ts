@@ -17,6 +17,24 @@ describe("areaForPath", () => {
     expect(areaForPath("/my-reports")).toBe("myReports");
   });
 
+  it("picks the most specific area", () => {
+    expect(areaForPath("/admin/audit")).toBe("audit");
+    expect(areaForPath("/admin/audit/x")).toBe("audit");
+    expect(areaForPath("/admin/auditx")).toBe("admin");
+    expect(areaForPath("/marks/completion")).toBe("completion");
+    expect(areaForPath("/marks/abc")).toBe("marks");
+  });
+
+  it("lets a head into the audit log but not the rest of /admin", () => {
+    const head = { isPlatformAdmin: false, schools: [school("a", ["head"])] };
+    expect(decideAreaAccess(areaForPath("/admin/audit")!, head, undefined)).toMatchObject({
+      kind: "allow",
+    });
+    expect(decideAreaAccess(areaForPath("/admin/setup")!, head, undefined)).toEqual({
+      kind: "forbidden",
+    });
+  });
+
   it("ignores other pages and look-alike prefixes", () => {
     expect(areaForPath("/")).toBeNull();
     expect(areaForPath("/sign-in")).toBeNull();
@@ -36,7 +54,15 @@ describe("decideAreaAccess", () => {
   });
 
   it("forbids every other role area and the platform console", () => {
-    const others = ["admin", "head", "department", "children", "myReports", "platform"] as const;
+    const others = [
+      "admin",
+      "audit",
+      "head",
+      "department",
+      "children",
+      "myReports",
+      "platform",
+    ] as const;
     for (const key of others) {
       expect(decideAreaAccess(key, teacher, undefined), key).toEqual({ kind: "forbidden" });
     }

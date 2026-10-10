@@ -127,9 +127,12 @@ export type Database = {
         Row: {
           action: Database["public"]["Enums"]["audit_action"]
           actor_id: string | null
+          class_id: string | null
+          class_subject_id: string | null
           created_at: string
           event: string | null
           id: number
+          learner_id: string | null
           new_data: Json | null
           old_data: Json | null
           reason: string | null
@@ -140,9 +143,12 @@ export type Database = {
         Insert: {
           action: Database["public"]["Enums"]["audit_action"]
           actor_id?: string | null
+          class_id?: string | null
+          class_subject_id?: string | null
           created_at?: string
           event?: string | null
           id?: never
+          learner_id?: string | null
           new_data?: Json | null
           old_data?: Json | null
           reason?: string | null
@@ -153,9 +159,12 @@ export type Database = {
         Update: {
           action?: Database["public"]["Enums"]["audit_action"]
           actor_id?: string | null
+          class_id?: string | null
+          class_subject_id?: string | null
           created_at?: string
           event?: string | null
           id?: never
+          learner_id?: string | null
           new_data?: Json | null
           old_data?: Json | null
           reason?: string | null
@@ -1510,6 +1519,38 @@ export type Database = {
         Args: { p_class_subject_id: string; p_term_id: string }
         Returns: boolean
       }
+      audit_entries: {
+        Args: {
+          p_actor_id?: string
+          p_before_at?: string
+          p_before_id?: number
+          p_class_id?: string
+          p_from?: string
+          p_learner_id?: string
+          p_limit?: number
+          p_school_id: string
+          p_to?: string
+        }
+        Returns: {
+          action: Database["public"]["Enums"]["audit_action"]
+          actor_name: string
+          assessment_name: string
+          class_name: string
+          created_at: string
+          event: string
+          id: number
+          learner_name: string
+          learner_number: string
+          new_data: Json
+          old_data: Json
+          other_class_name: string
+          person_name: string
+          reason: string
+          subject_name: string
+          table_name: string
+          term_name: string
+        }[]
+      }
       class_comment_lock: {
         Args: { p_class_id: string; p_term_id: string }
         Returns: {
@@ -1542,6 +1583,33 @@ export type Database = {
       commit_staff_import: {
         Args: { p_job_id: string; p_members: Json }
         Returns: number
+      }
+      completion_class_subjects: {
+        Args: { p_term_id: string }
+        Returns: {
+          assessments: number
+          class_id: string
+          class_name: string
+          class_subject_id: string
+          comments_missing: number
+          learners: number
+          marks_missing: number
+          subject_name: string
+          teacher_id: string
+          teacher_name: string
+          total_weight: number
+        }[]
+      }
+      completion_classes: {
+        Args: { p_term_id: string }
+        Returns: {
+          class_comments_missing: number
+          class_id: string
+          class_name: string
+          class_teacher_id: string
+          class_teacher_name: string
+          learners: number
+        }[]
       }
       create_parent_invite: {
         Args: { p_code_hash: string; p_guardian_id: string }

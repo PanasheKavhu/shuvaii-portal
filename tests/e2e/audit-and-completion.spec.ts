@@ -20,8 +20,21 @@ async function column(page: Page, name: string) {
   }
 }
 
-const savedNote = async (page: Page, input: ReturnType<Page["getByLabel"]>) =>
-  page.locator(`[id="${await input.getAttribute("aria-describedby")}"]`);
+/**
+ * Types a mark and waits for "Saved". Retried: on a busy dev server the grid
+ * can hydrate after the first fill, which then never saves (as in
+ * marks-upload.spec.ts).
+ */
+async function enterMark(page: Page, input: ReturnType<Page["getByLabel"]>, value: string) {
+  await expect(async () => {
+    await input.fill("");
+    await input.fill(value);
+    await expect(page.locator(`[id="${await input.getAttribute("aria-describedby")}"]`)).toHaveText(
+      "Saved",
+      { timeout: 5_000 },
+    );
+  }).toPass({ timeout: 30_000 });
+}
 
 test("a teacher's mark change is found in the audit log by learner", async ({ page, browser }) => {
   test.setTimeout(120_000);
@@ -34,8 +47,7 @@ test("a teacher's mark change is found in the audit log by learner", async ({ pa
   await page.goto(`/marks/${school.mathsId}/${school.termId}`);
   await column(page, "Test 1");
   const t1 = page.getByLabel(`Test 1 for ${learner.name}`);
-  await t1.fill("23");
-  await expect(await savedNote(page, t1)).toHaveText("Saved");
+  await enterMark(page, t1, "23");
 
   // The head finds it from the menu, by typing the learner's name.
   const headContext = await browser.newContext({ viewport: page.viewportSize()! });
@@ -110,8 +122,7 @@ test("completion counts drop as marks and comments are entered", async ({ page }
   await expect(page).toHaveURL(`/marks/${school.mathsId}/${school.termId}`);
   await column(page, "Exam");
   const exam = page.getByLabel(`Exam for ${learner.name}`);
-  await exam.fill("7");
-  await expect(await savedNote(page, exam)).toHaveText("Saved");
+  await enterMark(page, exam, "7");
   await column(page, "Teacher's comment");
   const commentLabel = `Teacher's comment for ${learner.name}`;
   await page.getByRole("textbox", { name: commentLabel, exact: true }).fill("Steady work.");

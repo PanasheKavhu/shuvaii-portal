@@ -143,7 +143,7 @@ export function CommentBox({
               : "";
 
   return (
-    <div className="flex min-w-60 flex-col gap-2">
+    <div className="flex min-w-44 flex-col gap-2 md:min-w-60">
       <textarea
         ref={textRef}
         id={`${id}-text`}

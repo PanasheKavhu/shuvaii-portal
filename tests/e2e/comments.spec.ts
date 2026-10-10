@@ -21,6 +21,14 @@ async function subjectComment(page: Page, learner: string) {
   return page.getByRole("textbox", { name: `Teacher's comment for ${learner}`, exact: true });
 }
 
+/** At 360 px the grid fits its box: nothing hidden off to the side (rule 7). */
+async function expectGridFits(page: Page) {
+  const hidden = await page
+    .getByRole("table", { name: "Marks" })
+    .evaluate((t) => t.parentElement!.scrollWidth - t.parentElement!.clientWidth);
+  expect(hidden, "pixels of the grid off to the side").toBeLessThanOrEqual(0);
+}
+
 const statusOf = (page: Page, label: string) =>
   page.getByRole("textbox", { name: label, exact: true }).locator("xpath=..").getByRole("status");
 
@@ -33,8 +41,11 @@ test("a teacher writes a subject comment beside the marks and marks it done", as
   await signIn(page, school.teacherEmail);
   await expect(page).toHaveURL("/teaching");
   await page.goto(`/marks/${school.mathsId}/${school.termId}`);
+  await expect(page.getByRole("table", { name: "Marks" })).toBeVisible();
+  if (isPhone(page)) await expectGridFits(page);
   const box = await subjectComment(page, learner.name);
   await expect(page.getByRole("columnheader", { name: /Teacher's comment/ })).toBeVisible();
+  if (isPhone(page)) await expectGridFits(page);
   // Over the report's limit: counted and refused.
   await box.fill("x".repeat(101));
   await expect(page.getByText("1 character too many")).toBeVisible();

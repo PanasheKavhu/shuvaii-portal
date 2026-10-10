@@ -360,7 +360,8 @@ export function MarksGrid({
                           )}
                         />
                         {!locked && (
-                          <span className="mt-2 flex gap-2 md:hidden">
+                          // Wraps on the narrowest phones so the grid fits without scrolling sideways.
+                          <span className="mt-2 flex flex-wrap gap-2 md:hidden">
                             {(["A", "E"] as const).map((letter) => (
                               <button
                                 key={letter}

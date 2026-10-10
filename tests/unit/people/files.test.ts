@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { detectDelimiter, parseCsv, toCsvLine } from "@/lib/people/csv";
 import { readSheet } from "@/lib/people/sheet";
 import { readUpload } from "@/lib/people/upload";
-import { readXlsx } from "@/lib/people/xlsx";
+import { readXlsx, XlsxError } from "@/lib/people/xlsx";
 import { buildXlsx } from "./xlsx-fixture";
 
 const enc = (s: string) => new TextEncoder().encode(s);
@@ -39,6 +39,15 @@ describe("parseCsv", () => {
   it("quotes template cells that need it", () => {
     expect(toCsvLine(["a", "b,c", 'say "x"'])).toBe('a,"b,c","say ""x"""');
   });
+
+  it("keeps template cells from running as formulas in Excel", () => {
+    expect(toCsvLine(['=HYPERLINK("http://x","y")', "+1+2", "-A1", "@SUM(A1)", "\tx"])).toBe(
+      `"'=HYPERLINK(""http://x"",""y"")",'+1+2,'-A1,'@SUM(A1),'\tx`,
+    );
+    expect(toCsvLine(["-5", "+3", "12.5", "Test 1 (out of 30)"])).toBe(
+      "-5,+3,12.5,Test 1 (out of 30)",
+    );
+  });
 });
 
 describe("readXlsx", () => {
@@ -58,6 +67,17 @@ describe("readXlsx", () => {
   it("follows the workbook's relationship to the sheet", () => {
     const bytes = buildXlsx([["a"], ["1"]], { sheetPath: "worksheets/data.xml" });
     expect(readXlsx(bytes)).toEqual([["a"], ["1"]]);
+  });
+
+  it("refuses a tiny file that claims a huge row or column number", () => {
+    const row = buildXlsx([], {
+      sheetData: '<row r="200000000"><c r="A200000000"><v>1</v></c></row>',
+    });
+    expect(() => readXlsx(row)).toThrow(XlsxError);
+    const col = buildXlsx([], { sheetData: '<row r="1"><c r="ZZZZZZZ1"><v>1</v></c></row>' });
+    expect(() => readXlsx(col)).toThrow(XlsxError);
+    const ok = buildXlsx([], { sheetData: '<row r="3000"><c r="Z3000"><v>1</v></c></row>' });
+    expect(readXlsx(ok)).toHaveLength(3000);
   });
 });
 

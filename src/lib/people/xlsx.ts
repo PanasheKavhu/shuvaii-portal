@@ -19,6 +19,14 @@ export class XlsxError extends Error {}
 /** Refuse anything that would inflate past this (a zip bomb guard). */
 const MAX_PART_BYTES = 50 * 1024 * 1024;
 
+/**
+ * Row and column numbers come from the file's own r="..." attributes and the
+ * reader pads up to them, so a tiny file claiming row 200,000,000 would fill
+ * memory. No import needs more than this (imports stop at 3,000 rows).
+ */
+const MAX_ROWS = 10_000;
+const MAX_COLUMNS = 1_000;
+
 type ZipEntry = { name: string; method: number; offset: number; compressedSize: number };
 
 function u16(b: Uint8Array, at: number): number {
@@ -145,6 +153,9 @@ export function readXlsx(bytes: Uint8Array): XlsxCell[][] {
   for (const rowMatch of sheet.matchAll(rowRe)) {
     const r = attr(rowMatch[1]!, "r");
     const rowIndex = r ? Number(r) - 1 : nextRow;
+    if (!Number.isInteger(rowIndex) || rowIndex < 0 || rowIndex >= MAX_ROWS) {
+      throw new XlsxError(`the sheet has more than ${MAX_ROWS} rows`);
+    }
     nextRow = rowIndex + 1;
     const cells: XlsxCell[] = [];
     let nextCol = 0;
@@ -153,6 +164,9 @@ export function readXlsx(bytes: Uint8Array): XlsxCell[][] {
       const body = cellMatch[2] ?? "";
       const ref = attr(head, "r");
       const col = ref ? columnIndex(ref) : nextCol;
+      if (!Number.isInteger(col) || col < 0 || col >= MAX_COLUMNS) {
+        throw new XlsxError(`the sheet has more than ${MAX_COLUMNS} columns`);
+      }
       nextCol = col + 1;
       const type = attr(head, "t") ?? "n";
       const v = /<(?:\w+:)?v>([\s\S]*?)<\/(?:\w+:)?v>/.exec(body)?.[1];

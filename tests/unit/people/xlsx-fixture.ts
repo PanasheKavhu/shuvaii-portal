@@ -62,7 +62,7 @@ function colName(i: number): string {
 /** Strings go to shared strings, numbers stay numbers, null is an empty cell. */
 export function buildXlsx(
   rows: (string | number | boolean | null)[][],
-  { sheetPath = "worksheets/sheet1.xml" } = {},
+  { sheetPath = "worksheets/sheet1.xml", sheetData = "" } = {},
 ): Uint8Array {
   const shared: string[] = [];
   const sheetRows = rows
@@ -112,7 +112,7 @@ export function buildXlsx(
     {
       name: `xl/${sheetPath}`,
       data: enc.encode(
-        `<?xml version="1.0"?><worksheet ${ns}><sheetData>${sheetRows}</sheetData></worksheet>`,
+        `<?xml version="1.0"?><worksheet ${ns}><sheetData>${sheetData || sheetRows}</sheetData></worksheet>`,
       ),
       deflate: true,
     },

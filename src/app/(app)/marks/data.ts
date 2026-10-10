@@ -48,7 +48,9 @@ function actorFrom(userId: string, school: { schoolId: string; roles: AppRole[] 
 }
 
 /** The viewer of a marks page, or 403 (the proxy already checked the area). */
-export async function requireMarksActor(area: "marks" | "teaching" = "marks"): Promise<MarksActor> {
+export async function requireMarksActor(
+  area: "marks" | "teaching" | "completion" = "marks",
+): Promise<MarksActor> {
   const { viewer, school } = await requireArea(area);
   const active = school ?? (await getActiveSchool(viewer));
   if (!active) forbidden();

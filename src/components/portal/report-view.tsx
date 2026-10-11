@@ -1,4 +1,10 @@
-import { bandLabel, printedDate, resultsLine, type ReportDocument } from "@/lib/reports/document";
+import {
+  bandLabel,
+  printedDate,
+  resultsLine,
+  termWithYear,
+  type ReportDocument,
+} from "@/lib/reports/document";
 
 /**
  * A published report on screen (US-7.1; D47), read from the frozen snapshot
@@ -18,7 +24,7 @@ export function ReportView({ doc }: { doc: ReportDocument }) {
         <p className="text-muted-foreground text-sm">{doc.school.name}</p>
         <h2 className="text-xl font-semibold tracking-tight">{doc.title}</h2>
         <p className="text-muted-foreground">
-          {doc.termName} {doc.year}
+          {termWithYear(doc.termName, doc.year)}
           {doc.version > 1 && ` · Amended, version ${doc.version}`}
         </p>
       </header>

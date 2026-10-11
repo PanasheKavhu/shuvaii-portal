@@ -189,6 +189,11 @@ export function resultsLine(doc: Pick<ReportDocument, "average" | "position" | "
   return parts.length ? parts.join("   ·   ") : null;
 }
 
+/** The term with its year, once: "Term 3 2026" already names its year. */
+export function termWithYear(termName: string, year: string | null, separator = " "): string {
+  return year && !termName.includes(year) ? `${termName}${separator}${year}` : termName;
+}
+
 /** "A 70–100" for the grading key. */
 export function bandLabel(b: { grade: string; minMark: number; maxMark: number }): string {
   return `${b.grade} ${b.minMark}–${b.maxMark}`;

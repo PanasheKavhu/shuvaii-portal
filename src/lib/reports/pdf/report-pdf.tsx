@@ -3,6 +3,7 @@ import {
   bandLabel,
   printedDate,
   resultsLine,
+  termWithYear,
   tint,
   type ReportDocument,
   type ReportDocumentLine,
@@ -182,10 +183,7 @@ function Header({ doc, logo }: { doc: ReportDocument; logo: PdfImage | null }) {
         </View>
         <View style={s.titleBlock}>
           <Text style={s.title}>{doc.title}</Text>
-          <Text>
-            {doc.termName}
-            {doc.year && !doc.termName.includes(doc.year) ? ` · ${doc.year}` : ""}
-          </Text>
+          <Text>{termWithYear(doc.termName, doc.year, " · ")}</Text>
           {doc.version > 1 && <Text style={s.amended}>Amended · version {doc.version}</Text>}
         </View>
       </View>

@@ -1275,6 +1275,42 @@ export type Database = {
         }
         Relationships: []
       }
+      report_share_opens: {
+        Row: {
+          id: string
+          opened_at: string
+          school_id: string
+          share_id: string
+        }
+        Insert: {
+          id?: string
+          opened_at?: string
+          school_id: string
+          share_id: string
+        }
+        Update: {
+          id?: string
+          opened_at?: string
+          school_id?: string
+          share_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_share_opens_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_share_opens_share_id_school_id_fkey"
+            columns: ["share_id", "school_id"]
+            isOneToOne: false
+            referencedRelation: "report_shares"
+            referencedColumns: ["id", "school_id"]
+          },
+        ]
+      }
       report_shares: {
         Row: {
           created_at: string
@@ -1947,6 +1983,14 @@ export type Database = {
           invite_id: string
         }[]
       }
+      create_report_share: {
+        Args: { p_report_id: string }
+        Returns: {
+          expires_at: string
+          share_id: string
+          token: string
+        }[]
+      }
       current_school_ids: { Args: never; Returns: string[] }
       decline_my_invites: { Args: never; Returns: number }
       generate_report_drafts: {
@@ -2059,6 +2103,23 @@ export type Database = {
           school_name: string
         }[]
       }
+      my_report_shares: {
+        Args: { p_report_id: string }
+        Returns: {
+          created_at: string
+          expires_at: string
+          opens: number
+          share_id: string
+        }[]
+      }
+      open_report_share: {
+        Args: { p_token_hash: string }
+        Returns: {
+          pdf_path: string
+          reference_code: string
+          share_id: string
+        }[]
+      }
       parent_invite_preview: {
         Args: { p_code_hash: string }
         Returns: {
@@ -2067,6 +2128,22 @@ export type Database = {
           guardian_name: string
           school_name: string
           status: string
+        }[]
+      }
+      portal_reports: {
+        Args: { p_school_id: string }
+        Returns: {
+          class_name: string
+          has_pdf: boolean
+          is_own: boolean
+          learner_id: string
+          learner_name: string
+          published_at: string
+          report_id: string
+          term_kind: Database["public"]["Enums"]["term_kind"]
+          term_name: string
+          version: number
+          year_label: string
         }[]
       }
       publish_class_reports: {
@@ -2107,6 +2184,7 @@ export type Database = {
         Args: { p_class_id: string; p_note: string; p_term_id: string }
         Returns: number
       }
+      revoke_report_share: { Args: { p_share_id: string }; Returns: undefined }
       save_assessment_set: {
         Args: {
           p_items: Json

@@ -1275,6 +1275,275 @@ export type Database = {
         }
         Relationships: []
       }
+      report_shares: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          expires_at: string
+          id: string
+          report_id: string
+          revoked_at: string | null
+          school_id: string
+          token_hash: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          expires_at: string
+          id?: string
+          report_id: string
+          revoked_at?: string | null
+          school_id: string
+          token_hash: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string
+          id?: string
+          report_id?: string
+          revoked_at?: string | null
+          school_id?: string
+          token_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_shares_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_shares_report_id_school_id_fkey"
+            columns: ["report_id", "school_id"]
+            isOneToOne: false
+            referencedRelation: "reports"
+            referencedColumns: ["id", "school_id"]
+          },
+          {
+            foreignKeyName: "report_shares_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      report_templates: {
+        Row: {
+          comment_label: string
+          created_at: string
+          footer_text: string
+          id: string
+          name: string
+          school_id: string
+          sections: Json
+          term_kind: Database["public"]["Enums"]["term_kind"]
+          updated_at: string
+        }
+        Insert: {
+          comment_label?: string
+          created_at?: string
+          footer_text?: string
+          id?: string
+          name: string
+          school_id: string
+          sections: Json
+          term_kind: Database["public"]["Enums"]["term_kind"]
+          updated_at?: string
+        }
+        Update: {
+          comment_label?: string
+          created_at?: string
+          footer_text?: string
+          id?: string
+          name?: string
+          school_id?: string
+          sections?: Json
+          term_kind?: Database["public"]["Enums"]["term_kind"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_templates_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reports: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          average_percent: number | null
+          class_position: number | null
+          class_size: number | null
+          created_at: string
+          created_by: string | null
+          enrolment_id: string
+          head_comment: string | null
+          id: string
+          pdf_path: string | null
+          published_at: string | null
+          published_by: string | null
+          reference_code: string
+          return_note: string | null
+          returned_at: string | null
+          returned_by: string | null
+          school_id: string
+          snapshot: Json | null
+          status: Database["public"]["Enums"]["report_status"]
+          submitted_at: string | null
+          submitted_by: string | null
+          template_id: string
+          term_id: string
+          updated_at: string
+          verification_code: string
+          version: number
+          withdrawn_at: string | null
+          withdrawn_by: string | null
+          withdrawn_reason: string | null
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          average_percent?: number | null
+          class_position?: number | null
+          class_size?: number | null
+          created_at?: string
+          created_by?: string | null
+          enrolment_id: string
+          head_comment?: string | null
+          id?: string
+          pdf_path?: string | null
+          published_at?: string | null
+          published_by?: string | null
+          reference_code: string
+          return_note?: string | null
+          returned_at?: string | null
+          returned_by?: string | null
+          school_id: string
+          snapshot?: Json | null
+          status?: Database["public"]["Enums"]["report_status"]
+          submitted_at?: string | null
+          submitted_by?: string | null
+          template_id: string
+          term_id: string
+          updated_at?: string
+          verification_code: string
+          version?: number
+          withdrawn_at?: string | null
+          withdrawn_by?: string | null
+          withdrawn_reason?: string | null
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          average_percent?: number | null
+          class_position?: number | null
+          class_size?: number | null
+          created_at?: string
+          created_by?: string | null
+          enrolment_id?: string
+          head_comment?: string | null
+          id?: string
+          pdf_path?: string | null
+          published_at?: string | null
+          published_by?: string | null
+          reference_code?: string
+          return_note?: string | null
+          returned_at?: string | null
+          returned_by?: string | null
+          school_id?: string
+          snapshot?: Json | null
+          status?: Database["public"]["Enums"]["report_status"]
+          submitted_at?: string | null
+          submitted_by?: string | null
+          template_id?: string
+          term_id?: string
+          updated_at?: string
+          verification_code?: string
+          version?: number
+          withdrawn_at?: string | null
+          withdrawn_by?: string | null
+          withdrawn_reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reports_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_enrolment_id_school_id_fkey"
+            columns: ["enrolment_id", "school_id"]
+            isOneToOne: false
+            referencedRelation: "enrolments"
+            referencedColumns: ["id", "school_id"]
+          },
+          {
+            foreignKeyName: "reports_published_by_fkey"
+            columns: ["published_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_returned_by_fkey"
+            columns: ["returned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_submitted_by_fkey"
+            columns: ["submitted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_template_id_school_id_fkey"
+            columns: ["template_id", "school_id"]
+            isOneToOne: false
+            referencedRelation: "report_templates"
+            referencedColumns: ["id", "school_id"]
+          },
+          {
+            foreignKeyName: "reports_term_id_school_id_fkey"
+            columns: ["term_id", "school_id"]
+            isOneToOne: false
+            referencedRelation: "terms"
+            referencedColumns: ["id", "school_id"]
+          },
+          {
+            foreignKeyName: "reports_withdrawn_by_fkey"
+            columns: ["withdrawn_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       schools: {
         Row: {
           accent_color: string | null
@@ -1709,6 +1978,8 @@ export type Database = {
         Returns: Json
       }
       is_class_teacher: { Args: { p_class_id: string }; Returns: boolean }
+      is_guardian_of: { Args: { p_learner_id: string }; Returns: boolean }
+      is_own_learner: { Args: { p_learner_id: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
       is_staff: { Args: { p_school_id: string }; Returns: boolean }
       link_learner_login: {
@@ -1902,6 +2173,12 @@ export type Database = {
       level_stage: "ecd" | "primary" | "o_level" | "a_level"
       mark_status: "present" | "absent" | "excused"
       membership_status: "invited" | "active" | "disabled"
+      report_status:
+        | "draft"
+        | "submitted"
+        | "approved"
+        | "published"
+        | "withdrawn"
       school_stage: "primary" | "secondary" | "combined"
       sex: "F" | "M"
       term_kind: "term" | "vacation" | "mock"
@@ -2051,6 +2328,13 @@ export const Constants = {
       level_stage: ["ecd", "primary", "o_level", "a_level"],
       mark_status: ["present", "absent", "excused"],
       membership_status: ["invited", "active", "disabled"],
+      report_status: [
+        "draft",
+        "submitted",
+        "approved",
+        "published",
+        "withdrawn",
+      ],
       school_stage: ["primary", "secondary", "combined"],
       sex: ["F", "M"],
       term_kind: ["term", "vacation", "mock"],

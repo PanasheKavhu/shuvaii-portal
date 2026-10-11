@@ -20,12 +20,23 @@ export default async function SetupPage() {
           <p className="text-muted-foreground text-sm">{schoolName}</p>
           <h1 className="text-2xl font-semibold tracking-tight">School setup</h1>
         </div>
-        <Link
-          href="/admin/setup/new"
-          className={buttonVariants({ className: "h-11 rounded-full px-5 text-base" })}
-        >
-          Set up a new year
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/admin/setup/reports"
+            className={buttonVariants({
+              variant: "outline",
+              className: "h-11 rounded-full px-5 text-base",
+            })}
+          >
+            Report settings
+          </Link>
+          <Link
+            href="/admin/setup/new"
+            className={buttonVariants({ className: "h-11 rounded-full px-5 text-base" })}
+          >
+            Set up a new year
+          </Link>
+        </div>
       </div>
 
       {years.length === 0 ? (

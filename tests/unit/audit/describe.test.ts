@@ -102,6 +102,42 @@ describe("describeAuditEntry: other tables", () => {
     expect(written.changes).toContainEqual({ label: "Comment", from: null, to: "A fine term." });
   });
 
+  it("describes report changes, with the withdrawal reason", () => {
+    const made = describeAuditEntry(
+      entry({ table: "reports", action: "insert", newData: { status: "draft", version: 1 } }),
+    );
+    expect(made.summary).toBe("Mr Moyo made a draft of Tendai Ncube's report");
+
+    const returned = describeAuditEntry(
+      entry({
+        table: "reports",
+        actorName: "Mrs Dube",
+        oldData: { status: "submitted", version: 1, return_note: null },
+        newData: { status: "draft", version: 1, return_note: "Check the maths line" },
+      }),
+    );
+    expect(returned.summary).toBe("Mrs Dube returned Tendai Ncube's report");
+    expect(returned.changes).toContainEqual({
+      label: "Return note",
+      from: null,
+      to: "Check the maths line",
+    });
+
+    const withdrawn = describeAuditEntry(
+      entry({
+        table: "reports",
+        actorName: "Mrs Dube",
+        oldData: { status: "published", version: 2 },
+        newData: { status: "withdrawn", version: 2, withdrawn_reason: "Wrong grade" },
+      }),
+    );
+    expect(withdrawn).toEqual({
+      summary: "Mrs Dube withdrew Tendai Ncube's report (version 2)",
+      changes: [{ label: "Status", from: "published", to: "withdrawn" }],
+      reason: "Wrong grade",
+    });
+  });
+
   it("shows the unlock reason and the reason on relock", () => {
     const unlock = describeAuditEntry(
       entry({

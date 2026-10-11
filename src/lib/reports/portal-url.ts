@@ -13,8 +13,15 @@ export async function portalUrl(): Promise<string> {
   if (configured) return configured.replace(/\/+$/, "");
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
-  const proto =
-    h.get("x-forwarded-proto") ??
-    (host.startsWith("localhost") || host.startsWith("127.") ? "http" : "https");
+  // A production server without SITE_URL would print whatever host the
+  // request named into PDFs that are never made again; only a local
+  // production build (the slow-3G check) may go without.
+  if (process.env.NODE_ENV === "production" && !isLocalHost(host))
+    throw new Error("SITE_URL is not set");
+  const proto = h.get("x-forwarded-proto") ?? (isLocalHost(host) ? "http" : "https");
   return `${proto}://${host}`;
+}
+
+function isLocalHost(host: string): boolean {
+  return host.startsWith("localhost") || host.startsWith("127.");
 }

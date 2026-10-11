@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { PortalHeading } from "@/components/portal/portal-heading";
 import { ReportList } from "@/components/portal/report-list";
 import { requireArea } from "@/lib/auth/viewer";
 import { pickChild } from "@/lib/reports/portal";
@@ -28,15 +29,14 @@ export default async function ChildrenPage({ searchParams }: PageProps<"/childre
   ]);
   if (error) throw new Error("Could not load your children");
   const chosen = pickChild(children, child);
-  const firstName = viewer.fullName.split(" ")[0];
 
   return (
     <section className="flex flex-col gap-5">
-      <div>
-        <p className="text-muted-foreground text-sm">{school?.schoolName}</p>
-        <h1 className="text-2xl font-semibold tracking-tight">My children</h1>
-        <p className="text-muted-foreground">{firstName ? `Welcome, ${firstName}.` : "Welcome."}</p>
-      </div>
+      <PortalHeading
+        schoolName={school?.schoolName}
+        title="My children"
+        fullName={viewer.fullName}
+      />
 
       {children.length > 0 && (
         <nav aria-label="Children">

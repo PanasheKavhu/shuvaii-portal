@@ -2212,6 +2212,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      withdraw_report: {
+        Args: { p_reason: string; p_report_id: string }
+        Returns: string
+      }
     }
     Enums: {
       app_role:

@@ -284,29 +284,34 @@ unique (term_id, enrolment_id)
 
 ### 4.5 Reports
 
-**report_templates**
+**report_templates**: one per school and term kind, made when the school is created (D43).
 
 ```
-id, school_id, name, term_kind, stage_scope, sections jsonb, footer_text
+id, school_id, term_kind, name, sections jsonb, footer_text, comment_label
+unique (school_id, term_kind); term_kind never changes; no insert or delete through the API
 ```
 
-`sections` toggles what a report shows (position, average, attendance, class comment, head's comment, signature column, stamp). See `REPORT_LAYOUT.md`.
+`sections` switches what a report shows: `subject_comments`, `teacher_signature`, `average_position`, `attendance`, `class_comment`, `head_comment`, `head_signature`, `school_stamp`, `grading_key`, `legal_line`, `verification` (exactly these keys, each true or false; a vacation template cannot turn on `average_position` or `class_comment`). See `REPORT_LAYOUT.md`. `footer_text` is the legal line; `comment_label` heads the comment column (Q28).
 
 **reports**
 
 ```
 id, school_id, term_id, enrolment_id, template_id, version int default 1,
 status report_status, reference_code unique, verification_code unique,
-average_percent, class_position, class_size,
-head_comment, approved_by, approved_at, published_by, published_at,
+average_percent, class_position, class_size, head_comment,
+submitted_by, submitted_at, return_note, returned_by, returned_at,
+approved_by, approved_at, published_by, published_at,
+withdrawn_reason, withdrawn_by, withdrawn_at,
 snapshot jsonb,          -- frozen subject lines, comments, grading key, branding, names
-pdf_path
-unique (term_id, enrolment_id, version)
+pdf_path,                -- {school_id}/{id}/v{version}.pdf in the reports bucket
+created_by
+unique (term_id, enrolment_id, version); one row not withdrawn per (term_id, enrolment_id)
+the template's kind is the term's kind; the learner is enrolled in the term's year
 ```
 
-Once `published`, `snapshot` and `pdf_path` are immutable (trigger). Corrections create version + 1 and set the old row to `withdrawn`.
+The state machine (section 5) holds for every writer. Version, codes, author and the `*_by`/`*_at` stamps are set by the database. Once `published`, nothing changes (so `snapshot` and `pdf_path` are frozen) except withdrawal with a reason; a withdrawn row never changes. Corrections create version + 1 once the old row is `withdrawn`. Never deleted; audited (D43).
 
-**report_shares**: `id, school_id, report_id, token_hash, expires_at, revoked_at, created_by`.
+**report_shares**: `id, school_id, report_id, token_hash, expires_at, revoked_at, created_by`. No API access; functions only.
 
 ### 4.6 Communication and audit
 
@@ -372,7 +377,8 @@ Helper functions (security definer, stable): `current_school_ids()`, `has_role(s
 | subject_comments                                                                   | as marks (admin, head, class subject's teacher, class teacher); parents and learners through published reports (Phase 4) | class subject's teacher until locked; school admin (D34)                         |
 | class_comments                                                                     | admin, head, class teacher                                                                                               | class teacher until locked; school admin (D34)                                   |
 | comment_bank                                                                       | owner; the school's active staff when shared                                                                             | owner                                                                            |
-| reports                                                                            | admin, head, class teacher for draft to approved; parents and learners only when `published`                             | class teacher (draft, submit); head (approve, publish, withdraw)                 |
+| reports                                                                            | admin, head; whoever teaches in the class, every state; hod every published; parents and learners only `published` (D43) | class teacher (draft, submit); head (return, approve, publish, withdraw)         |
+| report_templates, report_shares                                                    | staff (templates); nobody (shares, functions only)                                                                       | school admin (templates)                                                         |
 | announcements                                                                      | members in the audience while published                                                                                  | school admin, head                                                               |
 | audit_log                                                                          | admin, head                                                                                                              | triggers only                                                                    |
 
@@ -380,12 +386,13 @@ Default is deny. Each policy has a test in each direction (allowed and blocked) 
 
 ## 8. Storage buckets (Supabase Storage)
 
-| Bucket        | Contents                  | Access                                                                                                                                                 |
-| ------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `branding`    | logos, stamps, signatures | public read (logos only), write by school admin                                                                                                        |
-| `reports`     | published PDFs            | private; signed URLs for owners, share tokens for links                                                                                                |
-| `attachments` | newsletter files          | private; signed URLs for audience                                                                                                                      |
-| `imports`     | uploaded CSV/Excel        | private; school admin and head (D24); a class subject's teacher for `{school}/marks/{class_subject}/` (D33); deleted after 30 days (not yet automated) |
+| Bucket            | Contents                | Access                                                                                                                                                 |
+| ----------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `school-branding` | logos                   | public read; write by platform admin (D15)                                                                                                             |
+| `report-assets`   | stamp, head's signature | private; upload by the school admin, no read through the API (report rendering only, D43)                                                              |
+| `reports`         | published PDFs          | private; written by the server only; read through short signed URLs by whoever can read the report (D43); share tokens for links later                 |
+| `attachments`     | newsletter files        | private; signed URLs for audience                                                                                                                      |
+| `imports`         | uploaded CSV/Excel      | private; school admin and head (D24); a class subject's teacher for `{school}/marks/{class_subject}/` (D33); deleted after 30 days (not yet automated) |
 
 Object paths start with the school id (`{school_id}/...`) so storage policies can check it.
 

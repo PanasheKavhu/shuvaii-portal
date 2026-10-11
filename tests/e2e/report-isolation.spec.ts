@@ -50,12 +50,14 @@ test("another family and another school reach no report by any route", async ({
   // The page.
   expect((await parent.goto(`/children/reports/${own.id}`))!.status()).toBe(200);
   expect((await parent.goto(`/children/reports/${theirs.id}`))!.status()).toBe(404);
-  expect((await parent.goto(`/my-reports/${theirs.id}`))!.status()).toBe(404);
+  // The learner's page is not a parent's area at all.
+  expect([403, 404]).toContain((await parent.goto(`/my-reports/${theirs.id}`))!.status());
 
   // The PDF route: a redirect to the file for their own, 404 for another family's.
   const pdf = (id: string) => parent.request.get(`/reports/${id}/pdf`, { maxRedirects: 0 });
-  expect((await pdf(own.id)).status()).toBe(303);
-  expect((await pdf(theirs.id)).headers()["cache-control"]).not.toContain("public");
+  const ownPdf = await pdf(own.id);
+  expect(ownPdf.status()).toBe(303);
+  expect(ownPdf.headers()["cache-control"]).toBe("private, no-store");
   expect((await pdf(theirs.id)).status()).toBe(404);
   expect(
     (

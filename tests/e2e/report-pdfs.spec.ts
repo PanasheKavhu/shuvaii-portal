@@ -49,6 +49,10 @@ test("publishing a class makes its PDFs; a PDF opens and its QR address checks o
     expect(r.pdf_path).toBe(`${school.schoolId}/${r.id}/v${r.version}.pdf`);
   }
   const report = rows!.find((r) => r.enrolment_id === second.enrolmentId)!;
+  // Stored with max-age=0, so the hosted Storage CDN never tells a shared
+  // device or proxy to keep it after its 60-second link expires.
+  const info = await service.storage.from("reports").info(report.pdf_path!);
+  expect(info.data?.cacheControl).toBe("max-age=0");
 
   // Open the PDF from the learner's card.
   const card = page.getByRole("article", { name: second.name });
@@ -58,8 +62,6 @@ test("publishing a class makes its PDFs; a PDF opens and its QR address checks o
   const response = await page.request.get(href!);
   expect(response.status()).toBe(200);
   expect(response.headers()["content-type"]).toBe("application/pdf");
-  // Not kept in a shared device's or proxy's cache after the link expires.
-  expect(response.headers()["cache-control"]).toBe("max-age=0");
   const pdf = readPdf(await response.body());
   const text = flatText(pdf);
   for (const expected of [

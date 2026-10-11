@@ -86,11 +86,14 @@ export const LOGO_TYPES = {
 
 export type LogoCheck = { ok: true; extension: string } | { ok: false; error: string };
 
-export function checkLogoFile(file: { type: string; size: number } | null): LogoCheck {
+export function checkLogoFile(
+  file: { type: string; size: number } | null,
+  noun = "The logo",
+): LogoCheck {
   if (!file || file.size === 0) return { ok: false, error: "Choose an image to upload." };
   const extension = LOGO_TYPES[file.type as keyof typeof LOGO_TYPES];
   if (!extension) return { ok: false, error: "Upload a PNG, JPEG or WebP image." };
-  if (file.size > LOGO_MAX_BYTES) return { ok: false, error: "The logo must be 1 MB or smaller." };
+  if (file.size > LOGO_MAX_BYTES) return { ok: false, error: `${noun} must be 1 MB or smaller.` };
   return { ok: true, extension };
 }
 

@@ -311,7 +311,9 @@ the template's kind is the term's kind; the learner is enrolled in the term's ye
 
 The state machine (section 5) holds for every writer. Version, codes, author and the `*_by`/`*_at` stamps are set by the database; the codes when the report is published. Once `published`, nothing changes (so `snapshot` is frozen) except withdrawal with a reason, and the server storing the PDF path once; a withdrawn row never changes. Corrections create version + 1 once the old row is `withdrawn`. Never deleted; audited (D43). Signed-in users change reports only through the workflow functions (`generate_report_drafts`, `submit_class_reports`, `return_class_reports`, `set_report_head_comment`, `set_report_result_not_available`, `approve_class_reports`, `publish_class_reports`), which check the role and state; `head_comment` is at most 200 characters (D44).
 
-**report_shares**: `id, school_id, report_id, token_hash, expires_at, revoked_at, created_by`. No API access; functions only.
+**report_shares**: `id, school_id, report_id, token_hash, expires_at, revoked_at, created_by`. No API access; functions only: `create_report_share` (the learner or a linked parent, published reports with a PDF, 7 days, at most 10 live links per person and report; returns the token once, stores its SHA-256 hash), `my_report_shares` and `revoke_report_share` (the owner only), `open_report_share` (service role only). Withdrawing a report revokes its links (D46, D47).
+
+**report_share_opens**: `id, school_id, share_id, opened_at`. One row per opened share link, nothing personal (no address, device or token). No API access; written by `open_report_share` (D47).
 
 ### 4.6 Communication and audit
 
@@ -378,7 +380,7 @@ Helper functions (security definer, stable): `current_school_ids()`, `has_role(s
 | class_comments                                                                     | admin, head, class teacher                                                                                               | class teacher until locked; school admin (D34)                                   |
 | comment_bank                                                                       | owner; the school's active staff when shared                                                                             | owner                                                                            |
 | reports                                                                            | admin, head; whoever teaches in the class, every state; hod every published; parents and learners only `published` (D43) | class teacher (draft, submit); head (return, approve, publish, withdraw)         |
-| report_templates, report_shares                                                    | staff (templates); nobody (shares, functions only)                                                                       | school admin (templates)                                                         |
+| report_templates, report_shares, report_share_opens                                | staff (templates); nobody (shares and opens, functions only, D47)                                                        | school admin (templates)                                                         |
 | announcements                                                                      | members in the audience while published                                                                                  | school admin, head                                                               |
 | audit_log                                                                          | admin, head                                                                                                              | triggers only                                                                    |
 
@@ -390,7 +392,7 @@ Default is deny. Each policy has a test in each direction (allowed and blocked) 
 | ----------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `school-branding` | logos                   | public read; write by platform admin (D15)                                                                                                             |
 | `report-assets`   | stamp, head's signature | private; upload by the school admin, no read through the API (report rendering only, D43)                                                              |
-| `reports`         | published PDFs          | private; written by the server only; read through short signed URLs by whoever can read the report (D43); share tokens for links later                 |
+| `reports`         | published PDFs          | private; written by the server only; read through short signed URLs by whoever can read the report (D43), or by the server for a live share link (D47) |
 | `attachments`     | newsletter files        | private; signed URLs for audience                                                                                                                      |
 | `imports`         | uploaded CSV/Excel      | private; school admin and head (D24); a class subject's teacher for `{school}/marks/{class_subject}/` (D33); deleted after 30 days (not yet automated) |
 

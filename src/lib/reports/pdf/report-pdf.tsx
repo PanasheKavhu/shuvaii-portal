@@ -114,7 +114,9 @@ const s = StyleSheet.create({
   pageNumber: {
     position: "absolute",
     bottom: 18,
-    left: 32,
+    // Starts right of the platform footer (about 170 pt), so a long name
+    // never runs over it.
+    left: 212,
     right: 32,
     paddingTop: 4,
     fontSize: 8,
@@ -123,11 +125,37 @@ const s = StyleSheet.create({
   },
 });
 
-/** Column widths of the subject table, with and without the comment columns. */
-export function subjectColumns(withComments: boolean) {
-  return withComments
-    ? { subject: "21%", mark: "7%", grade: "7%", comment: "47%", teacher: "18%" }
-    : { subject: "60%", mark: "20%", grade: "20%", comment: "0%", teacher: "0%" };
+/** Grades up to this many characters fit the narrow grade column ("A", "U", "2a"). */
+const SHORT_GRADE = 3;
+
+/**
+ * Column widths of the subject table, with and without the comment columns.
+ * A school whose key has longer grades (up to 10 characters, such as
+ * "Excellent") gets a wider grade column, taken from the comment column,
+ * since words are never split (render.ts).
+ */
+export function subjectColumns(withComments: boolean, longestGrade = 1) {
+  const wide = longestGrade > SHORT_GRADE;
+  if (!withComments)
+    return { subject: "60%", mark: "20%", grade: "20%", comment: "0%", teacher: "0%" };
+  return wide
+    ? { subject: "21%", mark: "7%", grade: "13%", comment: "41%", teacher: "18%" }
+    : { subject: "21%", mark: "7%", grade: "7%", comment: "47%", teacher: "18%" };
+}
+
+/** The longest grade the table or key prints, in characters. */
+export function longestGrade(doc: ReportDocument): number {
+  return Math.max(
+    1,
+    ...doc.subjects.map((l) => l.grade?.length ?? 0),
+    ...doc.gradingKey.bands.map((b) => b.grade.length),
+  );
+}
+
+/** The learner's name as the page line prints it: cut short past 40 characters. */
+export const PAGE_LINE_NAME = 40;
+export function pageLineName(name: string): string {
+  return name.length > PAGE_LINE_NAME ? `${name.slice(0, PAGE_LINE_NAME - 1).trimEnd()}…` : name;
 }
 
 function Field({ label, value }: { label: string; value: string | null }) {
@@ -175,13 +203,14 @@ function SubjectRow({
   line,
   doc,
   gradeFill,
+  w,
 }: {
   line: ReportDocumentLine;
   doc: ReportDocument;
   gradeFill: string;
+  w: ReturnType<typeof subjectColumns>;
 }) {
   const withComments = doc.sections.subject_comments;
-  const w = subjectColumns(withComments);
   const comment = line.notAvailable
     ? ["Result not available.", line.comment].filter(Boolean).join(" ")
     : line.comment;
@@ -207,11 +236,12 @@ function SubjectRow({
 
 function SubjectTable({ doc }: { doc: ReportDocument }) {
   const withComments = doc.sections.subject_comments;
-  const w = subjectColumns(withComments);
+  const w = subjectColumns(withComments, longestGrade(doc));
   const gradeFill = tint(doc.school.accentColor, 0.14);
   return (
     <View>
-      <View style={[s.headRow, { borderColor: doc.school.accentColor }]} wrap={false}>
+      {/* fixed: the column headings repeat on every page the table runs onto. */}
+      <View style={[s.headRow, { borderColor: doc.school.accentColor }]} wrap={false} fixed>
         <Text style={[s.cell, s.th, { width: w.subject }]}>Subject</Text>
         <Text style={[s.cell, s.th, s.num, { width: w.mark }]}>Mark</Text>
         <Text style={[s.cell, s.th, s.num, { width: w.grade, backgroundColor: gradeFill }]}>
@@ -225,7 +255,7 @@ function SubjectTable({ doc }: { doc: ReportDocument }) {
         )}
       </View>
       {doc.subjects.map((line, i) => (
-        <SubjectRow key={i} line={line} doc={doc} gradeFill={gradeFill} />
+        <SubjectRow key={i} line={line} doc={doc} gradeFill={gradeFill} w={w} />
       ))}
     </View>
   );
@@ -360,7 +390,7 @@ export function ReportPdf({ doc, images, verifyUrl, qr }: ReportPdfProps) {
           style={s.pageNumber}
           render={({ pageNumber, totalPages }) =>
             [
-              doc.learner.name,
+              pageLineName(doc.learner.name),
               verification && `Ref ${doc.referenceCode}`,
               `Page ${pageNumber} of ${totalPages}`,
             ]

@@ -25,7 +25,12 @@ function readObjects(bytes: Buffer): Map<number, PdfObject> {
     }
     const dict = body.slice(0, at);
     let data = body.slice(at + "stream".length).replace(/^\r?\n/, "");
-    data = data.slice(0, data.lastIndexOf("endstream")).replace(/\r?\n$/, "");
+    // The stream's own /Length, when given directly: trimming a trailing
+    // newline instead would cut a compressed stream that ends in 0x0a.
+    const length = /\/Length (\d+)(?! \d+ R)/.exec(dict);
+    data = length
+      ? data.slice(0, Number(length[1]))
+      : data.slice(0, data.lastIndexOf("endstream")).replace(/\r?\n$/, "");
     const raw = Buffer.from(data, "latin1");
     objects.set(Number(m[1]), {
       dict,

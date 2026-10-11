@@ -17,14 +17,21 @@ import { cn } from "@/lib/utils";
 import { loadClassResults, requireClassTerm } from "../../../../marks/comment-data";
 import { resolveTerm } from "../../../../marks/data";
 import {
+  approveReport,
   approveReports,
   publishReports,
+  returnReport,
   returnReports,
   saveHeadComment,
   setResultNotAvailable,
   withdrawReport,
 } from "../../../../marks/report-actions";
-import { countByStatus, loadClassReports, type ClassReport } from "../../../../marks/report-data";
+import {
+  countByStatus,
+  loadClassReports,
+  loadReportChanges,
+  type ClassReport,
+} from "../../../../marks/report-data";
 
 export const metadata: Metadata = { title: "Class reports" };
 
@@ -46,8 +53,9 @@ export default async function HeadClassReportsPage({
   const { actor, ct } = await requireClassTerm(classId, termId);
   if (!actor.roles.includes("head")) forbidden();
   const supabase = await createClient();
-  const [reports, { learners }, { terms }, school] = await Promise.all([
+  const [reports, changes, { learners }, { terms }, school] = await Promise.all([
     loadClassReports(ct.classId, ct.term.id),
+    loadReportChanges(ct.classId, ct.term.id),
     loadClassResults(ct),
     resolveTerm(actor.schoolId, ct.term.id),
     supabase.from("schools").select("timezone").eq("id", actor.schoolId).maybeSingle(),
@@ -59,10 +67,14 @@ export default async function HeadClassReportsPage({
     .map((l) => ({ name: l.name, report: reportOf.get(l.enrolmentId) }))
     .filter((l): l is { name: string; report: ClassReport } => !!l.report);
   const blocked = reports.filter((r) => r.status === "submitted" && openGaps(r.content).length > 0);
-  const signed = new Intl.DateTimeFormat("en-GB", {
+  const timeZone = school.data?.timezone ?? "Africa/Harare";
+  const signed = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeZone });
+  const changedAt = new Intl.DateTimeFormat("en-GB", {
     dateStyle: "medium",
-    timeZone: school.data?.timezone ?? "Africa/Harare",
+    timeStyle: "short",
+    timeZone,
   });
+  const changed = ordered.filter(({ report }) => changes.has(report.id));
   const pdfsReady = reports.filter((r) => r.status === "published" && r.pdfPath).length;
   const n = (count: number) => `${count} ${count === 1 ? "report" : "reports"}`;
 
@@ -95,6 +107,18 @@ export default async function HeadClassReportsPage({
           hrefFor={(id) => `/head/reports/${ct.classId}/${id}`}
         />
       </div>
+
+      {changed.length > 0 && (
+        <p
+          role="note"
+          aria-label="Changed since the reports were made"
+          className="rounded-xl bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-200"
+        >
+          Marks or comments changed after these reports were made:{" "}
+          {changed.map(({ name }) => name).join(", ")}. The reports below do not show the change.
+          Return them so the class teacher makes them again; positions may change too.
+        </p>
+      )}
 
       {(counts.submitted > 0 || counts.approved > 0) && (
         <section
@@ -216,6 +240,50 @@ export default async function HeadClassReportsPage({
                     {r.status === "draft" ? "With the class teacher" : STATUS_LABELS[r.status]}
                   </span>
                 </div>
+                {changes.has(r.id) && (
+                  <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-sm text-amber-900 dark:text-amber-200">
+                    Changed since this report was made (
+                    {changedAt.format(new Date(changes.get(r.id)!))}).
+                  </p>
+                )}
+                {r.status === "submitted" && (
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start">
+                    <ActionForm
+                      action={approveReport.bind(null, r.id, ct.classId, ct.term.id)}
+                      submitLabel="Approve this report"
+                      pendingLabel="Approving…"
+                      submitVariant="outline"
+                      label={`Approve ${name}'s report`}
+                    />
+                    <details className="bg-muted/30 rounded-xl border md:flex-1">
+                      <summary className="flex min-h-11 cursor-pointer items-center px-4 text-sm font-medium">
+                        Return this report<span className="sr-only">&nbsp;of {name}</span>
+                      </summary>
+                      <ActionForm
+                        action={returnReport.bind(null, r.id, ct.classId, ct.term.id)}
+                        submitLabel="Return to the class teacher"
+                        pendingLabel="Returning…"
+                        submitVariant="outline"
+                        label={`Return ${name}'s report`}
+                        labels={{ note: "Note to the class teacher" }}
+                        className="border-t p-4"
+                      >
+                        <div className="flex flex-col gap-2">
+                          <label htmlFor={`return-${r.id}`} className="text-sm font-medium">
+                            Note to the class teacher
+                          </label>
+                          <textarea
+                            id={`return-${r.id}`}
+                            name="note"
+                            rows={3}
+                            maxLength={RETURN_NOTE_MAX}
+                            className="border-input focus-visible:border-ring focus-visible:ring-ring/50 dark:bg-input/30 w-full rounded-lg border bg-transparent px-3 py-2 text-base outline-none focus-visible:ring-3"
+                          />
+                        </div>
+                      </ActionForm>
+                    </details>
+                  </div>
+                )}
                 {r.status === "published" && r.pdfPath && (
                   <a
                     href={`/reports/${r.id}/pdf`}

@@ -5,7 +5,14 @@ import QRCode from "qrcode";
 import { describe, expect, it } from "vitest";
 import { readReportDocument, type ReportDocument } from "@/lib/reports/document";
 import { qrMatrix, renderReportPdf } from "@/lib/reports/pdf/render";
-import { NO_IMAGES, PLATFORM_FOOTER, type ReportImages } from "@/lib/reports/pdf/report-pdf";
+import {
+  NO_IMAGES,
+  PLATFORM_FOOTER,
+  longestGrade,
+  pageLineName,
+  subjectColumns,
+  type ReportImages,
+} from "@/lib/reports/pdf/report-pdf";
 import { PDF_BATCH_SIZE } from "@/lib/reports/pdf-progress";
 import { flatText, readPdf } from "./pdf-text";
 import {
@@ -161,6 +168,18 @@ describe("page breaks", () => {
     expect(all.indexOf("Grading key")).toBeLessThan(all.indexOf("Reference ABCD2345EF"));
   });
 
+  it("a table that runs onto a second page repeats its column headings there", async () => {
+    const subjects = Array.from({ length: 30 }, (_, i) =>
+      subjectLine(`Subject ${i + 1}`, i, { comment: MAX_SUBJECT_COMMENT }),
+    );
+    const result = await pages(doc({ subjects }));
+    expect(result.length).toBeGreaterThanOrEqual(2);
+    const texts = result.map((p) => p.text.replace(/\s+/g, " "));
+    const headings = "Subject Mark Grade Teacher's comment Teacher";
+    expect(texts[1]).toMatch(/Subject \d+/);
+    for (const text of texts.filter((t) => /Subject \d+/.test(t))) expect(text).toContain(headings);
+  });
+
   it("a short report stays on one page", async () => {
     expect(await pages(doc())).toHaveLength(1);
   });
@@ -304,5 +323,55 @@ describe("report kinds", () => {
 
   it("a reissued version says Amended with its version number", async () => {
     expect(flatText(await pages(doc({ version: 2 })))).toContain("Amended · version 2");
+  });
+});
+
+describe("long text in the layout", () => {
+  const LONG_NAME = "Tanatswanashe Rutendo Nyasha Chiedza Makanaka Mutasa-Chikwanha";
+
+  it("cuts a long name short in the page line, so it stays clear of the footer", async () => {
+    expect(pageLineName("Tendai Ncube")).toBe("Tendai Ncube");
+    expect(pageLineName(LONG_NAME)).toHaveLength(40);
+    expect(pageLineName(LONG_NAME).endsWith("…")).toBe(true);
+    const result = await pages(doc({ learner: { name: LONG_NAME, learner_number: "MS2026-099" } }));
+    const text = result[0]!.text.replace(/\s+/g, " ");
+    // The learner block prints the whole name; the page line the short one.
+    expect(text).toContain(`Name ${LONG_NAME}`);
+    expect(text).toContain(`${pageLineName(LONG_NAME)} · Ref ABCD2345EF · Page 1 of 1`);
+    expect(text).toContain(PLATFORM_FOOTER);
+  });
+
+  it("gives grades longer than 3 characters a wider column, taken from the comments", () => {
+    const sum = (w: Record<string, string>) =>
+      Object.values(w).reduce((t, v) => t + Number.parseFloat(v), 0);
+    const narrow = subjectColumns(true);
+    const wide = subjectColumns(true, 10);
+    expect(narrow.grade).toBe("7%");
+    expect(Number.parseFloat(wide.grade)).toBeGreaterThanOrEqual(13);
+    expect(sum(narrow)).toBe(100);
+    expect(sum(wide)).toBe(100);
+    expect(sum(subjectColumns(false, 10))).toBe(100);
+  });
+
+  it("measures the longest grade from the subjects and the key", () => {
+    expect(longestGrade(doc())).toBe(1);
+    const words = doc({
+      grading_key: {
+        scale: "Primary words",
+        level: "Grade 7",
+        bands: [
+          { grade: "Excellent", min_mark: 80, max_mark: 100, remark: null },
+          { grade: "Good", min_mark: 0, max_mark: 79, remark: null },
+        ],
+      },
+      subjects: [subjectLine("Mathematics", 0, { grade: "Good" })],
+    });
+    expect(longestGrade(words)).toBe(9);
+  });
+
+  it("prints a 10-character grade whole", async () => {
+    const d = doc({ subjects: [subjectLine("Mathematics", 0, { grade: "Proficient" })] });
+    const lines = (await pages(d)).flatMap((p) => p.lines.map((l) => l.trim()));
+    expect(lines).toContain("Proficient");
   });
 });

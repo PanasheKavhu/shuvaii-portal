@@ -16,7 +16,7 @@
 -- A vacation school term where every learner's Maths is complete.
 begin;
 
-select plan(88);
+select plan(105);
 
 insert into auth.users (
   id, instance_id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -327,9 +327,48 @@ reset role;
 insert into ids select enrolment_id, id from public.reports where enrolment_id = 'e8100000-0000-0000-0000-000000000002';
 set local role authenticated;
 
+-- One learner at a time, and the head's change warning (D48) ------------------------------------
+
+select pg_temp.as_user('e8000000-0000-0000-0000-000000000003');
+select throws_ok($$ select public.approve_report(pg_temp.rid('e8100000-0000-0000-0000-000000000001')) $$, '42501', null, 'the class teacher cannot approve one report');
+select throws_ok($$ select public.return_report(pg_temp.rid('e8100000-0000-0000-0000-000000000001'), 'Mine') $$, '42501', null, 'nor return one');
+select throws_ok($$ select * from public.report_changes_since_draft(pg_temp.c(), pg_temp.t()) $$, '42501', null, 'nor read the head''s change warning');
+select pg_temp.as_user('e8000000-0000-0000-0000-00000000000c');
+select throws_ok($$ select public.approve_report(pg_temp.rid('e8100000-0000-0000-0000-000000000001')) $$, '42501', null, 'another school''s head cannot approve one report');
+select throws_ok($$ select public.return_report(pg_temp.rid('e8100000-0000-0000-0000-000000000001'), 'No') $$, '42501', null, 'nor return one');
+select throws_ok($$ select * from public.report_changes_since_draft(pg_temp.c(), pg_temp.t()) $$, '42501', null, 'nor read the warning');
+
+select pg_temp.as_user('e8000000-0000-0000-0000-000000000002');
+select is((select count(*)::int from public.report_changes_since_draft(pg_temp.c(), pg_temp.t())), 0, 'nothing changed since the drafts were made');
+select throws_ok($$ select public.approve_report(pg_temp.rid('e8100000-0000-0000-0000-000000000003')) $$, '23514', null, 'one report with a subject without a result cannot be approved');
+select throws_ok($$ select public.return_report(pg_temp.rid('e8100000-0000-0000-0000-000000000002'), '  ') $$, '23514', null, 'returning one report needs a note');
+select lives_ok($$ select public.return_report(pg_temp.rid('e8100000-0000-0000-0000-000000000002'), 'Check Lerato''s English comment.') $$, 'the head returns one learner''s report');
+select is((select (status, return_note)::text from pg_temp.report_of('e8100000-0000-0000-0000-000000000002')),
+  '(draft,"Check Lerato''s English comment.")', 'it is a draft with the note');
+select is((select status::text from pg_temp.report_of('e8100000-0000-0000-0000-000000000001')), 'submitted', 'the others stay submitted');
+select throws_ok($$ select public.return_report(pg_temp.rid('e8100000-0000-0000-0000-000000000002'), 'Again') $$, '23514', null, 'a draft cannot be returned again');
+select lives_ok($$ select public.approve_report(pg_temp.rid('e8100000-0000-0000-0000-000000000001')) $$, 'the head approves one learner''s report');
+select is((select (status, approved_by)::text from pg_temp.report_of('e8100000-0000-0000-0000-000000000001')),
+  '(approved,e8000000-0000-0000-0000-000000000002)', 'approval of one report is stamped with the head');
+
+-- A mark of Lungi's changes after the report was made: the head is warned.
+reset role;
+alter table public.marks disable trigger marks_set_updated_at;
+update public.marks set updated_at = now() + interval '1 minute'
+where enrolment_id = 'e8100000-0000-0000-0000-000000000001'
+  and assessment_id = (select id from public.assessments where term_id = '78000000-0000-0000-0000-0000000000a3' limit 1);
+alter table public.marks enable trigger marks_set_updated_at;
+set local role authenticated;
+select pg_temp.as_user('e8000000-0000-0000-0000-000000000002');
+select results_eq($$ select report_id, changed_at from public.report_changes_since_draft(pg_temp.c(), pg_temp.t()) $$,
+  $$ select pg_temp.rid('e8100000-0000-0000-0000-000000000001'), now() + interval '1 minute' $$, 'a mark changed after Lungi''s report was made is flagged, with when');
+
+select pg_temp.as_user('e8000000-0000-0000-0000-000000000003');
+select is(public.submit_class_reports(pg_temp.c(), pg_temp.t()), 1, 'the class teacher resubmits the one returned report');
+
 select pg_temp.as_user('e8000000-0000-0000-0000-000000000002');
 select lives_ok($$ select public.set_report_result_not_available(pg_temp.rid('e8100000-0000-0000-0000-000000000003'), 'c9000000-0000-0000-0000-000000000001', true) $$, 'the head marks Lindo''s Maths "result not available"');
-select is(public.approve_class_reports(pg_temp.c(), pg_temp.t()), 3, 'the head approves the class');
+select is(public.approve_class_reports(pg_temp.c(), pg_temp.t()), 2, 'the head approves the rest of the class');
 select is((select (status, approved_by)::text from pg_temp.report_of('e8100000-0000-0000-0000-000000000002')), '(approved,e8000000-0000-0000-0000-000000000002)', 'approval is stamped with the head');
 select throws_ok($$ select public.set_report_result_not_available(pg_temp.rid('e8100000-0000-0000-0000-000000000003'), 'c9000000-0000-0000-0000-000000000001', false) $$, '23514', null, '"result not available" is decided before approval');
 select lives_ok($$ select public.set_report_head_comment(pg_temp.rid('e8100000-0000-0000-0000-000000000002'), 'Well done.') $$, 'the head comments on an approved report');

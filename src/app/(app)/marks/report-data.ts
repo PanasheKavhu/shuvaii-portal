@@ -105,3 +105,19 @@ export function countByStatus(reports: readonly ClassReport[]): Record<ReportSta
   for (const r of reports) counts[r.status] += 1;
   return counts;
 }
+
+/**
+ * Reports whose learner's own marks or comments changed after the report
+ * was made, with when (D48): the head's warning. Head only.
+ */
+export async function loadReportChanges(
+  classId: string,
+  termId: string,
+): Promise<Map<string, string>> {
+  const supabase = await createClient();
+  return new Map(
+    rows(
+      await supabase.rpc("report_changes_since_draft", { p_class_id: classId, p_term_id: termId }),
+    ).map((r) => [r.report_id, r.changed_at]),
+  );
+}

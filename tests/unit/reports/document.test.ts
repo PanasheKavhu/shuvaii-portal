@@ -6,6 +6,7 @@ import {
   resultsLine,
   tint,
   verifyUrl,
+  termWithYear,
 } from "@/lib/reports/document";
 import { imageKind } from "@/lib/reports/pdf/images";
 import { pdfProgressLine } from "@/lib/reports/pdf-progress";
@@ -192,5 +193,14 @@ describe("verification", () => {
     expect(readVerification({ ...row, status: "draft", reference_code: null })).toBeNull();
     expect(NOT_FOUND).toBe("Report not found");
     expect(WITHDRAWN).toBe("Report withdrawn");
+  });
+});
+
+describe("termWithYear", () => {
+  it("names the year once", () => {
+    expect(termWithYear("Term 3 2026", "2026")).toBe("Term 3 2026");
+    expect(termWithYear("Term Now", "This year")).toBe("Term Now This year");
+    expect(termWithYear("Term 1", "2026", " · ")).toBe("Term 1 · 2026");
+    expect(termWithYear("Term 1", null)).toBe("Term 1");
   });
 });

@@ -2,6 +2,7 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 import type { createAdminClient } from "@/lib/supabase/admin";
+import { limitedUntil } from "@/lib/reports/verify";
 import { LOOKBACK_MS, lockedUntil, type SignInAttempt } from "./lockout";
 
 type AdminClient = ReturnType<typeof createAdminClient>;
@@ -47,4 +48,40 @@ export function lockedAfterFailure(history: readonly SignInAttempt[], failedAt: 
 
 export function tooManyAttempts(minutes: number): string {
   return `Too many failed attempts. Try again in ${minutes} minute${minutes === 1 ? "" : "s"}.`;
+}
+
+/**
+ * A per-address limit counted in `sign_in_attempts` (the verification page,
+ * D45, and share links, D47): `limit` tries per `windowMs` under `hash`.
+ * How many minutes until the next try, null when one is allowed now, or
+ * "unavailable" when the count could not be read. The caller records the
+ * try with recordAttempt() once it knows whether it found anything.
+ */
+export async function addressLimit(
+  admin: AdminClient,
+  hash: string,
+  now: Date,
+  limit: number,
+  windowMs: number,
+): Promise<{ minutes: number } | null | "unavailable"> {
+  const { data, error } = await admin
+    .from("sign_in_attempts")
+    .select("created_at")
+    .eq("email_hash", hash)
+    .gte("created_at", new Date(now.getTime() - windowMs).toISOString());
+  if (error) return "unavailable";
+  const blocked = limitedUntil(
+    data.map((r) => new Date(r.created_at)),
+    now,
+    limit,
+    windowMs,
+  );
+  return blocked
+    ? { minutes: Math.max(1, Math.ceil((blocked.getTime() - now.getTime()) / 60_000)) }
+    : null;
+}
+
+/** A hash of a network address for one purpose's limit, so the address is never stored. */
+export function addressHash(purpose: string, address: string): string {
+  return createHash("sha256").update(`${purpose}:${address}`).digest("hex");
 }

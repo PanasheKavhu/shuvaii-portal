@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { buttonVariants } from "@/components/ui/button";
+import { termWithYear } from "@/lib/reports/document";
 import { loadMyShareLinks, loadPortalReport } from "@/lib/reports/portal-data";
 import { isUuid } from "@/lib/setup/structure";
 import { ReportView } from "./report-view";
@@ -33,7 +34,7 @@ export async function PortalReportPage({
       <div>
         <p className="text-muted-foreground text-sm">{doc.learner.name}</p>
         <h1 className="text-2xl font-semibold tracking-tight">
-          {doc.termName} {doc.year}
+          {termWithYear(doc.termName, doc.year)}
         </h1>
       </div>
 
@@ -70,7 +71,7 @@ export async function PortalReportPage({
           </div>
           <ShareLinkMaker
             reportId={report.id}
-            term={`${doc.termName} ${doc.year}`}
+            term={termWithYear(doc.termName, doc.year)}
             school={doc.school.name}
           />
           {links.length > 0 && (

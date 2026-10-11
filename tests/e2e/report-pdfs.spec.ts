@@ -1,7 +1,13 @@
 import { expect, test } from "@playwright/test";
 import { readPdf, flatText } from "../unit/reports/pdf-text";
 import { signIn } from "./helpers";
-import { approvedClass, expectNoSideScroll, serviceClient, someAddress } from "./report-helpers";
+import {
+  approvedClass,
+  expectNoSideScroll,
+  publishWithPdfs,
+  serviceClient,
+  someAddress,
+} from "./report-helpers";
 
 // Report PDFs and verification (US-6.3, US-6.4, US-6.5; D45) at 360 px (the
 // mobile project) and on a desktop screen: the head publishes a class and
@@ -49,6 +55,10 @@ test("publishing a class makes its PDFs; a PDF opens and its QR address checks o
     expect(r.pdf_path).toBe(`${school.schoolId}/${r.id}/v${r.version}.pdf`);
   }
   const report = rows!.find((r) => r.enrolment_id === second.enrolmentId)!;
+  // Stored with max-age=0, so the hosted Storage CDN never tells a shared
+  // device or proxy to keep it after its 60-second link expires.
+  const info = await service.storage.from("reports").info(report.pdf_path!);
+  expect(info.data?.cacheControl).toBe("max-age=0");
 
   // Open the PDF from the learner's card.
   const card = page.getByRole("article", { name: second.name });
@@ -109,6 +119,40 @@ test("publishing a class makes its PDFs; a PDF opens and its QR address checks o
   await stranger.close();
 });
 
+test("two schools with different grade keys each print their own key", async ({
+  page,
+  browser,
+}) => {
+  test.setTimeout(300_000);
+  const words = ["Excellent", "Very good", "Good", "Fair", "Weak", "Fail"];
+  const lettered = await approvedClass("key-letters");
+  const worded = await approvedClass("key-words", { grades: words });
+  await publishWithPdfs(page, lettered, 3);
+  const other = await (await browser.newContext({ viewport: page.viewportSize()! })).newPage();
+  await publishWithPdfs(other, worded, 3);
+
+  const service = serviceClient();
+  const keyText = async (schoolId: string) => {
+    const { data: r } = await service
+      .from("reports")
+      .select("pdf_path")
+      .eq("school_id", schoolId)
+      .limit(1)
+      .single();
+    const { data: file } = await service.storage.from("reports").download(r!.pdf_path!);
+    const text = flatText(readPdf(Buffer.from(await file!.arrayBuffer())));
+    return text.slice(text.indexOf("Grading key"));
+  };
+  const letters = await keyText(lettered.schoolId);
+  const named = await keyText(worded.schoolId);
+  expect(letters).toContain("A 70–100 B 60–69 C 50–59 D 45–49 E 40–44 U 0–39");
+  expect(named).toContain(
+    "Excellent 70–100 Very good 60–69 Good 50–59 Fair 45–49 Weak 40–44 Fail 0–39",
+  );
+  for (const w of ["Excellent", "Very good"]) expect(letters).not.toContain(w);
+  expect(named).not.toContain("A 70–100");
+});
+
 test("an unknown or mistyped code shows not found, with no sign in", async ({ browser }) => {
   const context = await browser.newContext({
     extraHTTPHeaders: { "x-forwarded-for": someAddress() },
@@ -131,6 +175,11 @@ test("checks are limited per network address", async ({ request }) => {
   }
   const blocked = await request.get("/verify/ABCDEFGHJKLMNPQRSTUVWXYZ", { headers });
   expect(await blocked.text()).toContain("Too many reports were checked from your network.");
+  // Writing another address in front of the real one does not get round it.
+  const forged = await request.get("/verify/ABCDEFGHJKLMNPQRSTUVWXYZ", {
+    headers: { "x-forwarded-for": `${someAddress()}, ${address}` },
+  });
+  expect(await forged.text()).toContain("Too many reports were checked from your network.");
   // Another address is not affected.
   const other = await request.get("/verify/ABCDEFGHJKLMNPQRSTUVWXYZ", {
     headers: { "x-forwarded-for": someAddress() },

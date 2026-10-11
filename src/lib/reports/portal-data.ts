@@ -2,7 +2,9 @@ import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
 import { readReportDocument, type ReportDocument } from "./document";
+import { ensureReportPdf } from "./pdf-files";
 import type { PortalReport } from "./portal";
+import { portalUrl } from "./portal-url";
 
 /**
  * The portal's reads (SPEC E7; D47), all with the viewer's own client, so
@@ -23,7 +25,11 @@ export type PortalReportView = {
   hasPdf: boolean;
 };
 
-/** One published report the viewer may read, from its frozen snapshot, or null. */
+/**
+ * One published report the viewer may read, from its frozen snapshot, or
+ * null. A PDF that publishing left unmade is made now (D48), only after the
+ * viewer's own read has found the report.
+ */
 export async function loadPortalReport(reportId: string): Promise<PortalReportView | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -34,7 +40,9 @@ export async function loadPortalReport(reportId: string): Promise<PortalReportVi
     .maybeSingle();
   if (error) throw new Error("Could not load the report");
   const document = data ? readReportDocument(data.snapshot) : null;
-  return data && document ? { id: data.id, document, hasPdf: !!data.pdf_path } : null;
+  if (!data || !document) return null;
+  const pdfPath = data.pdf_path ?? (await ensureReportPdf(data.id, await portalUrl()));
+  return { id: data.id, document, hasPdf: !!pdfPath };
 }
 
 export type ShareLinkRow = { id: string; createdAt: string; expiresAt: string; opens: number };

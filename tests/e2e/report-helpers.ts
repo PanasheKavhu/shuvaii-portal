@@ -30,10 +30,24 @@ export async function expectNoSideScroll(page: Page) {
   expect(hidden, "pixels of the page off to the side").toBeLessThanOrEqual(0);
 }
 
-/** A class whose three reports are approved and waiting to be published. */
-export async function approvedClass(prefix: string) {
+/** A class whose three reports are approved and waiting to be published, optionally with its own grade names. */
+export async function approvedClass(prefix: string, options: { grades?: string[] } = {}) {
   const school = await createMarksClass(prefix, { marks: true, head: true });
   const admin = await signedInClient(school.adminEmail);
+  if (options.grades) {
+    // The school's own key: the six bands, highest first, renamed before any draft is made.
+    const { data: bands } = await admin
+      .from("grading_bands")
+      .select("id")
+      .eq("school_id", school.schoolId)
+      .order("min_mark", { ascending: false });
+    expect(bands).toHaveLength(options.grades.length);
+    for (const [i, b] of bands!.entries())
+      expect(
+        (await admin.from("grading_bands").update({ grade: options.grades[i]! }).eq("id", b.id))
+          .error,
+      ).toBeNull();
+  }
   for (const l of school.learners) {
     for (const insert of [
       admin.from("subject_comments").insert({

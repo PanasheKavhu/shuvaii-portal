@@ -76,22 +76,24 @@ export async function loadReportImages(
   return { logo, stamp, headSignature };
 }
 
-/** Draws one report's PDF from its snapshot, stores it and records its path. */
+/** Draws one report's PDF from its snapshot, stores it and records its path, which it returns. */
 export async function storeReportPdf(
   admin: AdminClient,
   report: PdfReport,
   portalUrl: string,
   cache?: Map<string, Promise<PdfImage>>,
-): Promise<void> {
+): Promise<string> {
   const doc = readReportDocument(report.snapshot);
   if (!doc) throw new Error("the report has no published snapshot");
   const images = await loadReportImages(admin, doc, cache);
   const pdf = await renderReportPdf(doc, images, portalUrl);
   const path = reportPdfPath(report.schoolId, report.id, report.version);
   // Upsert: a retry after a stored file but a failed update writes the same bytes again.
+  // max-age=0: Storage's default (an hour) would keep a private report in a
+  // shared device's or proxy's cache long after its 60-second link expired.
   const upload = await admin.storage
     .from(REPORTS_BUCKET)
-    .upload(path, pdf, { contentType: "application/pdf", upsert: true });
+    .upload(path, pdf, { contentType: "application/pdf", upsert: true, cacheControl: "0" });
   if (upload.error) throw new Error("could not store the PDF");
   const { error } = await admin
     .from("reports")
@@ -100,6 +102,40 @@ export async function storeReportPdf(
     .eq("status", "published")
     .is("pdf_path", null);
   if (error) throw new Error("could not record the PDF");
+  return path;
+}
+
+/**
+ * A published report's PDF path, making the PDF first when publishing left
+ * it unmade (the head closed the page mid-class, or a PDF failed; D48).
+ * Callers must already have read the report with the viewer's own client,
+ * so RLS has decided the viewer may open it; this only fills in the file,
+ * from the same frozen snapshot the head's batch would use. Two viewers at
+ * once both upload the same bytes to the same path and one records it.
+ * Null when the report is not published or the PDF cannot be made now.
+ */
+export async function ensureReportPdf(reportId: string, portalUrl: string): Promise<string | null> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("reports")
+    .select("id, school_id, version, snapshot, pdf_path")
+    .eq("id", reportId)
+    .eq("status", "published")
+    .maybeSingle();
+  if (error || !data) return null;
+  if (data.pdf_path) return data.pdf_path;
+  try {
+    // The path it returns, not a second read: a page's identical reads are memoised.
+    return await storeReportPdf(
+      admin,
+      { id: data.id, schoolId: data.school_id, version: data.version, snapshot: data.snapshot },
+      portalUrl,
+    );
+  } catch (e) {
+    // No learner details in logs (rule 5): the report id is enough to find it.
+    console.error(`report PDF failed for report ${data.id}: ${(e as Error)?.message}`);
+    return null;
+  }
 }
 
 export type PdfBatchResult = {

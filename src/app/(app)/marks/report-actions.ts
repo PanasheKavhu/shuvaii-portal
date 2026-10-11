@@ -109,6 +109,40 @@ export async function approveReports(classId: string, termId: string): Promise<F
   return saved(`Approved ${plural(data, "report", "reports")}.`);
 }
 
+/** US-6.2 (D48): one learner's report back to the class teacher, with a note. */
+export async function returnReport(
+  reportId: string,
+  classId: string,
+  termId: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  if (!isUuid(reportId) || !isUuid(classId) || !isUuid(termId)) return failed(TRY_AGAIN);
+  const note = String(formData.get("note") ?? "").trim();
+  if (!note) return failed("Check the note.", { note: "Say what the class teacher should fix." });
+  if (note.length > RETURN_NOTE_MAX)
+    return failed("Check the note.", { note: `Use at most ${RETURN_NOTE_MAX} characters.` });
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("return_report", { p_report_id: reportId, p_note: note });
+  if (error) return failed(message(error, HEAD));
+  revalidate(classId, termId);
+  return saved("Returned the report to the class teacher.");
+}
+
+/** US-6.2 (D48): approves one learner's report. */
+export async function approveReport(
+  reportId: string,
+  classId: string,
+  termId: string,
+): Promise<FormState> {
+  if (!isUuid(reportId) || !isUuid(classId) || !isUuid(termId)) return failed(TRY_AGAIN);
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("approve_report", { p_report_id: reportId });
+  if (error) return failed(message(error, HEAD));
+  revalidate(classId, termId);
+  return saved("Approved the report.");
+}
+
 /**
  * US-6.3: freezes each approved report's snapshot and gives it its codes.
  * The head's screen then makes the PDFs a few at a time (makeReportPdfs).

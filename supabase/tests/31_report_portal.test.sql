@@ -17,7 +17,7 @@
 -- 2026 Term 1 report (4 Blue), all published with PDFs.
 begin;
 
-select plan(56);
+select plan(60);
 
 insert into auth.users (
   id, instance_id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -381,6 +381,50 @@ reset role;
 set local role service_role;
 select is((select count(*)::int from public.open_report_share((select pg_temp.sha(token) from lara_link))), 0,
   'and their own share links stop working');
+reset role;
+
+-- A parent who loses access (Phase 4 gate) ----------------------------------------------------------
+
+-- (Their ten links from above are revoked, to make room for one more.)
+update public.report_shares set revoked_at = now()
+where created_by = 'eb000000-0000-0000-0000-000000000007' and revoked_at is null;
+
+set local role authenticated;
+select pg_temp.as_user('eb000000-0000-0000-0000-000000000007');
+create temporary table pat_gate_link on commit drop as
+select * from public.create_report_share(pg_temp.r('1'));
+reset role;
+grant select on pat_gate_link to service_role;
+set local role service_role;
+select is((select count(*)::int from public.open_report_share((select pg_temp.sha(token) from pat_gate_link))), 1,
+  'a parent''s link opens while they are a parent');
+reset role;
+update public.memberships set status = 'disabled'
+where user_id = 'eb000000-0000-0000-0000-000000000007' and role = 'parent';
+set local role service_role;
+select is((select count(*)::int from public.open_report_share((select pg_temp.sha(token) from pat_gate_link))), 0,
+  'and stops when their parent membership ends');
+reset role;
+update public.memberships set status = 'active'
+where user_id = 'eb000000-0000-0000-0000-000000000007' and role = 'parent';
+delete from public.guardian_links
+where guardian_id = '9ab00000-0000-0000-0000-000000000001' and learner_id = 'fb000000-0000-0000-0000-000000000001';
+set local role service_role;
+select is((select count(*)::int from public.open_report_share((select pg_temp.sha(token) from pat_gate_link))), 0,
+  'or when they are no longer linked to the child');
+reset role;
+
+-- The family rule runs once per query, not once per report row (D48).
+create function pg_temp.plan_of(q text) returns text language plpgsql as $f$
+declare l text; t text := '';
+begin
+  for l in execute 'explain ' || q loop t := t || l || E'\n'; end loop;
+  return t;
+end $f$;
+set local role authenticated;
+select pg_temp.as_user('eb000000-0000-0000-0000-000000000007');
+select unalike(pg_temp.plan_of('select id from public.reports'), '%family_can_read_report%',
+  'the reports policy does not run the family rule on every row');
 reset role;
 
 select * from finish();

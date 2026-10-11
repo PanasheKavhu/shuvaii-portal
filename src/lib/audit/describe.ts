@@ -105,6 +105,12 @@ const FIELDS: Record<string, Field[]> = {
     { key: "phone", label: "Phone" },
   ],
   grading_scales: [{ key: "bands", label: "Bands", format: bandList }],
+  reports: [
+    { key: "status", label: "Status", format: words },
+    { key: "version", label: "Version", format: formatNumber },
+    { key: "head_comment", label: "Head's comment" },
+    { key: "return_note", label: "Return note" },
+  ],
   schools: [
     { key: "primary_color", label: "Main colour" },
     { key: "accent_color", label: "Accent colour" },
@@ -163,6 +169,31 @@ export function describeAuditEntry(e: AuditEntry): AuditLine {
           : nowDone && !changed("comment")
             ? `${actor} marked ${what} done`
             : `${actor} changed ${what}${nowDone ? " and marked it done" : ""}`;
+      break;
+    }
+    case "reports": {
+      const what = `${possessive(learner)} report`;
+      const version = Number(data.version) > 1 ? ` (version ${formatNumber(data.version)})` : "";
+      const from = e.oldData?.status;
+      const to = e.newData?.status;
+      if (e.action === "insert") {
+        summary = `${actor} made a draft of ${what}${version}`;
+      } else if (from === to) {
+        summary = `${actor} changed ${what}${version}`;
+      } else {
+        const verb =
+          to === "submitted"
+            ? "submitted"
+            : to === "draft"
+              ? "returned"
+              : to === "approved"
+                ? "approved"
+                : to === "published"
+                  ? "published"
+                  : "withdrew";
+        summary = `${actor} ${verb} ${what}${version}`;
+      }
+      reason ??= text(e.newData?.withdrawn_reason);
       break;
     }
     case "class_subject_unlocks":

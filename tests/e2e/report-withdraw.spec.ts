@@ -1,7 +1,13 @@
 import { expect, test } from "@playwright/test";
 import { flatText, readPdf } from "../unit/reports/pdf-text";
-import { createTestAccount, PASSWORD, signIn, signedInClient } from "./helpers";
-import { approvedClass, expectNoSideScroll, serviceClient, someAddress } from "./report-helpers";
+import { PASSWORD, signIn, signedInClient } from "./helpers";
+import {
+  approvedClass,
+  expectNoSideScroll,
+  parentOf,
+  serviceClient,
+  someAddress,
+} from "./report-helpers";
 
 // Withdrawing and reissuing a report (US-6.6; D46) at 360 px (the mobile
 // project) and on a desktop screen: the head withdraws a published report
@@ -15,38 +21,6 @@ test.beforeEach(async ({ page }, testInfo) => {
   if (testInfo.project.name === "mobile") await page.setViewportSize({ width: 360, height: 780 });
 });
 
-/** A parent login linked to `learnerId`, made with the local service role as the seed does. */
-async function parentOf(schoolId: string, learnerId: string, prefix: string) {
-  const email = `${prefix}-parent-${Date.now()}-${Math.floor(Math.random() * 1e6)}@demo.spportal.test`;
-  const userId = await createTestAccount(email, "Rudo Parent");
-  const service = serviceClient();
-  expect(
-    (
-      await service
-        .from("memberships")
-        .insert({ school_id: schoolId, user_id: userId, role: "parent", status: "active" })
-    ).error,
-  ).toBeNull();
-  const { data: guardian, error } = await service
-    .from("guardians")
-    .insert({ school_id: schoolId, full_name: "Rudo Parent", user_id: userId })
-    .select("id")
-    .single();
-  expect(error).toBeNull();
-  expect(
-    (
-      await service.from("guardian_links").insert({
-        school_id: schoolId,
-        guardian_id: guardian!.id,
-        learner_id: learnerId,
-        relationship: "mother",
-        is_primary: true,
-      })
-    ).error,
-  ).toBeNull();
-  return email;
-}
-
 test("the head withdraws a report with a reason and the reissued version replaces it", async ({
   page,
   browser,
@@ -54,7 +28,7 @@ test("the head withdraws a report with a reason and the reissued version replace
   test.setTimeout(300_000);
   const school = await approvedClass("withdraw");
   const learner = school.learners[0]!;
-  const parentEmail = await parentOf(school.schoolId, learner.id, "withdraw");
+  const parentEmail = await parentOf(school.schoolId, [learner.id], "withdraw");
   const service = serviceClient();
   const versions = async () =>
     (

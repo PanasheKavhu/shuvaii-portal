@@ -24,12 +24,25 @@ export const VERIFY_WINDOW_MS = 10 * 60 * 1000;
 
 /** When this address may look up again, or null if it may now. */
 export function verifyBlockedUntil(lookups: readonly Date[], now: Date): Date | null {
-  const recent = lookups
+  return limitedUntil(lookups, now, VERIFY_LIMIT, VERIFY_WINDOW_MS);
+}
+
+/**
+ * A sliding-window limit: `limit` tries per `windowMs`. When the next try
+ * is allowed, or null if it is allowed now. Also used for share links (D47).
+ */
+export function limitedUntil(
+  tries: readonly Date[],
+  now: Date,
+  limit: number,
+  windowMs: number,
+): Date | null {
+  const recent = tries
     .map((d) => d.getTime())
-    .filter((t) => t > now.getTime() - VERIFY_WINDOW_MS && t <= now.getTime())
+    .filter((t) => t > now.getTime() - windowMs && t <= now.getTime())
     .sort((a, b) => a - b);
-  if (recent.length < VERIFY_LIMIT) return null;
-  return new Date(recent[recent.length - VERIFY_LIMIT]! + VERIFY_WINDOW_MS);
+  if (recent.length < limit) return null;
+  return new Date(recent[recent.length - limit]! + windowMs);
 }
 
 export const NOT_FOUND = "Report not found";

@@ -89,9 +89,11 @@ export async function storeReportPdf(
   const pdf = await renderReportPdf(doc, images, portalUrl);
   const path = reportPdfPath(report.schoolId, report.id, report.version);
   // Upsert: a retry after a stored file but a failed update writes the same bytes again.
+  // max-age=0: Storage's default (an hour) would keep a private report in a
+  // shared device's or proxy's cache long after its 60-second link expired.
   const upload = await admin.storage
     .from(REPORTS_BUCKET)
-    .upload(path, pdf, { contentType: "application/pdf", upsert: true });
+    .upload(path, pdf, { contentType: "application/pdf", upsert: true, cacheControl: "0" });
   if (upload.error) throw new Error("could not store the PDF");
   const { error } = await admin
     .from("reports")

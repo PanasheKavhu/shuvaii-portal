@@ -36,5 +36,8 @@ export async function GET(request: Request, ctx: RouteContext<"/reports/[reportI
       download ? { download: reportFileName(data.reference_code) } : undefined,
     );
   if (error || !signed) return notFound;
-  return NextResponse.redirect(signed.signedUrl, { status: 303 });
+  return NextResponse.redirect(signed.signedUrl, {
+    status: 303,
+    headers: { "Cache-Control": "private, no-store" },
+  });
 }

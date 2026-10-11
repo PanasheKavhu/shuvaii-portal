@@ -1800,6 +1800,14 @@ export type Database = {
         Args: { p_bands: Json; p_scale_id: string }
         Returns: undefined
       }
+      school_grading_status: {
+        Args: { p_school_id: string }
+        Returns: {
+          complete: boolean
+          grade_level_name: string
+          scale_name: string
+        }[]
+      }
       school_staff: {
         Args: { p_school_id: string }
         Returns: {

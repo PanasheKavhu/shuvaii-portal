@@ -9,7 +9,7 @@ import { logoUrl } from "@/lib/branding/theme";
 import { STAGE_LABELS } from "@/lib/platform/school-input";
 import { supabaseUrl } from "@/lib/supabase/env";
 import { inviteSchoolAdmin, resendInvite, saveColors, uploadLogo } from "../../actions";
-import { getSchool, listSchoolAdmins } from "../../data";
+import { getSchool, getSchoolGrading, listSchoolAdmins } from "../../data";
 import { ColorsForm } from "./colors-form";
 import { InviteForm } from "./invite-form";
 import { LogoForm } from "./logo-form";
@@ -29,7 +29,11 @@ export default async function SchoolPage({ params }: PageProps<"/platform/school
   const { id } = await params;
   const school = await getSchool(id);
   if (!school) notFound();
-  const admins = await listSchoolAdmins(school.id);
+  const [admins, grading] = await Promise.all([
+    listSchoolAdmins(school.id),
+    getSchoolGrading(school.id),
+  ]);
+  const incomplete = grading.filter((l) => !l.complete);
   const logo = logoUrl(school.logoPath, supabaseUrl());
   const badge = isHexColor(school.primaryColor)
     ? ({
@@ -99,6 +103,48 @@ export default async function SchoolPage({ params }: PageProps<"/platform/school
           </ul>
         ) : (
           <InviteForm action={inviteSchoolAdmin.bind(null, school.id)} />
+        )}
+      </Panel>
+
+      <Panel
+        title="Grading key"
+        description="Each school enters its own grading key for every grade level in its setup area. Onboarding is not done until every level has a complete scale."
+      >
+        <p
+          role="status"
+          aria-label="Grading key status"
+          className={
+            grading.length > 0 && incomplete.length === 0
+              ? "rounded-lg bg-emerald-500/10 px-3 py-2 text-sm font-medium text-emerald-800 dark:text-emerald-300"
+              : "rounded-lg bg-amber-500/15 px-3 py-2 text-sm font-medium text-amber-900 dark:text-amber-200"
+          }
+        >
+          {grading.length === 0
+            ? "No grade levels yet: the school admin enters levels and their grading key in setup."
+            : incomplete.length === 0
+              ? "Every grade level has a complete grading scale."
+              : `${incomplete.length} of ${grading.length} grade level${grading.length === 1 ? "" : "s"} still need${incomplete.length === 1 ? "s" : ""} a complete grading scale.`}
+        </p>
+        {grading.length > 0 && (
+          <ul aria-label="Grade levels and their scales" className="flex flex-col gap-2">
+            {grading.map((l) => (
+              <li
+                key={l.gradeLevelName}
+                className="bg-muted/40 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl border px-3 py-2"
+              >
+                <span className="font-medium">{l.gradeLevelName}</span>
+                <span
+                  className={
+                    l.complete
+                      ? "text-muted-foreground text-sm"
+                      : "text-destructive text-sm font-medium"
+                  }
+                >
+                  {l.scaleName} · {l.complete ? "Complete" : "Not complete"}
+                </span>
+              </li>
+            ))}
+          </ul>
         )}
       </Panel>
     </section>

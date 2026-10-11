@@ -101,3 +101,21 @@ export async function listSchoolAdmins(schoolId: string): Promise<SchoolAdmin[]>
     };
   });
 }
+
+export type LevelGrading = { gradeLevelName: string; scaleName: string; complete: boolean };
+
+/**
+ * Each grade level's scale and whether it is complete (D42), so onboarding
+ * includes entering the school's own key (D38). Through a security definer
+ * function that answers platform admins only; no bands, marks or people.
+ */
+export async function getSchoolGrading(schoolId: string): Promise<LevelGrading[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("school_grading_status", { p_school_id: schoolId });
+  if (error) throw new Error("Could not load the school's grading status");
+  return data.map((l) => ({
+    gradeLevelName: l.grade_level_name,
+    scaleName: l.scale_name,
+    complete: l.complete,
+  }));
+}

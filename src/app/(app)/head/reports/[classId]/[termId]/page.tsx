@@ -3,6 +3,7 @@ import Link from "next/link";
 import { forbidden } from "next/navigation";
 import { TermTabs } from "@/components/marks/class-subject-list";
 import { HeadCommentForm, InlineActionButton } from "@/components/reports/head-report-forms";
+import { PdfProgress } from "@/components/reports/pdf-progress";
 import { ActionForm } from "@/components/setup/action-form";
 import { describeIncomplete } from "@/lib/marks/cell";
 import { RETURN_NOTE_MAX, STATUS_LABELS, openGaps } from "@/lib/reports/workflow";
@@ -26,7 +27,9 @@ export const metadata: Metadata = { title: "Class reports" };
  * learner's report as the class teacher generated it (or, once published,
  * as frozen), the head's comment, the explicit "result not available" line
  * for a subject without a result, and the class's approve, return and
- * publish buttons. Head only (head, deputy or senior master, Q11).
+ * publish buttons. Once published, each report's PDF is made from its
+ * snapshot with progress on this page, and opens from its card (US-6.4,
+ * D45). Head only (head, deputy or senior master, Q11).
  */
 export default async function HeadClassReportsPage({
   params,
@@ -52,6 +55,7 @@ export default async function HeadClassReportsPage({
     dateStyle: "medium",
     timeZone: school.data?.timezone ?? "Africa/Harare",
   });
+  const pdfsReady = reports.filter((r) => r.status === "published" && r.pdfPath).length;
   const n = (count: number) => `${count} ${count === 1 ? "report" : "reports"}`;
 
   return (
@@ -154,6 +158,17 @@ export default async function HeadClassReportsPage({
         </section>
       )}
 
+      {counts.published > 0 && (
+        <PdfProgress
+          // Publishing more reports starts a fresh run with the new counts.
+          key={counts.published}
+          classId={ct.classId}
+          termId={ct.term.id}
+          total={counts.published}
+          ready={pdfsReady}
+        />
+      )}
+
       {noReport.length > 0 && (
         <p className="text-muted-foreground bg-muted/40 rounded-xl border border-dashed p-4 text-sm">
           No report yet for {noReport.map((l) => l.name).join(", ")}.
@@ -192,6 +207,16 @@ export default async function HeadClassReportsPage({
                     {r.status === "draft" ? "With the class teacher" : STATUS_LABELS[r.status]}
                   </span>
                 </div>
+                {r.status === "published" && r.pdfPath && (
+                  <a
+                    href={`/reports/${r.id}/pdf`}
+                    target="_blank"
+                    rel="noopener"
+                    className="border-input hover:bg-muted inline-flex h-11 w-fit items-center rounded-lg border px-4 text-sm font-medium"
+                  >
+                    Open PDF<span className="sr-only"> of {name}&apos;s report</span>
+                  </a>
+                )}
 
                 <table aria-label={`Report for ${name}`} className="w-full text-sm">
                   <thead className="sr-only">

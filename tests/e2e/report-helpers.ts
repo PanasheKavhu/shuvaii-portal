@@ -1,7 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { expect, type Page } from "@playwright/test";
 import type { Database } from "../../src/lib/supabase/database.types";
-import { createMarksClass, signedInClient } from "./helpers";
+import { createMarksClass, createTestAccount, signIn, signedInClient } from "./helpers";
 
 // Shared by the report specs (report-pdfs, report-withdraw).
 
@@ -66,4 +66,54 @@ export async function approvedClass(prefix: string) {
   expect((await head.rpc("approve_class_reports", args)).error).toBeNull();
   const { data: s } = await admin.from("schools").select("name").eq("id", school.schoolId).single();
   return { ...school, schoolName: s!.name };
+}
+
+/** A parent login linked to each of `learnerIds`, made with the local service role as the seed does. */
+export async function parentOf(schoolId: string, learnerIds: string[], prefix: string) {
+  const email = `${prefix}-parent-${Date.now()}-${Math.floor(Math.random() * 1e6)}@demo.spportal.test`;
+  const userId = await createTestAccount(email, "Rudo Parent");
+  const service = serviceClient();
+  expect(
+    (
+      await service
+        .from("memberships")
+        .insert({ school_id: schoolId, user_id: userId, role: "parent", status: "active" })
+    ).error,
+  ).toBeNull();
+  const { data: guardian, error } = await service
+    .from("guardians")
+    .insert({ school_id: schoolId, full_name: "Rudo Parent", user_id: userId })
+    .select("id")
+    .single();
+  expect(error).toBeNull();
+  expect(
+    (
+      await service.from("guardian_links").insert(
+        learnerIds.map((learnerId) => ({
+          school_id: schoolId,
+          guardian_id: guardian!.id,
+          learner_id: learnerId,
+          relationship: "mother" as const,
+          is_primary: true,
+        })),
+      )
+    ).error,
+  ).toBeNull();
+  return email;
+}
+
+/** Publishes an approved class from the head's class page and waits for every PDF (D45). */
+export async function publishWithPdfs(
+  page: Page,
+  school: { headEmail?: string | null; classId: string; termId: string },
+  count: number,
+) {
+  await signIn(page, school.headEmail!);
+  await expect(page).toHaveURL("/head");
+  await page.goto(`/head/reports/${school.classId}/${school.termId}`);
+  await page.getByRole("button", { name: `Publish ${count} reports` }).click();
+  await expect(page.getByRole("region", { name: "Report PDFs" }).getByRole("status")).toHaveText(
+    `${count} of ${count} report PDFs ready.`,
+    { timeout: 60_000 },
+  );
 }

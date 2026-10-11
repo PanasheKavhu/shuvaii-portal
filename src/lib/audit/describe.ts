@@ -110,6 +110,7 @@ const FIELDS: Record<string, Field[]> = {
     { key: "version", label: "Version", format: formatNumber },
     { key: "head_comment", label: "Head's comment" },
     { key: "return_note", label: "Return note" },
+    { key: "reference_code", label: "Reference" },
   ],
   schools: [
     { key: "primary_color", label: "Main colour" },
@@ -179,7 +180,14 @@ export function describeAuditEntry(e: AuditEntry): AuditLine {
       if (e.action === "insert") {
         summary = `${actor} made a draft of ${what}${version}`;
       } else if (from === to) {
-        summary = `${actor} changed ${what}${version}`;
+        const marked = notAvailableChanges(e.oldData, e.newData);
+        summary = changed("head_comment")
+          ? `${actor} ${e.newData?.head_comment ? "wrote" : "removed"} the head's comment on ${what}${version}`
+          : marked
+            ? `${actor} marked ${marked} on ${what}${version}`
+            : from === "draft"
+              ? `${actor} refreshed the draft of ${what}${version}`
+              : `${actor} changed ${what}${version}`;
       } else {
         const verb =
           to === "submitted"
@@ -193,7 +201,9 @@ export function describeAuditEntry(e: AuditEntry): AuditLine {
                   : "withdrew";
         summary = `${actor} ${verb} ${what}${version}`;
       }
-      reason ??= text(e.newData?.withdrawn_reason);
+      reason ??=
+        text(e.newData?.withdrawn_reason) ??
+        (from === "submitted" && to === "draft" ? text(e.newData?.return_note) : null);
       break;
     }
     case "class_subject_unlocks":
@@ -320,6 +330,31 @@ function show(field: Field, value: unknown): string | null {
   if (field.format) return field.format(value);
   if (typeof value === "string" || typeof value === "number") return String(value);
   return null;
+}
+
+/**
+ * "the Mathematics result not available": the subject lines of a report
+ * whose "result not available" mark the head changed (D44), or null.
+ */
+function notAvailableChanges(
+  oldRow: Record<string, unknown> | null,
+  newRow: Record<string, unknown> | null,
+): string | null {
+  const lines = (row: Record<string, unknown> | null) => {
+    const subjects = (row?.snapshot as { subjects?: unknown } | null | undefined)?.subjects;
+    return Array.isArray(subjects) ? (subjects as Record<string, unknown>[]) : [];
+  };
+  const before = new Map(lines(oldRow).map((l) => [l.class_subject_id, l.not_available === true]));
+  const flips = lines(newRow).filter(
+    (l) =>
+      before.has(l.class_subject_id) &&
+      before.get(l.class_subject_id) !== (l.not_available === true),
+  );
+  if (!flips.length) return null;
+  const names = flips.map((l) => text(l.subject) ?? "a subject").join(" and ");
+  return flips[0]!.not_available === true
+    ? `the ${names} result not available`
+    : `the ${names} result as needed again`;
 }
 
 function markValue(row: Record<string, unknown>): string {

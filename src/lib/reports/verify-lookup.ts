@@ -1,14 +1,9 @@
 import "server-only";
 
-import { createHash } from "node:crypto";
-import { headers } from "next/headers";
+import { addressHash, addressLimit, recordAttempt } from "@/lib/auth/sign-in-attempts";
+import { clientAddress } from "@/lib/request/client-address";
 import { createAdminClient } from "@/lib/supabase/admin";
-import {
-  VERIFY_WINDOW_MS,
-  readVerification,
-  verifyBlockedUntil,
-  type Verification,
-} from "./verify";
+import { VERIFY_LIMIT, VERIFY_WINDOW_MS, readVerification, type Verification } from "./verify";
 
 /**
  * The public verification page's reads (US-6.5; D45), with the service
@@ -18,16 +13,6 @@ import {
  * stored.
  */
 
-export function verifySourceHash(address: string): string {
-  return createHash("sha256").update(`report-verify:${address}`).digest("hex");
-}
-
-/** The caller's network address as the hosting proxy reports it. */
-async function clientAddress(): Promise<string> {
-  const h = await headers();
-  return h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown";
-}
-
 export type VerifyOutcome =
   | { kind: "found"; report: Verification }
   | { kind: "not-found" }
@@ -36,24 +21,10 @@ export type VerifyOutcome =
 
 export async function verifyReport(code: string | null, now = new Date()): Promise<VerifyOutcome> {
   const admin = createAdminClient();
-  const hash = verifySourceHash(await clientAddress());
-
-  const recent = await admin
-    .from("sign_in_attempts")
-    .select("created_at")
-    .eq("email_hash", hash)
-    .gte("created_at", new Date(now.getTime() - VERIFY_WINDOW_MS).toISOString());
-  if (recent.error) return { kind: "unavailable" };
-  const blocked = verifyBlockedUntil(
-    recent.data.map((r) => new Date(r.created_at)),
-    now,
-  );
-  if (blocked) {
-    return {
-      kind: "limited",
-      minutes: Math.max(1, Math.ceil((blocked.getTime() - now.getTime()) / 60_000)),
-    };
-  }
+  const hash = addressHash("report-verify", await clientAddress());
+  const limited = await addressLimit(admin, hash, now, VERIFY_LIMIT, VERIFY_WINDOW_MS);
+  if (limited === "unavailable") return { kind: "unavailable" };
+  if (limited) return { kind: "limited", minutes: limited.minutes };
 
   // A malformed code is still a lookup, so guessing costs the same either way.
   const found = code
@@ -65,10 +36,8 @@ export async function verifyReport(code: string | null, now = new Date()): Promi
         .eq("verification_code", code)
         .maybeSingle()
     : { data: null, error: null };
-  const recorded = await admin
-    .from("sign_in_attempts")
-    .insert({ email_hash: hash, succeeded: !!found.data });
-  if (found.error || recorded.error) return { kind: "unavailable" };
+  const recorded = await recordAttempt(admin, hash, !!found.data);
+  if (found.error || !recorded) return { kind: "unavailable" };
 
   const report = readVerification(found.data);
   return report ? { kind: "found", report } : { kind: "not-found" };

@@ -58,6 +58,8 @@ test("publishing a class makes its PDFs; a PDF opens and its QR address checks o
   const response = await page.request.get(href!);
   expect(response.status()).toBe(200);
   expect(response.headers()["content-type"]).toBe("application/pdf");
+  // Not kept in a shared device's or proxy's cache after the link expires.
+  expect(response.headers()["cache-control"]).toBe("max-age=0");
   const pdf = readPdf(await response.body());
   const text = flatText(pdf);
   for (const expected of [
@@ -131,6 +133,11 @@ test("checks are limited per network address", async ({ request }) => {
   }
   const blocked = await request.get("/verify/ABCDEFGHJKLMNPQRSTUVWXYZ", { headers });
   expect(await blocked.text()).toContain("Too many reports were checked from your network.");
+  // Writing another address in front of the real one does not get round it.
+  const forged = await request.get("/verify/ABCDEFGHJKLMNPQRSTUVWXYZ", {
+    headers: { "x-forwarded-for": `${someAddress()}, ${address}` },
+  });
+  expect(await forged.text()).toContain("Too many reports were checked from your network.");
   // Another address is not affected.
   const other = await request.get("/verify/ABCDEFGHJKLMNPQRSTUVWXYZ", {
     headers: { "x-forwarded-for": someAddress() },

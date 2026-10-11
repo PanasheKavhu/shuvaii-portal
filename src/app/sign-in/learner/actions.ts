@@ -1,6 +1,6 @@
 "use server";
 
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { SCHOOL_COOKIE } from "@/lib/auth/active-school";
 import { learnerLogin } from "@/lib/auth/learner-accounts";
@@ -18,6 +18,7 @@ import {
   tooManyAttempts,
 } from "@/lib/auth/sign-in-attempts";
 import { landingPathFor, loadViewer } from "@/lib/auth/viewer";
+import { clientAddress } from "@/lib/request/client-address";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -25,12 +26,6 @@ export type LearnerSignInState = { error: string | null; schoolId: string; learn
 
 const UNAVAILABLE = "Sign in is unavailable right now. Please try again shortly.";
 const WRONG = "Learner number or PIN is incorrect.";
-
-/** The caller's network address as the hosting proxy reports it. */
-async function clientAddress(): Promise<string> {
-  const h = await headers();
-  return h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown";
-}
 
 /**
  * Learner sign in with learner number and PIN (US-1.2, D26). The same

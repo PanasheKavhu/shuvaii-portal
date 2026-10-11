@@ -22,7 +22,10 @@ export default async function LevelsPage({ params }: PageProps<"/admin/setup/[ye
   const { yearId } = await params;
   const year = await getYear(schoolId, yearId);
   const [levels, scales] = await Promise.all([listLevels(schoolId), listScales(schoolId)]);
-  const scaleOptions = scales.map((s) => ({ value: s.id, label: s.name }));
+  const scaleOptions = scales.map((s) => ({
+    value: s.id,
+    label: s.complete ? s.name : `${s.name} (not complete)`,
+  }));
   const defaultScale = scales.find((s) => s.isDefault) ?? scales[0];
 
   return (

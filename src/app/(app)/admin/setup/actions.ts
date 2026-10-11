@@ -219,6 +219,8 @@ export async function createScale(
   const errors: FormState["errors"] = {};
   if (name.length < 1 || name.length > 120) errors.name = "Enter a name (up to 120 characters).";
   if (!LEVEL_STAGES.includes(stage as never)) errors.stage = "Choose a stage.";
+  if (template !== "o_level" && template !== "primary" && template !== "blank")
+    errors.template = "Choose a starting point: a sample to edit, or blank.";
   if (Object.keys(errors).length) return failed("Check the scale's details.", errors);
 
   const supabase = await createClient();

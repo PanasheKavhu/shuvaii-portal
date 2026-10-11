@@ -18,7 +18,7 @@ export type SetupSnapshot = {
     subjectName: string;
     teacherId: string | null;
   }[];
-  gradeLevels: readonly { id: string; name: string; scaleComplete: boolean }[];
+  gradeLevels: readonly { id: string; name: string; scaleName: string; scaleComplete: boolean }[];
 };
 
 export type SetupGap =
@@ -27,7 +27,7 @@ export type SetupGap =
   | { kind: "no-class-teacher"; classId: string; className: string }
   | { kind: "no-subjects"; classId: string; className: string }
   | { kind: "no-subject-teacher"; classId: string; className: string; subjectName: string }
-  | { kind: "incomplete-scale"; gradeLevelName: string };
+  | { kind: "incomplete-scale"; gradeLevelName: string; scaleName: string };
 
 /**
  * Every gap, classes in name order. Blocking gaps stop the admin finishing;
@@ -59,10 +59,17 @@ export function findSetupGaps(s: SetupSnapshot): SetupGap[] {
     }
   }
 
+  // Grading is per school (D38): every level with classes needs a complete
+  // scale, as public.academic_year_scale_gaps() checks on finish and when a
+  // term opens.
   const usedLevels = new Set(s.classes.map((c) => c.gradeLevelId));
   for (const level of s.gradeLevels) {
     if (usedLevels.has(level.id) && !level.scaleComplete)
-      gaps.push({ kind: "incomplete-scale", gradeLevelName: level.name });
+      gaps.push({
+        kind: "incomplete-scale",
+        gradeLevelName: level.name,
+        scaleName: level.scaleName,
+      });
   }
   return gaps;
 }
@@ -80,6 +87,6 @@ export function describeGap(g: SetupGap): string {
     case "no-subject-teacher":
       return `${g.subjectName} in ${g.className} has no teacher.`;
     case "incomplete-scale":
-      return `${g.gradeLevelName} uses a grading scale that does not cover 0 to 100 exactly.`;
+      return `${g.gradeLevelName} has no complete grading scale: ${g.scaleName} does not cover 0 to 100 exactly.`;
   }
 }

@@ -46,9 +46,15 @@ test("a school admin sets up a year from scratch; gaps block finishing until fix
   await term1.getByRole("button", { name: `Save Term 1 ${thisYear}` }).click();
   await expect(term1.getByRole("status")).toHaveText(`Term 1 ${thisYear} saved.`);
 
-  // Step 2: a grading scale from the O-level template, then the band editor.
+  // Step 2: the school's own scale, started from the O-level sample, then
+  // the band editor. A starting point must be chosen; nothing is a default.
   await page.getByRole("link", { name: "Next: Grading scales" }).click();
-  await page.getByRole("button", { name: "Create scale" }).click();
+  const newScale = form(page, "New grading scale");
+  await newScale.getByLabel("Name").fill("Our key");
+  await newScale.getByRole("button", { name: "Create scale" }).click();
+  await expect(newScale.getByText("Start from: Choose a starting point")).toBeVisible();
+  await newScale.getByLabel("Start from").selectOption("o_level");
+  await newScale.getByRole("button", { name: "Create scale" }).click();
   await expect(page).toHaveURL(/\/grading\/[0-9a-f-]{36}$/);
   const check = page.getByRole("region", { name: "Band check" });
   await expect(check).toHaveText("Marks 0 to 100 are each in exactly one band.");
@@ -78,6 +84,11 @@ test("a school admin sets up a year from scratch; gaps block finishing until fix
   await addLevel.getByLabel("Name").fill("Form 1");
   await addLevel.getByRole("button", { name: "Add grade level" }).click();
   await expect(addLevel.getByRole("status")).toHaveText("Form 1 added.");
+  await steps(page).getByRole("link", { name: "Grading scales" }).click();
+  await expect(page.getByRole("list", { name: "Scale used by each grade level" })).toHaveText(
+    "Form 1Our key · Complete",
+  );
+  await steps(page).getByRole("link", { name: "Grade levels" }).click();
 
   // Step 4: subjects.
   await page.getByRole("link", { name: "Next: Subjects" }).click();

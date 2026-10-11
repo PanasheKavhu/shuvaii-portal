@@ -96,8 +96,8 @@ describe("findSetupGaps", () => {
   const complete: SetupSnapshot = {
     terms: [{ id: ID(1) }],
     gradeLevels: [
-      { id: ID(2), name: "Form 3", scaleComplete: true },
-      { id: ID(7), name: "Form 4", scaleComplete: true },
+      { id: ID(2), name: "Form 3", scaleName: "Our key", scaleComplete: true },
+      { id: ID(7), name: "Form 4", scaleName: "Our key", scaleComplete: true },
     ],
     // One teacher (ID 9) is class teacher of two classes in different grades
     // and teaches subjects in both.
@@ -143,13 +143,13 @@ describe("findSetupGaps", () => {
         ...complete,
         classSubjects: [complete.classSubjects[0]!],
         gradeLevels: [
-          { id: ID(2), name: "Form 3", scaleComplete: false },
-          { id: ID(7), name: "Form 4", scaleComplete: true },
+          { id: ID(2), name: "Form 3", scaleName: "Draft key", scaleComplete: false },
+          { id: ID(7), name: "Form 4", scaleName: "Our key", scaleComplete: true },
         ],
       }).map(describeGap),
     ).toEqual([
       "4 Green has no subjects.",
-      "Form 3 uses a grading scale that does not cover 0 to 100 exactly.",
+      "Form 3 has no complete grading scale: Draft key does not cover 0 to 100 exactly.",
     ]);
   });
 });

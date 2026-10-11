@@ -271,7 +271,11 @@ select throws_ok(
 );
 select set_config('request.jwt.claim.sub', 'e9000000-0000-0000-0000-000000000001', true);
 reset role;
+-- This fixture's scale overlaps on purpose (D37), and since D38 an incomplete
+-- scale stops a term opening, so the reopen skips that check.
+alter table public.terms disable trigger terms_opening_needs_complete_scales;
 update public.terms set status = 'open', marks_deadline = null where id = '79000000-0000-0000-0000-0000000000a1';
+alter table public.terms enable trigger terms_opening_needs_complete_scales;
 set local role authenticated;
 select is(
   (select lock_reason from public.marks_lock('c9500000-0000-0000-0000-000000000001', '79000000-0000-0000-0000-0000000000a1')),

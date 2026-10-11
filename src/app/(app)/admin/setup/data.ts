@@ -290,7 +290,7 @@ export async function loadYearSetup(schoolId: string, yearId: string): Promise<Y
   ]);
   const classSubjects = await listClassSubjects(classes.map((c) => c.id));
   const subjectName = new Map(subjects.map((s) => [s.id, s.name]));
-  const scaleComplete = new Map(scales.map((s) => [s.id, s.complete]));
+  const scaleById = new Map(scales.map((s) => [s.id, s]));
   const gaps = findSetupGaps({
     terms,
     classes,
@@ -301,7 +301,8 @@ export async function loadYearSetup(schoolId: string, yearId: string): Promise<Y
     gradeLevels: levels.map((l) => ({
       id: l.id,
       name: l.name,
-      scaleComplete: scaleComplete.get(l.gradingScaleId) ?? false,
+      scaleName: scaleById.get(l.gradingScaleId)?.name ?? "Its scale",
+      scaleComplete: scaleById.get(l.gradingScaleId)?.complete ?? false,
     })),
   });
   return { terms, scales, levels, subjects, classes, classSubjects, gaps };

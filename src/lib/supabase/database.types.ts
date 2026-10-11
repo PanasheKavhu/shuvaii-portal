@@ -1499,6 +1499,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      academic_year_scale_gaps: {
+        Args: { p_year_id: string }
+        Returns: {
+          grade_level_id: string
+          grade_level_name: string
+          scale_id: string
+          scale_name: string
+        }[]
+      }
       academic_year_setup_gaps: {
         Args: { p_year_id: string }
         Returns: {

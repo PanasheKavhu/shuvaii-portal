@@ -4,14 +4,19 @@ import { revalidatePath } from "next/cache";
 import { dbErrorMessage, type DbError } from "@/lib/db-errors";
 import { makeClassPdfBatch, type PdfBatchResult } from "@/lib/reports/pdf-files";
 import { portalUrl } from "@/lib/reports/portal-url";
-import { HEAD_COMMENT_MAX, RETURN_NOTE_MAX, describeGeneration } from "@/lib/reports/workflow";
+import {
+  HEAD_COMMENT_MAX,
+  RETURN_NOTE_MAX,
+  WITHDRAW_REASON_MAX,
+  describeGeneration,
+} from "@/lib/reports/workflow";
 import { isUuid } from "@/lib/setup/structure";
 import { createClient } from "@/lib/supabase/server";
 import { failed, saved, type FormState } from "../platform/form-state";
 import { marksActor } from "./data";
 
 /**
- * Report workflow actions (US-6.1 to US-6.3, US-5.4; D44). Each calls one
+ * Report workflow actions (US-6.1 to US-6.3, US-5.4, US-6.6; D44, D46). Each calls one
  * database function through the user-scoped client; the function checks
  * the caller's role and the reports' state, so these only validate input
  * and put the answer in plain words.
@@ -163,6 +168,37 @@ export async function setResultNotAvailable(
   if (error) return failed(message(error, HEAD));
   revalidate(classId, termId);
   return saved(notAvailable ? "Marked “result not available”." : "The result is needed again.");
+}
+
+/**
+ * US-6.6: withdraws one published report with a reason (its share links end
+ * and the verification page then says withdrawn) and makes the next version
+ * as a draft from the current marks and comments.
+ */
+export async function withdrawReport(
+  reportId: string,
+  classId: string,
+  termId: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  if (!isUuid(reportId) || !isUuid(classId) || !isUuid(termId)) return failed(TRY_AGAIN);
+  const reason = String(formData.get("reason") ?? "").trim();
+  if (!reason) return failed("Check the reason.", { reason: "Say why the report is withdrawn." });
+  if (reason.length > WITHDRAW_REASON_MAX)
+    return failed("Check the reason.", {
+      reason: `Use at most ${WITHDRAW_REASON_MAX} characters.`,
+    });
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("withdraw_report", {
+    p_report_id: reportId,
+    p_reason: reason,
+  });
+  if (error) return failed(message(error, HEAD));
+  revalidate(classId, termId);
+  return saved(
+    "Report withdrawn. The next version is a draft with the class teacher, to submit for approval again.",
+  );
 }
 
 // Report PDFs (US-6.3, US-6.4; D45) --------------------------------------------------------

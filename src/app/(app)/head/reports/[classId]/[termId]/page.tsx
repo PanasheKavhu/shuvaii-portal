@@ -6,7 +6,12 @@ import { HeadCommentForm, InlineActionButton } from "@/components/reports/head-r
 import { PdfProgress } from "@/components/reports/pdf-progress";
 import { ActionForm } from "@/components/setup/action-form";
 import { describeIncomplete } from "@/lib/marks/cell";
-import { RETURN_NOTE_MAX, STATUS_LABELS, openGaps } from "@/lib/reports/workflow";
+import {
+  RETURN_NOTE_MAX,
+  STATUS_LABELS,
+  WITHDRAW_REASON_MAX,
+  openGaps,
+} from "@/lib/reports/workflow";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 import { loadClassResults, requireClassTerm } from "../../../../marks/comment-data";
@@ -17,6 +22,7 @@ import {
   returnReports,
   saveHeadComment,
   setResultNotAvailable,
+  withdrawReport,
 } from "../../../../marks/report-actions";
 import { countByStatus, loadClassReports, type ClassReport } from "../../../../marks/report-data";
 
@@ -29,7 +35,9 @@ export const metadata: Metadata = { title: "Class reports" };
  * for a subject without a result, and the class's approve, return and
  * publish buttons. Once published, each report's PDF is made from its
  * snapshot with progress on this page, and opens from its card (US-6.4,
- * D45). Head only (head, deputy or senior master, Q11).
+ * D45). A published report can be withdrawn with a reason, which makes its
+ * next version a draft for the class teacher (US-6.6, D46). Head only
+ * (head, deputy or senior master, Q11).
  */
 export default async function HeadClassReportsPage({
   params,
@@ -191,6 +199,7 @@ export default async function HeadClassReportsPage({
                     <h2 className="text-base font-semibold">{name}</h2>
                     <p className="text-muted-foreground text-xs">
                       {c.learnerNumber}
+                      {r.version > 1 && ` · Version ${r.version}`}
                       {r.referenceCode && ` · Reference ${r.referenceCode}`}
                     </p>
                   </div>
@@ -216,6 +225,40 @@ export default async function HeadClassReportsPage({
                   >
                     Open PDF<span className="sr-only"> of {name}&apos;s report</span>
                   </a>
+                )}
+                {r.status === "published" && (
+                  <details className="bg-muted/30 rounded-xl border">
+                    <summary className="flex min-h-11 cursor-pointer items-center px-4 text-sm font-medium">
+                      Withdraw<span className="sr-only">&nbsp;{name}&apos;s report</span>
+                    </summary>
+                    <ActionForm
+                      action={withdrawReport.bind(null, r.id, ct.classId, ct.term.id)}
+                      submitLabel="Withdraw and reissue"
+                      pendingLabel="Withdrawing…"
+                      submitVariant="destructive"
+                      label={`Withdraw ${name}'s report`}
+                      labels={{ reason: "Reason" }}
+                      className="border-t p-4"
+                    >
+                      <p className="text-muted-foreground text-sm">
+                        The family stops seeing this version and its share links stop working.
+                        Version {r.version + 1} is made from the current marks and comments for the
+                        class teacher to submit, and prints &ldquo;Amended&rdquo; once published.
+                      </p>
+                      <div className="flex flex-col gap-2">
+                        <label htmlFor={`withdraw-${r.id}`} className="text-sm font-medium">
+                          Reason for withdrawing
+                        </label>
+                        <textarea
+                          id={`withdraw-${r.id}`}
+                          name="reason"
+                          rows={3}
+                          maxLength={WITHDRAW_REASON_MAX}
+                          className="border-input focus-visible:border-ring focus-visible:ring-ring/50 dark:bg-input/30 w-full rounded-lg border bg-transparent px-3 py-2 text-base outline-none focus-visible:ring-3"
+                        />
+                      </div>
+                    </ActionForm>
+                  </details>
                 )}
 
                 <table aria-label={`Report for ${name}`} className="w-full text-sm">

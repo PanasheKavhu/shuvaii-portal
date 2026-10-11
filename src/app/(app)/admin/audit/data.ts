@@ -28,7 +28,14 @@ export async function requireAuditViewer(): Promise<{ schoolId: string; schoolNa
   return { schoolId: active.schoolId, schoolName: active.schoolName };
 }
 
-export type AuditListItem = { id: number; when: string; term: string | null; line: AuditLine };
+export type AuditListItem = {
+  id: number;
+  when: string;
+  term: string | null;
+  line: AuditLine;
+  /** The report version's PDF, on a report's publishing or withdrawal (US-6.6, D46). */
+  pdf: { href: string; version: number } | null;
+};
 
 export async function loadAuditPage(
   schoolId: string,
@@ -64,6 +71,7 @@ export async function loadAuditPage(
       id: r.id,
       when: when.format(new Date(r.created_at)),
       term: r.term_name ?? null,
+      pdf: reportPdf(r.table_name, asObject(r.new_data)),
       line: describeAuditEntry({
         id: r.id,
         createdAt: r.created_at,
@@ -86,6 +94,20 @@ export async function loadAuditPage(
     next:
       found.length > AUDIT_PAGE_SIZE && last ? { createdAt: last.created_at, id: last.id } : null,
   };
+}
+
+/**
+ * A published or withdrawn report version's stored PDF. Withdrawn versions
+ * stay readable to the school, so their PDFs open from here (US-6.6, D46).
+ */
+function reportPdf(
+  table: string,
+  row: Record<string, unknown> | null,
+): { href: string; version: number } | null {
+  if (table !== "reports" || !row || typeof row.pdf_path !== "string") return null;
+  if (row.status !== "published" && row.status !== "withdrawn") return null;
+  if (typeof row.id !== "string") return null;
+  return { href: `/reports/${row.id}/pdf`, version: Number(row.version) || 1 };
 }
 
 function asObject(value: unknown): Record<string, unknown> | null {

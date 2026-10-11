@@ -1,81 +1,18 @@
-import { createClient } from "@supabase/supabase-js";
-import { expect, test, type Page } from "@playwright/test";
-import type { Database } from "../../src/lib/supabase/database.types";
+import { expect, test } from "@playwright/test";
 import { readPdf, flatText } from "../unit/reports/pdf-text";
-import { createMarksClass, signIn, signedInClient } from "./helpers";
+import { signIn } from "./helpers";
+import { approvedClass, expectNoSideScroll, serviceClient, someAddress } from "./report-helpers";
 
 // Report PDFs and verification (US-6.3, US-6.4, US-6.5; D45) at 360 px (the
 // mobile project) and on a desktop screen: the head publishes a class and
 // its PDFs are made with progress, a PDF opens and says what the snapshot
 // says, the address beside its QR code opens the public check page, and
-// unknown or withdrawn codes are "not found or withdrawn". Each run makes
-// its own school, since reports are never deleted.
+// unknown codes are "not found" (withdrawn ones: report-withdraw.spec.ts).
+// Each run makes its own school, since reports are never deleted.
 
 test.beforeEach(async ({ page }, testInfo) => {
   if (testInfo.project.name === "mobile") await page.setViewportSize({ width: 360, height: 780 });
 });
-
-function serviceClient() {
-  try {
-    process.loadEnvFile(".env.local");
-  } catch {
-    // Already in the environment (CI).
-  }
-  return createClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } },
-  );
-}
-
-/** A network address of its own per test, so lookups from other runs do not count (D45). */
-const someAddress = () =>
-  `10.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}`;
-
-async function expectNoSideScroll(page: Page) {
-  const hidden = await page.evaluate(
-    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-  );
-  expect(hidden, "pixels of the page off to the side").toBeLessThanOrEqual(0);
-}
-
-/** A class whose three reports are approved and waiting to be published. */
-async function approvedClass(prefix: string) {
-  const school = await createMarksClass(prefix, { marks: true, head: true });
-  const admin = await signedInClient(school.adminEmail);
-  for (const l of school.learners) {
-    for (const insert of [
-      admin.from("subject_comments").insert({
-        school_id: school.schoolId,
-        term_id: school.termId,
-        enrolment_id: l.enrolmentId,
-        class_subject_id: school.mathsId,
-        comment: "Steady work in algebra.",
-        status: "submitted",
-      }),
-      admin.from("class_comments").insert({
-        school_id: school.schoolId,
-        term_id: school.termId,
-        enrolment_id: l.enrolmentId,
-        comment: "A good term.",
-        status: "submitted",
-      }),
-    ])
-      expect((await insert).error).toBeNull();
-  }
-  const teacher = await signedInClient(school.teacherEmail);
-  const args = { p_class_id: school.classId, p_term_id: school.termId };
-  // English has no assessments yet, so only Mathematics is on the reports.
-  expect(
-    (await teacher.rpc("generate_report_drafts", { ...args, p_include_incomplete_results: false }))
-      .error,
-  ).toBeNull();
-  expect((await teacher.rpc("submit_class_reports", args)).error).toBeNull();
-  const head = await signedInClient(school.headEmail!);
-  expect((await head.rpc("approve_class_reports", args)).error).toBeNull();
-  const { data: s } = await admin.from("schools").select("name").eq("id", school.schoolId).single();
-  return { ...school, schoolName: s!.name };
-}
 
 test("publishing a class makes its PDFs; a PDF opens and its QR address checks out", async ({
   page,
@@ -169,24 +106,10 @@ test("publishing a class makes its PDFs; a PDF opens and its QR address checks o
   await expect(visitor.getByText("Implemented by Panashe and Shuvai 2026")).toBeVisible();
   await expectNoSideScroll(visitor);
 
-  // Withdrawn by the school (the server, until US-6.6): the same address no longer checks out.
-  const withdraw = await service
-    .from("reports")
-    .update({ status: "withdrawn", withdrawn_reason: "Wrong mark in Mathematics." })
-    .eq("id", report.id)
-    .select("id");
-  expect(withdraw.error).toBeNull();
-  await visitor.reload();
-  await expect(
-    visitor.getByRole("heading", { name: "Report not found or withdrawn" }),
-  ).toBeVisible();
-  await expect(visitor.getByText(second.name)).toHaveCount(0);
   await stranger.close();
 });
 
-test("an unknown or mistyped code shows not found or withdrawn, with no sign in", async ({
-  browser,
-}) => {
+test("an unknown or mistyped code shows not found, with no sign in", async ({ browser }) => {
   const context = await browser.newContext({
     extraHTTPHeaders: { "x-forwarded-for": someAddress() },
   });
@@ -194,9 +117,7 @@ test("an unknown or mistyped code shows not found or withdrawn, with no sign in"
   for (const code of ["ABCDEFGHJKLMNPQRSTUVWXYZ", "not-a-code"]) {
     await page.goto(`/verify/${code}`);
     await expect(page).toHaveURL(`/verify/${code}`);
-    await expect(
-      page.getByRole("heading", { name: "Report not found or withdrawn" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Report not found" })).toBeVisible();
   }
   await context.close();
 });
@@ -206,7 +127,7 @@ test("checks are limited per network address", async ({ request }) => {
   const headers = { "x-forwarded-for": address };
   for (let i = 0; i < 30; i++) {
     const r = await request.get("/verify/ABCDEFGHJKLMNPQRSTUVWXYZ", { headers });
-    expect(await r.text()).toContain("Report not found or withdrawn");
+    expect(await r.text()).toContain("Report not found");
   }
   const blocked = await request.get("/verify/ABCDEFGHJKLMNPQRSTUVWXYZ", { headers });
   expect(await blocked.text()).toContain("Too many reports were checked from your network.");
@@ -214,5 +135,5 @@ test("checks are limited per network address", async ({ request }) => {
   const other = await request.get("/verify/ABCDEFGHJKLMNPQRSTUVWXYZ", {
     headers: { "x-forwarded-for": someAddress() },
   });
-  expect(await other.text()).toContain("Report not found or withdrawn");
+  expect(await other.text()).toContain("Report not found");
 });

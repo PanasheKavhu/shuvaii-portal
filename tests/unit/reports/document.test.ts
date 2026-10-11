@@ -10,7 +10,8 @@ import {
 import { imageKind } from "@/lib/reports/pdf/images";
 import { pdfProgressLine } from "@/lib/reports/pdf-progress";
 import {
-  NOT_FOUND_OR_WITHDRAWN,
+  NOT_FOUND,
+  WITHDRAWN,
   VERIFY_LIMIT,
   VERIFY_WINDOW_MS,
   normalizeVerificationCode,
@@ -160,7 +161,7 @@ describe("verification", () => {
     expect(verifyBlockedUntil(old, now)).toBeNull();
   });
 
-  it("shows only the five facts, and nothing for a withdrawn or unpublished report", () => {
+  it("shows only the five facts, says when a report is withdrawn, and nothing if unpublished", () => {
     const row = {
       status: "published",
       reference_code: "ABCD2345EF",
@@ -170,6 +171,7 @@ describe("verification", () => {
       version: 1,
     };
     expect(readVerification(row)).toEqual({
+      withdrawn: false,
       reference: "ABCD2345EF",
       learnerName: "Tendai Ncube",
       schoolName: "Msasa Demo High School",
@@ -177,9 +179,18 @@ describe("verification", () => {
       status: "Valid: published by the school",
     });
     expect(readVerification({ ...row, version: 2 })?.status).toContain("amended, version 2");
-    expect(readVerification({ ...row, status: "withdrawn" })).toBeNull();
+    expect(readVerification({ ...row, status: "withdrawn" })).toEqual({
+      withdrawn: true,
+      reference: "ABCD2345EF",
+      learnerName: "Tendai Ncube",
+      schoolName: "Msasa Demo High School",
+      termName: "Term 1 2026",
+      status: "Withdrawn by the school: no longer valid",
+    });
     expect(readVerification({ ...row, status: "approved" })).toBeNull();
     expect(readVerification(null)).toBeNull();
-    expect(NOT_FOUND_OR_WITHDRAWN).toBe("Report not found or withdrawn");
+    expect(readVerification({ ...row, status: "draft", reference_code: null })).toBeNull();
+    expect(NOT_FOUND).toBe("Report not found");
+    expect(WITHDRAWN).toBe("Report withdrawn");
   });
 });

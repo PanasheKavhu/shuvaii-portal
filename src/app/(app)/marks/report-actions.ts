@@ -2,10 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { dbErrorMessage, type DbError } from "@/lib/db-errors";
+import { makeClassPdfBatch, type PdfBatchResult } from "@/lib/reports/pdf-files";
+import { portalUrl } from "@/lib/reports/portal-url";
 import { HEAD_COMMENT_MAX, RETURN_NOTE_MAX, describeGeneration } from "@/lib/reports/workflow";
 import { isUuid } from "@/lib/setup/structure";
 import { createClient } from "@/lib/supabase/server";
 import { failed, saved, type FormState } from "../platform/form-state";
+import { marksActor } from "./data";
 
 /**
  * Report workflow actions (US-6.1 to US-6.3, US-5.4; D44). Each calls one
@@ -101,7 +104,10 @@ export async function approveReports(classId: string, termId: string): Promise<F
   return saved(`Approved ${plural(data, "report", "reports")}.`);
 }
 
-/** US-6.3: freezes each approved report's snapshot and gives it its codes. */
+/**
+ * US-6.3: freezes each approved report's snapshot and gives it its codes.
+ * The head's screen then makes the PDFs a few at a time (makeReportPdfs).
+ */
 export async function publishReports(classId: string, termId: string): Promise<FormState> {
   if (!isUuid(classId) || !isUuid(termId)) return failed(TRY_AGAIN);
   const supabase = await createClient();
@@ -157,4 +163,35 @@ export async function setResultNotAvailable(
   if (error) return failed(message(error, HEAD));
   revalidate(classId, termId);
   return saved(notAvailable ? "Marked “result not available”." : "The result is needed again.");
+}
+
+// Report PDFs (US-6.3, US-6.4; D45) --------------------------------------------------------
+
+/**
+ * The next few PDFs of a class's published reports; the head's screen calls
+ * this again until every report has its PDF. `skip` holds reports that
+ * failed earlier in this run, so one bad report does not stop the rest;
+ * "Try again" sends an empty list.
+ */
+export async function makeReportPdfs(
+  classId: string,
+  termId: string,
+  skip: string[],
+): Promise<PdfBatchResult | { error: string }> {
+  if (!isUuid(classId) || !isUuid(termId) || !Array.isArray(skip) || !skip.every(isUuid))
+    return { error: TRY_AGAIN };
+  const actor = await marksActor();
+  if (!actor || !actor.roles.includes("head")) return { error: HEAD };
+  try {
+    // No revalidation here: the screen refreshes once the run is over.
+    return await makeClassPdfBatch(
+      actor.schoolId,
+      classId,
+      termId,
+      skip.slice(0, 100),
+      await portalUrl(),
+    );
+  } catch {
+    return { error: "Could not make the PDFs. Check your connection and try again." };
+  }
 }

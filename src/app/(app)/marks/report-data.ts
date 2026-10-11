@@ -30,6 +30,8 @@ export type ClassReport = {
   returnNote: string | null;
   returnedAt: string | null;
   referenceCode: string | null;
+  /** The stored PDF of a published report, once made (US-6.4). */
+  pdfPath: string | null;
   /** Whether the report's template prints a head's comment (not on vacation reports by default). */
   hasHeadComment: boolean;
 };
@@ -41,7 +43,7 @@ export async function loadClassReports(classId: string, termId: string): Promise
     await supabase
       .from("reports")
       .select(
-        "id, enrolment_id, status, version, snapshot, head_comment, return_note, returned_at, reference_code, enrolments!inner(class_id), report_templates!inner(sections)",
+        "id, enrolment_id, status, version, snapshot, head_comment, return_note, returned_at, reference_code, pdf_path, enrolments!inner(class_id), report_templates!inner(sections)",
       )
       .eq("term_id", termId)
       .eq("enrolments.class_id", classId)
@@ -56,6 +58,7 @@ export async function loadClassReports(classId: string, termId: string): Promise
     returnNote: r.return_note,
     returnedAt: r.returned_at,
     referenceCode: r.reference_code,
+    pdfPath: r.pdf_path,
     hasHeadComment:
       (r.report_templates.sections as Record<string, unknown> | null)?.head_comment === true,
   }));

@@ -1873,6 +1873,7 @@ export type Database = {
         Args: { p_class_id: string; p_term_id: string }
         Returns: number
       }
+      approve_report: { Args: { p_report_id: string }; Returns: undefined }
       assessment_weight_problems: {
         Args: { p_term_id: string }
         Returns: {
@@ -2155,6 +2156,13 @@ export type Database = {
         Args: { p_class_subject_id: string; p_term_id: string }
         Returns: undefined
       }
+      report_changes_since_draft: {
+        Args: { p_class_id: string; p_term_id: string }
+        Returns: {
+          changed_at: string
+          report_id: string
+        }[]
+      }
       report_class_overview: {
         Args: { p_term_id: string }
         Returns: {
@@ -2183,6 +2191,10 @@ export type Database = {
       return_class_reports: {
         Args: { p_class_id: string; p_note: string; p_term_id: string }
         Returns: number
+      }
+      return_report: {
+        Args: { p_note: string; p_report_id: string }
+        Returns: undefined
       }
       revoke_report_share: { Args: { p_share_id: string }; Returns: undefined }
       save_assessment_set: {

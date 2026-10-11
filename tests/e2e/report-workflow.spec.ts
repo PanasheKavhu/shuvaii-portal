@@ -184,6 +184,92 @@ test("a class's reports go from drafts to published, and a published report stay
   await headContext.close();
 });
 
+test("the head is warned when a mark changes after the drafts, and returns or approves one report", async ({
+  page,
+}) => {
+  test.setTimeout(240_000);
+  const school = await createMarksClass("one-report", { marks: true, head: true });
+  const [first, second] = school.learners as [
+    (typeof school.learners)[number],
+    (typeof school.learners)[number],
+  ];
+  const admin = await signedInClient(school.adminEmail);
+  for (const l of school.learners) {
+    for (const insert of [
+      admin.from("subject_comments").insert({
+        school_id: school.schoolId,
+        term_id: school.termId,
+        enrolment_id: l.enrolmentId,
+        class_subject_id: school.mathsId,
+        comment: "Steady work in algebra.",
+        status: "submitted",
+      }),
+      admin.from("class_comments").insert({
+        school_id: school.schoolId,
+        term_id: school.termId,
+        enrolment_id: l.enrolmentId,
+        comment: "A good term.",
+        status: "submitted",
+      }),
+    ])
+      expect((await insert).error).toBeNull();
+  }
+  const teacher = await signedInClient(school.teacherEmail);
+  const args = { p_class_id: school.classId, p_term_id: school.termId };
+  expect((await teacher.rpc("generate_report_drafts", args)).error).toBeNull();
+  expect((await teacher.rpc("submit_class_reports", args)).error).toBeNull();
+
+  // A Mathematics mark of the second learner changes after the drafts were made.
+  const { data: exam } = await admin
+    .from("assessments")
+    .select("id")
+    .eq("class_subject_id", school.mathsId)
+    .eq("name", "Exam")
+    .single();
+  const edit = await admin
+    .from("marks")
+    .update({ score: 95 })
+    .eq("assessment_id", exam!.id)
+    .eq("enrolment_id", second.enrolmentId)
+    .select("id");
+  expect(edit.data).toHaveLength(1);
+
+  await signIn(page, school.headEmail!);
+  await expect(page).toHaveURL("/head");
+  await page.goto(`/head/reports/${school.classId}/${school.termId}`);
+  const warning = page.getByRole("note", { name: "Changed since the reports were made" });
+  await expect(warning).toContainText(second.name);
+  await expect(warning).not.toContainText(first.name);
+  const secondCard = page.getByRole("article", { name: second.name });
+  await expect(secondCard).toContainText("Changed since this report was made");
+  await expect(page.getByRole("article", { name: first.name })).not.toContainText(
+    "Changed since this report was made",
+  );
+  await expectNoSideScroll(page);
+
+  // The head returns only that report, and approves the first learner's on its own.
+  await secondCard.getByText("Return this report").click();
+  const returnOne = secondCard.getByRole("form", { name: `Return ${second.name}'s report` });
+  await returnOne.getByLabel("Note to the class teacher").fill("Make it again: Maths changed.");
+  await returnOne.getByRole("button", { name: "Return to the class teacher" }).click();
+  const standing = page.getByLabel("Where the reports stand");
+  await expect(standing).toHaveText("2 waiting for the head, 1 with the class teacher");
+  await page
+    .getByRole("article", { name: first.name })
+    .getByRole("button", { name: "Approve this report" })
+    .click();
+  await expect(standing).toHaveText("1 waiting for the head, 1 approved, 1 with the class teacher");
+  await expectNoSideScroll(page);
+
+  // The class teacher makes it again: the warning is gone.
+  const regenerated = await teacher.rpc("generate_report_drafts", args);
+  expect(regenerated.error).toBeNull();
+  await page.reload();
+  await expect(page.getByRole("note", { name: "Changed since the reports were made" })).toHaveCount(
+    0,
+  );
+});
+
 test("a class teacher cannot approve or publish through the API", async () => {
   const school = await createMarksClass("workflow403", { marks: true });
   const teacher = await signedInClient(school.teacherEmail);

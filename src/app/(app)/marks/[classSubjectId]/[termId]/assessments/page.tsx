@@ -8,7 +8,6 @@ import {
   ASSESSMENT_TYPES,
   ASSESSMENT_TYPE_LABELS,
   describeSet,
-  usualSet,
   weightTotal,
 } from "@/lib/marks/assessments";
 import {
@@ -19,7 +18,13 @@ import {
   unlockMarks,
   updateAssessment,
 } from "../../../actions";
-import { getLockState, listAssessments, listUnlockers, loadClassSubjectPage } from "../../../data";
+import {
+  getLockState,
+  listAssessments,
+  listUnlockers,
+  loadClassSubjectPage,
+  loadUsualSet,
+} from "../../../data";
 
 export const metadata: Metadata = { title: "Assessments" };
 
@@ -41,13 +46,13 @@ export default async function AssessmentsPage({
 }: PageProps<"/marks/[classSubjectId]/[termId]/assessments">) {
   const { classSubjectId, termId } = await params;
   const { actor, cst } = await loadClassSubjectPage(classSubjectId, termId);
-  const [assessments, lock] = await Promise.all([
+  const [assessments, lock, set] = await Promise.all([
     listAssessments(cst.classSubjectId, cst.term.id),
     getLockState(cst.classSubjectId, cst.term.id),
+    loadUsualSet(actor.schoolId, cst.term.kind),
   ]);
   const readOnly = lock.teachersLocked && !actor.isAdminOrHead;
   const unlockers = readOnly ? await listUnlockers(actor.schoolId) : [];
-  const set = usualSet(cst.term.kind);
   const subject = `${cst.subjectName} for ${cst.className}`;
 
   return (

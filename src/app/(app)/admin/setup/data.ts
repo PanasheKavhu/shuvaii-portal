@@ -3,7 +3,8 @@ import "server-only";
 import { forbidden, notFound } from "next/navigation";
 import { getActiveSchool, requireArea } from "@/lib/auth/viewer";
 import { checkBands } from "@/lib/setup/bands";
-import type { TermKind, TermStatus } from "@/lib/setup/calendar";
+import { TERM_KINDS, TERM_KIND_LABELS, type TermKind, type TermStatus } from "@/lib/setup/calendar";
+import { usualSet, type AssessmentDraft } from "@/lib/marks/assessments";
 import { findSetupGaps, type SetupGap } from "@/lib/setup/gaps";
 import { isUuid, type LevelStage, type SubjectScope } from "@/lib/setup/structure";
 import { rowsOrThrow } from "@/lib/supabase/rows";
@@ -277,16 +278,19 @@ export type YearSetup = {
   classes: ClassRow[];
   classSubjects: ClassSubjectRow[];
   gaps: SetupGap[];
+  /** Term kinds with the school's own usual set, e.g. ["Term"]. */
+  assessmentKinds: string[];
 };
 
 /** Everything the wizard hub needs for one year, with its gaps. */
 export async function loadYearSetup(schoolId: string, yearId: string): Promise<YearSetup> {
-  const [terms, scales, levels, subjects, classes] = await Promise.all([
+  const [terms, scales, levels, subjects, classes, sets] = await Promise.all([
     listTerms(yearId),
     listScales(schoolId),
     listLevels(schoolId),
     listSubjects(schoolId),
     listClasses(yearId),
+    listAssessmentSets(schoolId),
   ]);
   const classSubjects = await listClassSubjects(classes.map((c) => c.id));
   const subjectName = new Map(subjects.map((s) => [s.id, s.name]));
@@ -305,5 +309,37 @@ export async function loadYearSetup(schoolId: string, yearId: string): Promise<Y
       scaleComplete: scaleById.get(l.gradingScaleId)?.complete ?? false,
     })),
   });
-  return { terms, scales, levels, subjects, classes, classSubjects, gaps };
+  const assessmentKinds = sets.filter((s) => s.saved).map((s) => TERM_KIND_LABELS[s.termKind]);
+  return { terms, scales, levels, subjects, classes, classSubjects, gaps, assessmentKinds };
+}
+
+export type AssessmentSetRow = {
+  termKind: TermKind;
+  /** False while the school uses the starting set for this kind. */
+  saved: boolean;
+  items: readonly AssessmentDraft[];
+};
+
+/** The school's usual assessment set for each term kind (D41). */
+export async function listAssessmentSets(schoolId: string): Promise<AssessmentSetRow[]> {
+  const supabase = await createClient();
+  const data = rows(
+    await supabase
+      .from("assessment_set_items")
+      .select("term_kind, name, type, max_mark, weight_percent")
+      .eq("school_id", schoolId)
+      .order("sort_order"),
+  );
+  const saved = data.map((i) => ({
+    termKind: i.term_kind,
+    name: i.name,
+    type: i.type,
+    maxMark: i.max_mark,
+    weightPercent: i.weight_percent,
+  }));
+  return TERM_KINDS.map((termKind) => ({
+    termKind,
+    saved: saved.some((i) => i.termKind === termKind),
+    items: usualSet(termKind, saved),
+  }));
 }

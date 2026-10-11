@@ -53,6 +53,53 @@ export type Database = {
           },
         ]
       }
+      assessment_set_items: {
+        Row: {
+          created_at: string
+          id: string
+          max_mark: number
+          name: string
+          school_id: string
+          sort_order: number
+          term_kind: Database["public"]["Enums"]["term_kind"]
+          type: Database["public"]["Enums"]["assessment_type"]
+          updated_at: string
+          weight_percent: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          max_mark: number
+          name: string
+          school_id: string
+          sort_order?: number
+          term_kind: Database["public"]["Enums"]["term_kind"]
+          type: Database["public"]["Enums"]["assessment_type"]
+          updated_at?: string
+          weight_percent: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          max_mark?: number
+          name?: string
+          school_id?: string
+          sort_order?: number
+          term_kind?: Database["public"]["Enums"]["term_kind"]
+          type?: Database["public"]["Enums"]["assessment_type"]
+          updated_at?: string
+          weight_percent?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessment_set_items_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assessments: {
         Row: {
           assessed_on: string | null
@@ -1739,6 +1786,14 @@ export type Database = {
       redeem_parent_invite: { Args: { p_code_hash: string }; Returns: string }
       relock_class_subject: {
         Args: { p_class_subject_id: string; p_term_id: string }
+        Returns: undefined
+      }
+      save_assessment_set: {
+        Args: {
+          p_items: Json
+          p_school_id: string
+          p_term_kind: Database["public"]["Enums"]["term_kind"]
+        }
         Returns: undefined
       }
       save_grading_bands: {

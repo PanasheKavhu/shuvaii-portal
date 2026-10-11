@@ -5,7 +5,15 @@ import { redirect } from "next/navigation";
 import { schoolAdminContext } from "@/lib/auth/viewer";
 import { dbErrorMessage, type DbError } from "@/lib/db-errors";
 import { SCALE_TEMPLATES, describeBandProblem, parseBands } from "@/lib/setup/bands";
-import { parseTerm, parseYear, termClashes, type TermDraft } from "@/lib/setup/calendar";
+import { checkAssessmentSet } from "@/lib/marks/assessments";
+import {
+  isTermKind,
+  parseTerm,
+  parseYear,
+  termClashes,
+  TERM_KIND_LABELS,
+  type TermDraft,
+} from "@/lib/setup/calendar";
 import { describeGap } from "@/lib/setup/gaps";
 import {
   LEVEL_STAGES,
@@ -311,6 +319,57 @@ export async function saveBands(
   }
   revalidatePath(setupPath(yearId), "layout");
   return saved("Bands saved. They cover 0 to 100 with no gaps or overlaps.");
+}
+
+// Usual assessments ------------------------------------------------------------------
+
+/**
+ * The school's usual assessment set for one term kind (D41): names, types,
+ * maximums and weights, adding up to 100. The marks screens offer it as one tap.
+ */
+export async function saveAssessmentSet(
+  yearId: string,
+  termKind: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const schoolId = (await schoolAdminContext())?.schoolId;
+  if (!schoolId || !isUuid(yearId) || !isTermKind(termKind)) return NOT_ALLOWED;
+  const names = formData.getAll("name");
+  const types = formData.getAll("type");
+  const maxes = formData.getAll("maxMark");
+  const weights = formData.getAll("weightPercent");
+  const checked = checkAssessmentSet(
+    names.map((name, i) => ({
+      name,
+      type: types[i],
+      maxMark: maxes[i],
+      weightPercent: weights[i],
+    })),
+  );
+  if (!checked.ok) return failed(`Not saved. ${checked.problems.join(" ")}`);
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("save_assessment_set", {
+    p_school_id: schoolId,
+    p_term_kind: termKind,
+    p_items: checked.value.map((a) => ({
+      name: a.name,
+      type: a.type,
+      max_mark: Number(a.maxMark),
+      weight_percent: Number(a.weightPercent),
+    })),
+  });
+  if (error)
+    return failed(
+      dbMessage(error, "assessment").replace(
+        "That assessment already exists. Use a different name or code.",
+        "Each assessment in the set needs a different name.",
+      ),
+    );
+  revalidatePath(setupPath(yearId), "layout");
+  revalidatePath("/marks", "layout");
+  return saved(`Usual ${TERM_KIND_LABELS[termKind].toLowerCase()} assessments saved.`);
 }
 
 // Grade levels and subjects ----------------------------------------------------------

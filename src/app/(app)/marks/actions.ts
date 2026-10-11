@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { dbErrorMessage, type DbError } from "@/lib/db-errors";
-import { parseAssessment, usualSet } from "@/lib/marks/assessments";
+import { parseAssessment } from "@/lib/marks/assessments";
 import { parseCell } from "@/lib/marks/cell";
 import { planMarksUpload } from "@/lib/marks/upload";
 import { readUpload, uploadContentType } from "@/lib/people/upload";
@@ -17,6 +17,7 @@ import {
   isStillInClass,
   loadUploadContext,
   loadSavedResults,
+  loadUsualSet,
   marksActor,
   mayEnterMarks,
   requireClassSubjectTerm,
@@ -237,7 +238,7 @@ export async function addUsualAssessments(
   if (!term) return failed(NOT_ALLOWED);
   if (count) return failed("This subject already has assessments this term.");
 
-  const set = usualSet(term.kind);
+  const set = await loadUsualSet(actor.schoolId, term.kind);
   const { error } = await supabase.from("assessments").insert(
     set.map((a, i) => ({
       school_id: actor.schoolId,

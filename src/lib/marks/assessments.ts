@@ -25,9 +25,11 @@ export type AssessmentDraft = {
 };
 
 /**
- * The usual term set (GRADING_AND_WEIGHTS section 4, assumed until the
- * school confirms Q5): Test 1 out of 30 at 20%, Test 2 out of 50 at 20%
- * and the exam out of 100 at 60%. A vacation term gets one mark out of 100.
+ * The starting set (GRADING_AND_WEIGHTS section 4): Test 1 out of 30 at 20%,
+ * Test 2 out of 50 at 20% and the exam out of 100 at 60%; a vacation term
+ * gets one mark out of 100. Each school sets its own usual set per term
+ * kind in setup (D41); this is where that starts, and what a school that
+ * has not set its own gets.
  */
 export const USUAL_TERM_SET: readonly AssessmentDraft[] = [
   { name: "Test 1", type: "test", maxMark: "30", weightPercent: "20" },
@@ -38,8 +40,70 @@ export const USUAL_VACATION_SET: readonly AssessmentDraft[] = [
   { name: "Vacation school mark", type: "vacation", maxMark: "100", weightPercent: "100" },
 ];
 
-export function usualSet(termKind: string): readonly AssessmentDraft[] {
+/** The starting set for a term kind; mock exams start like a term. */
+export function startingSet(termKind: string): readonly AssessmentDraft[] {
   return termKind === "vacation" ? USUAL_VACATION_SET : USUAL_TERM_SET;
+}
+
+/** A school's saved usual-set item for one term kind (assessment_set_items). */
+export type SetItem = {
+  termKind: string;
+  name: string;
+  type: AssessmentType;
+  maxMark: number | string;
+  weightPercent: number | string;
+};
+
+/**
+ * The school's usual set for a term kind (D41): what it saved in setup, in
+ * order, or the starting set when it saved none for that kind.
+ */
+export function usualSet(
+  termKind: string,
+  saved: readonly SetItem[] = [],
+): readonly AssessmentDraft[] {
+  const own = saved.filter((i) => i.termKind === termKind);
+  if (own.length === 0) return startingSet(termKind);
+  return own.map((i) => ({
+    name: i.name,
+    type: i.type,
+    maxMark: String(Number(i.maxMark)),
+    weightPercent: String(Number(i.weightPercent)),
+  }));
+}
+
+/**
+ * Checks a usual set before saving (D41): every row a valid assessment,
+ * names not repeated (ignoring case), weights adding up to exactly 100.
+ * The database repeats the total and name rules.
+ */
+export function checkAssessmentSet(
+  rows: readonly { name: unknown; type: unknown; maxMark: unknown; weightPercent: unknown }[],
+): { ok: true; value: AssessmentDraft[] } | { ok: false; problems: string[] } {
+  if (rows.length === 0) return { ok: false, problems: ["Add at least one assessment."] };
+  const problems: string[] = [];
+  const value: AssessmentDraft[] = [];
+  rows.forEach((row, i) => {
+    const parsed = parseAssessment(row);
+    if (parsed.ok) value.push(parsed.value);
+    else
+      problems.push(
+        `Row ${i + 1}: ${Object.values(parsed.errors)
+          .map((e) => e.replace(/\.$/, ""))
+          .join("; ")}.`,
+      );
+  });
+  const seen = new Set<string>();
+  for (const a of value) {
+    const key = a.name.toLowerCase();
+    if (seen.has(key)) problems.push(`${a.name} is in the set more than once.`);
+    seen.add(key);
+  }
+  if (problems.length === 0) {
+    const total = weightTotal(value.map((a) => a.weightPercent));
+    if (total !== 100) problems.push(weightMessage(total, value.length).text.split(".")[0] + ".");
+  }
+  return problems.length ? { ok: false, problems } : { ok: true, value };
 }
 
 /** "Test 1, Test 2 and Exam". */

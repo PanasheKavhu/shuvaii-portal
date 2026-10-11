@@ -5,7 +5,7 @@ import { cache } from "react";
 import type { AppRole } from "@/lib/auth/roles";
 import { getActiveSchool, getViewer, requireArea } from "@/lib/auth/viewer";
 import type { MarkStatus } from "@/lib/grading/results";
-import type { AssessmentType } from "@/lib/marks/assessments";
+import { usualSet, type AssessmentDraft, type AssessmentType } from "@/lib/marks/assessments";
 import type { ExistingMark, MarksUploadSummary, UploadContext } from "@/lib/marks/upload";
 import { pickCurrentTerm, todayIn } from "@/lib/marks/terms";
 import type { Band } from "@/lib/setup/bands";
@@ -233,6 +233,34 @@ export async function requireClassSubjectTerm(
     gradingScaleId: klass.grade_levels.grading_scale_id,
     term: toTerm(term.data),
   };
+}
+
+/**
+ * The school's usual assessment set for a term kind (D41): what the school
+ * admin saved in setup, or the starting set when there is none.
+ */
+export async function loadUsualSet(
+  schoolId: string,
+  termKind: TermKind,
+): Promise<readonly AssessmentDraft[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("assessment_set_items")
+    .select("term_kind, name, type, max_mark, weight_percent")
+    .eq("school_id", schoolId)
+    .eq("term_kind", termKind)
+    .order("sort_order");
+  if (error) throw new Error("Could not load the usual assessments.");
+  return usualSet(
+    termKind,
+    data.map((i) => ({
+      termKind: i.term_kind,
+      name: i.name,
+      type: i.type,
+      maxMark: i.max_mark,
+      weightPercent: i.weight_percent,
+    })),
+  );
 }
 
 /** The actor and class subject of a marks page; cached per request. */

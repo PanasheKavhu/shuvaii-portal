@@ -39,6 +39,9 @@ export default async function YearSetupPage({ params }: PageProps<"/admin/setup/
   const progress: Record<string, string> = {
     "/terms": `${setup.terms.length} period${setup.terms.length === 1 ? "" : "s"}`,
     "/grading": `${setup.scales.length} scale${setup.scales.length === 1 ? "" : "s"}`,
+    "/assessments": setup.assessmentKinds.length
+      ? `Set for ${setup.assessmentKinds.join(", ").toLowerCase()}`
+      : "Starting set",
     "/levels": `${setup.levels.length} level${setup.levels.length === 1 ? "" : "s"}`,
     "/subjects": `${setup.subjects.length} subject${setup.subjects.length === 1 ? "" : "s"}`,
     "/classes": `${setup.classes.length} class${setup.classes.length === 1 ? "" : "es"}, ${setup.classes.filter((c) => c.classTeacherId).length} with a class teacher`,

@@ -78,6 +78,25 @@ test("a school admin sets up a year from scratch; gaps block finishing until fix
     page.getByText("Bands saved. They cover 0 to 100 with no gaps or overlaps."),
   ).toBeVisible();
 
+  // The school's usual set (D41): starts from Test 1, Test 2 and Exam.
+  await steps(page).getByRole("link", { name: "Usual assessments" }).click();
+  const termSet = form(page, "Usual term assessments");
+  await expect(termSet.getByLabel("Name, assessment 3")).toHaveValue("Exam");
+  await termSet.getByLabel("Weight (%), assessment 1").fill("30");
+  await expect(
+    termSet.getByRole("status", { name: "Usual term assessments weight total" }),
+  ).toHaveText("Weights add up to 110, 10 over 100. They must add up to 100 to save.");
+  await termSet.getByRole("button", { name: "Save usual term assessments" }).click();
+  await expect(termSet.getByText(/^Not saved\. Weights add up to 110/)).toBeVisible();
+  await termSet.getByLabel("Weight (%), assessment 3").fill("50");
+  await termSet.getByRole("button", { name: "Save usual term assessments" }).click();
+  await expect(termSet.getByText("Usual term assessments saved.")).toBeVisible();
+  await page.reload();
+  await expect(page.getByText("Your school's set: Test 1, Test 2 and Exam.")).toBeVisible();
+  await expect(
+    form(page, "Usual term assessments").getByLabel("Weight (%), assessment 1"),
+  ).toHaveValue("30");
+
   // Step 3: a grade level using that scale.
   await steps(page).getByRole("link", { name: "Grade levels" }).click();
   const addLevel = form(page, "Add a grade level");

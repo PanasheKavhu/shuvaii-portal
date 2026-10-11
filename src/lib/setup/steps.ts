@@ -2,6 +2,7 @@
 export const SETUP_STEPS = [
   { path: "/terms", label: "Year and terms" },
   { path: "/grading", label: "Grading scales" },
+  { path: "/assessments", label: "Usual assessments" },
   { path: "/levels", label: "Grade levels" },
   { path: "/subjects", label: "Subjects" },
   { path: "/classes", label: "Classes and class teachers" },
@@ -13,6 +14,7 @@ export const SETUP_STEPS = [
 export function stepIndexFor(pathname: string, yearId: string): number {
   const base = `/admin/setup/${yearId}`;
   if (pathname === base) return SETUP_STEPS.length - 1;
-  if (pathname.startsWith(`${base}/classes/`)) return 5;
+  if (pathname.startsWith(`${base}/classes/`))
+    return SETUP_STEPS.findIndex((s) => s.path === "/class-subjects");
   return SETUP_STEPS.findIndex((s) => s.path !== "" && pathname.startsWith(base + s.path));
 }

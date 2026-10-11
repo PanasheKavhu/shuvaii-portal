@@ -295,3 +295,15 @@ Format: **D#. Title** (date). Decision. Why. Alternatives.
 - Audit context speed: the before-insert trigger on `audit_log` (D35) fills learner, class and class subject inline and returns at once for tables without them (migration `faster_audit_context`), instead of calling the set-returning `private.audit_context()` for every row; a 1,000-learner import writes about 4,000 audit rows.
 - Shared code: one `dbErrorMessage()` (`src/lib/db-errors.ts`) for the marks, comments and setup actions (the comments copy missed `22023`).
 - Not changed, with reasons: the learner name typed in the audit (and people) search boxes is in the address (`?q=`), so it can reach hosting access logs; listed in Known gaps and on the go-live checklist. `marks_progress()` and `completion_class_subjects()` share CTE shapes but answer different questions and are each tuned as one query; left separate. The class screen hides graduated learners while `class_positions()` still counts them in past terms (D31); that matters only after year rollover, so it is settled with US-3.5.
+
+## D38. Grading is a per-school choice; no national key (2026-10-11)
+
+- Decision: every school enters its own grading key during onboarding, per grade level, in `/admin/setup` (Q1 settled this way, no longer a blocker). The database already stores scales and bands per school and each grade level points at one scale (D20 to D22, D31); nothing in the calculations or screens assumes one national key. The O-level and primary tables in `GRADING_AND_WEIGHTS.md` are starting points offered in setup ("O-level sample key", "Primary example", or "Blank"), not defaults.
+- The pilot school's bands are entered and checked against one of its past reports before go-live (`PROGRESS.md`, go-live checklist). The seed school keeps the O-level sample key, so the seed fixtures (70 is an A) still hold.
+
+## D39. Phase 4 answers recorded: signatures, approvers, parents' access (2026-10-11)
+
+- Q10: a typed teacher name with the signed date is acceptable as the subject teacher's signature on a report; no signature images are needed for teachers. The subject comment's `signed_at` (D34) already holds the date.
+- Q11: reports are approved by the head, deputy, senior master and HOD. Today the `head` role covers head, deputy and senior master (Q16) and a `hod` reads only what they teach (D23, D30), so Phase 4 decides how a HOD approves. Not answered yet, so still assumed: a returned report goes back to the class teacher, and the stamp and head's signature images are uploaded by the school.
+- Q19: parents see published reports directly, with no blocking over unpaid fees, but this may change per school's requirements, so Phase 4 should keep that rule in one place a per-school setting can later change.
+- Nothing is built for these in this change; they are inputs to Phase 4.

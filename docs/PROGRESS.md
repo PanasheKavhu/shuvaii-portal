@@ -4,7 +4,7 @@ Update at the end of every story (definition of done, `SPEC.md` section 6).
 
 ## Current phase
 
-Phase 1 (E1: access, tenancy, branding). Tenancy schema, staff, learner and parent sign in, password reset, role-based navigation, school theming and a minimal super-admin console done. Phase 2 (E2, E3: school setup and people) done and tagged `v0.2.0` after its gate: academic structure tables, the school admin setup area (US-2.1 to US-2.4), the people tables and the people admin area (US-3.1 to US-3.4), and parent and learner sign in. Phase 3 (marks and comments) done and tagged `v0.3.0` after its gate: assessment and mark tables with locking in the database (D30), subject results, averages and positions computed in the database (D31), the marks entry screens for teachers, school admins and heads (D32), marks upload from a template with the lock screens (D33), subject and class comments with the comment bank (D34), the audit log screen and completion tracking (D35, D36), and the gate's review fixes (D37). Grades still use our assumed bands until the pilot school answers Q1.
+Phase 1 (E1: access, tenancy, branding). Tenancy schema, staff, learner and parent sign in, password reset, role-based navigation, school theming and a minimal super-admin console done. Phase 2 (E2, E3: school setup and people) done and tagged `v0.2.0` after its gate: academic structure tables, the school admin setup area (US-2.1 to US-2.4), the people tables and the people admin area (US-3.1 to US-3.4), and parent and learner sign in. Phase 3 (marks and comments) done and tagged `v0.3.0` after its gate: assessment and mark tables with locking in the database (D30), subject results, averages and positions computed in the database (D31), the marks entry screens for teachers, school admins and heads (D32), marks upload from a template with the lock screens (D33), subject and class comments with the comment bank (D34), the audit log screen and completion tracking (D35, D36), and the gate's review fixes (D37).
 
 ## Done
 
@@ -53,7 +53,6 @@ _None._
 
 ## Known gaps
 
-- **Q1 (pilot school's grade bands) is not answered.** Grades use our assumed O-level bands (A 70 to 100, B 60 to 69, C 50 to 59, D 45 to 49, E 40 to 44, U 0 to 39, both ends included). The school's sample report shows a 70 graded B; until the school confirms the boundaries at 70, 60, 50, 45 and 40, the Phase 3 gate item "grades match the pilot school's confirmed bands" stays open. Bands are data (`/admin/setup`), so a confirmed key needs no code change, only a check that the fixtures still match.
 - Search boxes (audit log learner, people lists) put the typed name in the address (`?q=`), so it can reach hosting access logs (D37); see the go-live checklist.
 - The class teacher's screen hides graduated learners while past-term positions still count them (D31, D37); settle with US-3.5 year rollover.
 - CI runs `test:db` (D29) but not `test:e2e`; run e2e locally before calling a story done.
@@ -81,4 +80,5 @@ Things to do on the hosted Supabase project and deployment before the first real
 - [ ] Set `LEARNER_PIN_SECRET` (32+ random characters) in the deployment's server environment, and keep it: changing it stops every learner PIN (D26).
 - [ ] Raise Auth's `sign_in_sign_ups` rate limit in the Supabase dashboard: a class of learners signs in from one school IP (D26).
 - [ ] Make sure the hosting provider's access logs drop query strings, or keep them only briefly, since search boxes carry learner names in `?q=` (D37).
+- [ ] The pilot school's own bands entered and checked against a past report: each grade level's scale in `/admin/setup` matches the school's key at every boundary (for example 70, 60, 50, 45, 40 on the O-level sample), and a past report's marks give the grades printed on it (Q1, D38). The seed school still uses the O-level sample key, under which a 70 is an A.
 - [ ] Set the invite email template (subject and the `/auth/confirm?token_hash=...&type=invite` link from `supabase/templates/invite.html`) and the site URL in the Supabase dashboard (D14).

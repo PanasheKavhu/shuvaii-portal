@@ -1389,7 +1389,7 @@ export type Database = {
           pdf_path: string | null
           published_at: string | null
           published_by: string | null
-          reference_code: string
+          reference_code: string | null
           return_note: string | null
           returned_at: string | null
           returned_by: string | null
@@ -1401,7 +1401,7 @@ export type Database = {
           template_id: string
           term_id: string
           updated_at: string
-          verification_code: string
+          verification_code: string | null
           version: number
           withdrawn_at: string | null
           withdrawn_by: string | null
@@ -1421,7 +1421,7 @@ export type Database = {
           pdf_path?: string | null
           published_at?: string | null
           published_by?: string | null
-          reference_code: string
+          reference_code?: string | null
           return_note?: string | null
           returned_at?: string | null
           returned_by?: string | null
@@ -1433,7 +1433,7 @@ export type Database = {
           template_id: string
           term_id: string
           updated_at?: string
-          verification_code: string
+          verification_code?: string | null
           version?: number
           withdrawn_at?: string | null
           withdrawn_by?: string | null
@@ -1453,7 +1453,7 @@ export type Database = {
           pdf_path?: string | null
           published_at?: string | null
           published_by?: string | null
-          reference_code?: string
+          reference_code?: string | null
           return_note?: string | null
           returned_at?: string | null
           returned_by?: string | null
@@ -1465,7 +1465,7 @@ export type Database = {
           template_id?: string
           term_id?: string
           updated_at?: string
-          verification_code?: string
+          verification_code?: string | null
           version?: number
           withdrawn_at?: string | null
           withdrawn_by?: string | null
@@ -1833,6 +1833,10 @@ export type Database = {
         }[]
       }
       accept_my_invites: { Args: never; Returns: number }
+      approve_class_reports: {
+        Args: { p_class_id: string; p_term_id: string }
+        Returns: number
+      }
       assessment_weight_problems: {
         Args: { p_term_id: string }
         Returns: {
@@ -1945,6 +1949,17 @@ export type Database = {
       }
       current_school_ids: { Args: never; Returns: string[] }
       decline_my_invites: { Args: never; Returns: number }
+      generate_report_drafts: {
+        Args: {
+          p_class_id: string
+          p_include_incomplete_results?: boolean
+          p_term_id: string
+        }
+        Returns: {
+          enrolment_id: string
+          outcome: string
+        }[]
+      }
       grading_scale_is_complete: {
         Args: { p_scale_id: string }
         Returns: boolean
@@ -2054,10 +2069,43 @@ export type Database = {
           status: string
         }[]
       }
+      publish_class_reports: {
+        Args: { p_class_id: string; p_term_id: string }
+        Returns: number
+      }
       redeem_parent_invite: { Args: { p_code_hash: string }; Returns: string }
       relock_class_subject: {
         Args: { p_class_subject_id: string; p_term_id: string }
         Returns: undefined
+      }
+      report_class_overview: {
+        Args: { p_term_id: string }
+        Returns: {
+          approved: number
+          class_id: string
+          class_name: string
+          class_teacher_name: string
+          drafts: number
+          learners: number
+          published: number
+          returned: number
+          submitted: number
+        }[]
+      }
+      report_gaps: {
+        Args: { p_class_id: string; p_term_id: string }
+        Returns: {
+          assessment_names: string[]
+          class_subject_id: string
+          enrolment_id: string
+          gap: string
+          reason: string
+          subject_name: string
+        }[]
+      }
+      return_class_reports: {
+        Args: { p_class_id: string; p_note: string; p_term_id: string }
+        Returns: number
       }
       save_assessment_set: {
         Args: {
@@ -2105,6 +2153,18 @@ export type Database = {
         Returns: undefined
       }
       set_primary_guardian: { Args: { p_link_id: string }; Returns: undefined }
+      set_report_head_comment: {
+        Args: { p_comment: string; p_report_id: string }
+        Returns: undefined
+      }
+      set_report_result_not_available: {
+        Args: {
+          p_class_subject_id: string
+          p_not_available: boolean
+          p_report_id: string
+        }
+        Returns: undefined
+      }
       sign_in_schools: {
         Args: never
         Returns: {
@@ -2129,6 +2189,10 @@ export type Database = {
           term_id: string
           weighted_percent: number
         }[]
+      }
+      submit_class_reports: {
+        Args: { p_class_id: string; p_term_id: string }
+        Returns: number
       }
       teaches: { Args: { p_class_subject_id: string }; Returns: boolean }
       unlock_class_subject: {

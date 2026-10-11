@@ -179,9 +179,12 @@ where id in ('a5000000-0000-0000-0000-000000000122', 'a5000000-0000-0000-0000-00
              'b5000000-0000-0000-0000-0000000000b1');
 update public.reports set status = 'submitted' where id = 'a5000000-0000-0000-0000-000000000361';
 
--- PDFs in the reports bucket for every published or withdrawn report.
+-- PDFs in the reports bucket for every published or withdrawn report (a
+-- local database may already hold real ones, made by the app, D45).
 insert into storage.objects (bucket_id, name)
-select 'reports', pdf_path from public.reports where pdf_path is not null;
+select 'reports', pdf_path from public.reports r
+where pdf_path is not null
+  and not exists (select 1 from storage.objects o where o.bucket_id = 'reports' and o.name = r.pdf_path);
 
 -- A share for each school (no API access at all).
 insert into public.report_shares (school_id, report_id, token_hash, expires_at) values

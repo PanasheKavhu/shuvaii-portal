@@ -138,6 +138,60 @@ describe("describeAuditEntry: other tables", () => {
     });
   });
 
+  it("describes the report workflow in plain words (D44)", () => {
+    const line = (oldData: Record<string, unknown>, newData: Record<string, unknown>) =>
+      describeAuditEntry(entry({ table: "reports", actorName: "Mrs Dube", oldData, newData }));
+    const maths = { class_subject_id: "cs1", subject: "Mathematics", status: "incomplete" };
+
+    expect(
+      line(
+        { status: "draft", version: 1, snapshot: { subjects: [] } },
+        { status: "draft", version: 1, snapshot: { subjects: [maths] } },
+      ).summary,
+    ).toBe("Mrs Dube refreshed the draft of Tendai Ncube's report");
+    expect(line({ status: "draft", version: 1 }, { status: "submitted", version: 1 }).summary).toBe(
+      "Mrs Dube submitted Tendai Ncube's report",
+    );
+    const returned = line(
+      { status: "submitted", version: 1, return_note: null },
+      { status: "draft", version: 1, return_note: "Lerato has no report yet." },
+    );
+    expect(returned.reason).toBe("Lerato has no report yet.");
+    const comment = line(
+      { status: "submitted", version: 1, head_comment: null },
+      { status: "submitted", version: 1, head_comment: "Keep it up." },
+    );
+    expect(comment.summary).toBe("Mrs Dube wrote the head's comment on Tendai Ncube's report");
+    expect(comment.changes).toContainEqual({
+      label: "Head's comment",
+      from: null,
+      to: "Keep it up.",
+    });
+    expect(
+      line(
+        {
+          status: "submitted",
+          version: 1,
+          snapshot: { subjects: [{ ...maths, not_available: false }] },
+        },
+        {
+          status: "submitted",
+          version: 1,
+          snapshot: { subjects: [{ ...maths, not_available: true }] },
+        },
+      ).summary,
+    ).toBe("Mrs Dube marked the Mathematics result not available on Tendai Ncube's report");
+    expect(
+      line({ status: "submitted", version: 1 }, { status: "approved", version: 1 }).summary,
+    ).toBe("Mrs Dube approved Tendai Ncube's report");
+    const published = line(
+      { status: "approved", version: 1, reference_code: null },
+      { status: "published", version: 1, reference_code: "ABCDEFGH23" },
+    );
+    expect(published.summary).toBe("Mrs Dube published Tendai Ncube's report");
+    expect(published.changes).toContainEqual({ label: "Reference", from: null, to: "ABCDEFGH23" });
+  });
+
   it("shows the unlock reason and the reason on relock", () => {
     const unlock = describeAuditEntry(
       entry({

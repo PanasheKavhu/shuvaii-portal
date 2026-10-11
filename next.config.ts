@@ -13,6 +13,10 @@ const nextConfig: NextConfig = {
     // IMPORT_MAX_BYTES) go through server actions, plus room for the
     // multipart overhead.
     serverActions: { bodySizeLimit: "6mb" },
+    // Styles arrive inside the HTML instead of as a render-blocking file, so
+    // a phone on a slow 3G link paints the portal one round trip sooner
+    // (SPEC section 5, D47). The whole stylesheet is about 11 KB compressed.
+    inlineCss: true,
   },
 };
 

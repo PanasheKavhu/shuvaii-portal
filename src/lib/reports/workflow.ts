@@ -1,13 +1,16 @@
 /**
  * The report workflow in plain words (US-6.1 to US-6.3, US-5.4; D44). Pure:
  * the pages pass rows from public.report_gaps() and the reports' stored
- * snapshot. Limits mirror 20261011120000_report_workflow.sql.
+ * snapshot. Limits mirror 20261011120000_report_workflow.sql and
+ * 20261011140000_report_withdraw_and_reissue.sql.
  */
 
 /** The head's comment: three lines beside the signature and stamp. */
 export const HEAD_COMMENT_MAX = 200;
 /** The note the head writes when returning reports. */
 export const RETURN_NOTE_MAX = 500;
+/** Why the head withdraws a published report (US-6.6). */
+export const WITHDRAW_REASON_MAX = 500;
 
 export type ReportStatus = "draft" | "submitted" | "approved" | "published" | "withdrawn";
 

@@ -32,10 +32,13 @@ export function verifyBlockedUntil(lookups: readonly Date[], now: Date): Date | 
   return new Date(recent[recent.length - VERIFY_LIMIT]! + VERIFY_WINDOW_MS);
 }
 
-export const NOT_FOUND_OR_WITHDRAWN = "Report not found or withdrawn";
+export const NOT_FOUND = "Report not found";
+export const WITHDRAWN = "Report withdrawn";
 
 /** What the page shows: only the reference, learner, school, term and status (US-6.5). */
 export type Verification = {
+  /** Withdrawn by the school (US-6.6): no longer valid; a newer version replaces it. */
+  withdrawn: boolean;
   reference: string;
   learnerName: string;
   schoolName: string;
@@ -52,16 +55,24 @@ export type VerifyRow = {
   version: number | null;
 };
 
-/** A found report as the page shows it; withdrawn and unpublished ones are not found. */
+/**
+ * A published or withdrawn report as the page shows it (D46: a withdrawn
+ * code says so, so whoever holds the old paper knows to ask for the new
+ * one); a report that was never published is not found.
+ */
 export function readVerification(row: VerifyRow | null): Verification | null {
-  if (!row || row.status !== "published" || !row.reference_code) return null;
+  if (!row || !row.reference_code) return null;
+  if (row.status !== "published" && row.status !== "withdrawn") return null;
+  const withdrawn = row.status === "withdrawn";
   return {
+    withdrawn,
     reference: row.reference_code,
     learnerName: row.learner_name ?? "",
     schoolName: row.school_name ?? "",
     termName: row.term_name ?? "",
-    status:
-      row.version && row.version > 1
+    status: withdrawn
+      ? "Withdrawn by the school: no longer valid"
+      : row.version && row.version > 1
         ? `Valid: published by the school (amended, version ${row.version})`
         : "Valid: published by the school",
   };

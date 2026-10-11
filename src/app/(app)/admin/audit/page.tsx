@@ -51,7 +51,7 @@ export default async function AuditPage({ searchParams }: PageProps<"/admin/audi
         <p className="text-muted-foreground text-sm">{schoolName}</p>
         <h1 className="text-2xl font-semibold tracking-tight">Audit log</h1>
         <p className="text-muted-foreground mt-1">
-          Every change to marks, comments, learners and staff, newest first.
+          Every change to marks, comments, reports, learners and staff, newest first.
         </p>
       </div>
 
@@ -215,7 +215,7 @@ export default async function AuditPage({ searchParams }: PageProps<"/admin/audi
             </p>
           ) : (
             <ol aria-label="Changes" className="flex flex-col gap-3">
-              {page.items.map(({ id, when, term, line }) => (
+              {page.items.map(({ id, when, term, line, pdf }) => (
                 <li key={id} className="bg-card rounded-2xl border p-4 shadow-xs">
                   <p className="font-medium">{line.summary}</p>
                   <p className="text-muted-foreground mt-1 text-sm">
@@ -250,6 +250,19 @@ export default async function AuditPage({ searchParams }: PageProps<"/admin/audi
                       <span className="font-medium">Reason: </span>
                       {line.reason}
                     </p>
+                  )}
+                  {pdf && (
+                    <a
+                      href={pdf.href}
+                      target="_blank"
+                      rel="noopener"
+                      className={buttonVariants({
+                        variant: "outline",
+                        className: "mt-3 h-11 text-sm",
+                      })}
+                    >
+                      Open PDF (version {pdf.version})
+                    </a>
                   )}
                 </li>
               ))}

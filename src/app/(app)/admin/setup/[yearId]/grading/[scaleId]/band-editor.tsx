@@ -3,7 +3,13 @@
 import { useActionState, useState, useTransition, type FormEvent } from "react";
 import { FormMessage } from "@/components/platform/form-bits";
 import { Button } from "@/components/ui/button";
-import { checkBands, describeBandProblem } from "@/lib/setup/bands";
+import {
+  bandChangeWarning,
+  checkBands,
+  describeBandProblem,
+  parseBands,
+  type MarkedTerm,
+} from "@/lib/setup/bands";
 import { idle, type FormState } from "@/app/(app)/platform/form-state";
 
 type Row = { key: number; grade: string; minMark: string; maxMark: string; remark: string };
@@ -15,16 +21,19 @@ const cell =
 /**
  * US-2.3 band editor. Checks the bands as you type (the same rule the
  * server and database apply) and lists exactly what is wrong: gaps,
- * overlaps, marks out of range.
+ * overlaps, marks out of range. Before saving, warns how many class
+ * subjects with marks the change regrades (D40).
  */
 export function BandEditor({
   action,
   bands,
   isDefault,
+  marked,
 }: {
   action: Action;
   bands: { grade: string; minMark: number; maxMark: number; remark: string | null }[];
   isDefault: boolean;
+  marked: MarkedTerm[];
 }) {
   const [state, formAction, pending] = useActionState(action, idle);
   const [, startTransition] = useTransition();
@@ -40,6 +49,8 @@ export function BandEditor({
   );
   const problems = checkBands(rows);
   const badRows = new Set(problems.flatMap((p) => ("row" in p ? [p.row] : [])));
+  const parsed = parseBands(rows);
+  const warning = parsed.ok ? bandChangeWarning(bands, parsed.value, marked) : null;
 
   function update(key: number, field: keyof Omit<Row, "key">, value: string) {
     setRows((rs) => rs.map((r) => (r.key === key ? { ...r, [field]: value } : r)));
@@ -154,9 +165,19 @@ export function BandEditor({
           : "Make this the default scale for its stage"}
       </label>
 
+      {warning && (
+        <p
+          role="note"
+          aria-label="Band change warning"
+          className="rounded-lg bg-amber-500/15 px-3 py-2 text-sm font-medium text-amber-900 dark:text-amber-200"
+        >
+          {warning} The change is recorded in the audit log.
+        </p>
+      )}
+
       <FormMessage status={state.status} message={state.message} />
       <Button type="submit" disabled={pending} className="h-12 text-base">
-        {pending ? "Saving…" : "Save bands"}
+        {pending ? "Saving…" : warning ? "Save and change these grades" : "Save bands"}
       </Button>
     </form>
   );

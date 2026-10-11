@@ -195,3 +195,34 @@ export function gradeFor(bands: readonly Band[], mark: number): string | null {
   }
   return best?.grade ?? null;
 }
+
+/** Class subjects with marks in one term whose grades come from a scale (D40). */
+export type MarkedTerm = { termName: string; classSubjects: number };
+
+/** Whether any whole mark from 0 to 100 gets a different grade. */
+export function bandsChangeGrades(before: readonly Band[], after: readonly Band[]): boolean {
+  for (let mark = 0; mark <= 100; mark++) {
+    if (gradeFor(before, mark) !== gradeFor(after, mark)) return true;
+  }
+  return false;
+}
+
+/**
+ * The band editor's warning before saving (D40): grades in every term are
+ * computed live from the bands, so a change that moves any mark to another
+ * grade regrades the class subjects that already have marks. Null when no
+ * grade changes or nothing is marked yet. Remarks alone change no grade.
+ */
+export function bandChangeWarning(
+  before: readonly Band[],
+  after: readonly Band[],
+  marked: readonly MarkedTerm[],
+): string | null {
+  const terms = marked.filter((t) => t.classSubjects > 0);
+  if (terms.length === 0 || !bandsChangeGrades(before, after)) return null;
+  const parts = terms.map(
+    (t) => `${t.classSubjects} class subject${t.classSubjects === 1 ? "" : "s"} in ${t.termName}`,
+  );
+  const list = parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}` : parts[0];
+  return `This changes the grades of ${list} that already have marks.`;
+}

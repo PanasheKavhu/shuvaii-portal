@@ -237,3 +237,38 @@ describe("describeAuditEntry: other tables", () => {
     expect(line).toEqual({ summary: "Mr Moyo made a change", changes: [], reason: null });
   });
 });
+
+describe("describeAuditEntry: grading bands (D40)", () => {
+  it("names the scale and shows the old and new bands", () => {
+    const line = describeAuditEntry(
+      entry({
+        table: "grading_scales",
+        action: "event",
+        event: "grading_bands_changed",
+        actorName: "Mrs Tembo",
+        oldData: {
+          scale_name: "Our key",
+          bands: [
+            { grade: "A", min_mark: 70, max_mark: 100, remark: null },
+            { grade: "B", min_mark: 0, max_mark: 69, remark: null },
+          ],
+        },
+        newData: {
+          scale_name: "Our key",
+          bands: [
+            { grade: "A", min_mark: 71, max_mark: 100, remark: "Excellent" },
+            { grade: "B", min_mark: 0, max_mark: 70, remark: null },
+          ],
+        },
+      }),
+    );
+    expect(line.summary).toBe("Mrs Tembo changed the grading bands of Our key");
+    expect(line.changes).toEqual([
+      {
+        label: "Bands",
+        from: "A 70 to 100, B 0 to 69",
+        to: "A 71 to 100 (Excellent), B 0 to 70",
+      },
+    ]);
+  });
+});

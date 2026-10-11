@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { LEVEL_STAGE_LABELS, isUuid } from "@/lib/setup/structure";
+import { createClient } from "@/lib/supabase/server";
 import { saveBands } from "../../../actions";
 import { getYear, listScales, requireSchoolAdmin } from "../../../data";
 import { BandEditor } from "./band-editor";
@@ -18,6 +19,11 @@ export default async function ScalePage({
   if (!isUuid(scaleId)) notFound();
   const scale = (await listScales(schoolId)).find((s) => s.id === scaleId);
   if (!scale) notFound();
+  // Class subjects already marked per term, for the warning before saving (D40).
+  const supabase = await createClient();
+  const { data: marked } = await supabase.rpc("grading_scale_marked_class_subjects", {
+    p_scale_id: scale.id,
+  });
 
   return (
     <div className="flex flex-col gap-4">
@@ -31,13 +37,19 @@ export default async function ScalePage({
         <h2 className="text-xl font-semibold">{scale.name}</h2>
         <p className="text-muted-foreground text-sm">
           {LEVEL_STAGE_LABELS[scale.stage]}. Whole marks; each band includes its lowest and highest
-          mark. Saved changes apply to reports made from now on.
+          mark. Grades of every term are worked out from these bands as they are now, so saving a
+          change regrades marks already entered; the change is kept in the audit log. Published
+          reports will keep the key they were made with.
         </p>
       </div>
       <BandEditor
         action={saveBands.bind(null, year.id, scale.id)}
         bands={scale.bands}
         isDefault={scale.isDefault}
+        marked={(marked ?? []).map((t) => ({
+          termName: t.term_name,
+          classSubjects: t.class_subjects,
+        }))}
       />
     </div>
   );

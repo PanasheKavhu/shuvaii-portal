@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   O_LEVEL_BANDS,
   PRIMARY_BANDS,
+  bandChangeWarning,
+  bandsChangeGrades,
   checkBands,
   describeBandProblem,
   gradeFor,
@@ -111,5 +113,58 @@ describe("gradeFor", () => {
     expect(gradeFor([...overlapping].reverse(), 60)).toBe("B");
     expect(gradeFor(overlapping, 59)).toBe("C");
     expect(gradeFor(overlapping, 75)).toBeNull();
+  });
+});
+
+describe("bandChangeWarning (D40)", () => {
+  const moved = O_LEVEL_BANDS.map((b) =>
+    b.grade === "A" ? { ...b, minMark: 71 } : b.grade === "B" ? { ...b, maxMark: 70 } : b,
+  );
+  const reworded = O_LEVEL_BANDS.map((b) => ({ ...b, remark: "New remark" }));
+
+  it("counts the class subjects with marks in the one term affected", () => {
+    expect(
+      bandChangeWarning(O_LEVEL_BANDS, moved, [{ termName: "Term 2", classSubjects: 14 }]),
+    ).toBe("This changes the grades of 14 class subjects in Term 2 that already have marks.");
+  });
+
+  it("lists every term with marks and leaves out terms without any", () => {
+    expect(
+      bandChangeWarning(O_LEVEL_BANDS, moved, [
+        { termName: "Term 1", classSubjects: 1 },
+        { termName: "April Vacation School", classSubjects: 0 },
+        { termName: "Term 2", classSubjects: 3 },
+        { termName: "Term 3", classSubjects: 2 },
+      ]),
+    ).toBe(
+      "This changes the grades of 1 class subject in Term 1, 3 class subjects in Term 2 and 2 class subjects in Term 3 that already have marks.",
+    );
+  });
+
+  it("says nothing when no grade changes or nothing is marked", () => {
+    expect(
+      bandChangeWarning(O_LEVEL_BANDS, reworded, [{ termName: "Term 2", classSubjects: 14 }]),
+    ).toBeNull();
+    expect(
+      bandChangeWarning(O_LEVEL_BANDS, [...O_LEVEL_BANDS].reverse(), [
+        { termName: "Term 2", classSubjects: 14 },
+      ]),
+    ).toBeNull();
+    expect(bandChangeWarning(O_LEVEL_BANDS, moved, [])).toBeNull();
+    expect(
+      bandChangeWarning(O_LEVEL_BANDS, moved, [{ termName: "Term 2", classSubjects: 0 }]),
+    ).toBeNull();
+  });
+
+  it("sees a renamed grade and a single moved boundary", () => {
+    expect(
+      bandsChangeGrades(
+        O_LEVEL_BANDS,
+        O_LEVEL_BANDS.map((b) => (b.grade === "U" ? { ...b, grade: "F" } : b)),
+      ),
+    ).toBe(true);
+    expect(bandsChangeGrades(O_LEVEL_BANDS, moved)).toBe(true);
+    expect(gradeFor(moved, 70)).toBe("B");
+    expect(gradeFor(O_LEVEL_BANDS, 70)).toBe("A");
   });
 });

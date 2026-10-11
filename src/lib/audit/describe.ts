@@ -47,6 +47,17 @@ const yesNo = (v: unknown) => (v === true ? "yes" : v === false ? "no" : null);
 const percent = (v: unknown) => (v == null ? null : `${formatNumber(v)}%`);
 const doneOrDraft = (v: unknown) => (v === "submitted" ? "done" : v === "draft" ? "draft" : null);
 const role = (v: unknown) => (isAppRole(v) ? roleLabel(v) : words(v));
+/** "A 70 to 100, B 60 to 69": a scale's bands, highest first, as recorded (D40). */
+const bandList = (v: unknown): string | null => {
+  if (!Array.isArray(v)) return null;
+  if (v.length === 0) return "no bands";
+  return v
+    .map((b: Record<string, unknown>) => {
+      const range = `${text(b.grade) ?? "?"} ${formatNumber(b.min_mark)} to ${formatNumber(b.max_mark)}`;
+      return text(b.remark) ? `${range} (${text(b.remark)})` : range;
+    })
+    .join(", ");
+};
 
 /** The fields shown for each table, in order. Anything else is never shown. */
 const FIELDS: Record<string, Field[]> = {
@@ -93,6 +104,7 @@ const FIELDS: Record<string, Field[]> = {
     { key: "full_name", label: "Name" },
     { key: "phone", label: "Phone" },
   ],
+  grading_scales: [{ key: "bands", label: "Bands", format: bandList }],
   schools: [
     { key: "primary_color", label: "Main colour" },
     { key: "accent_color", label: "Accent colour" },
@@ -228,6 +240,9 @@ export function describeAuditEntry(e: AuditEntry): AuditLine {
     }
     case "profiles":
       summary = `${actor} changed ${possessive(e.personName ?? "a staff member")} staff details`;
+      break;
+    case "grading_scales":
+      summary = `${actor} changed the grading bands of ${text(data.scale_name) ?? "a grading scale"}`;
       break;
     case "schools":
       summary =

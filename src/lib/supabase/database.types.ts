@@ -1633,6 +1633,15 @@ export type Database = {
         Args: { p_scale_id: string }
         Returns: boolean
       }
+      grading_scale_marked_class_subjects: {
+        Args: { p_scale_id: string }
+        Returns: {
+          class_subjects: number
+          term_id: string
+          term_name: string
+          term_status: Database["public"]["Enums"]["term_status"]
+        }[]
+      }
       grading_scale_problems: {
         Args: { p_scale_id: string }
         Returns: {

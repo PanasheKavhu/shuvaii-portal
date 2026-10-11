@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ClassCommentBox } from "@/components/comments/class-comment-box";
+import { ClassReportPanel } from "@/components/reports/class-report-panel";
 import { TermTabs } from "@/components/marks/class-subject-list";
 import { termHasClassComments } from "@/lib/comments/rules";
 import { describeIncomplete } from "@/lib/marks/cell";
 import { describeLock, describeUnlockers } from "@/lib/marks/terms";
 import { listBank, loadClassResults, requireClassTerm } from "../../../comment-data";
 import { listUnlockers, resolveTerm } from "../../../data";
+import { loadClassReports, loadReportGaps } from "../../../report-data";
 
 export const metadata: Metadata = { title: "Class results and comments" };
 
@@ -15,17 +17,20 @@ export const metadata: Metadata = { title: "Class results and comments" };
  * subject results and grades, average and position, and a box for the
  * overall comment (term reports only, Q8). The class teacher and the school
  * admin write; the head reads. Teachers are locked out after the marks
- * deadline like marks (D34).
+ * deadline like marks (D34). Above them, the class's reports (US-6.1,
+ * US-6.2; D44): the class teacher generates drafts and submits them here.
  */
 export default async function ClassCommentsPage({
   params,
 }: PageProps<"/marks/classes/[classId]/[termId]">) {
   const { classId, termId } = await params;
   const { actor, ct, isClassTeacher } = await requireClassTerm(classId, termId);
-  const [{ learners, comments, lock }, bank, { terms }] = await Promise.all([
+  const [{ learners, comments, lock }, bank, { terms }, reports, gaps] = await Promise.all([
     loadClassResults(ct),
     listBank(actor),
     resolveTerm(actor.schoolId, ct.term.id),
+    loadClassReports(ct.classId, ct.term.id),
+    loadReportGaps(ct.classId, ct.term.id),
   ]);
   const isAdmin = actor.roles.includes("school_admin");
   const hasComments = termHasClassComments(ct.term.kind);
@@ -62,6 +67,16 @@ export default async function ClassCommentsPage({
           hrefFor={(id) => `/marks/classes/${ct.classId}/${id}`}
         />
       </div>
+
+      <ClassReportPanel
+        classId={ct.classId}
+        termId={ct.term.id}
+        learners={learners}
+        reports={reports}
+        gaps={gaps}
+        isClassTeacher={isClassTeacher}
+        isHead={actor.roles.includes("head")}
+      />
 
       {hasComments && lock.teachersLocked && (
         <p

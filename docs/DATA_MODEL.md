@@ -297,19 +297,19 @@ unique (school_id, term_kind); term_kind never changes; no insert or delete thro
 
 ```
 id, school_id, term_id, enrolment_id, template_id, version int default 1,
-status report_status, reference_code unique, verification_code unique,
+status report_status, reference_code unique, verification_code unique,  -- set on publishing
 average_percent, class_position, class_size, head_comment,
 submitted_by, submitted_at, return_note, returned_by, returned_at,
 approved_by, approved_at, published_by, published_at,
 withdrawn_reason, withdrawn_by, withdrawn_at,
-snapshot jsonb,          -- frozen subject lines, comments, grading key, branding, names
-pdf_path,                -- {school_id}/{id}/v{version}.pdf in the reports bucket
+snapshot jsonb,          -- a draft's contents; frozen on publishing with grading key, template, branding, codes
+pdf_path,                -- {school_id}/{id}/v{version}.pdf in the reports bucket; null until US-6.4
 created_by
 unique (term_id, enrolment_id, version); one row not withdrawn per (term_id, enrolment_id)
 the template's kind is the term's kind; the learner is enrolled in the term's year
 ```
 
-The state machine (section 5) holds for every writer. Version, codes, author and the `*_by`/`*_at` stamps are set by the database. Once `published`, nothing changes (so `snapshot` and `pdf_path` are frozen) except withdrawal with a reason; a withdrawn row never changes. Corrections create version + 1 once the old row is `withdrawn`. Never deleted; audited (D43).
+The state machine (section 5) holds for every writer. Version, codes, author and the `*_by`/`*_at` stamps are set by the database; the codes when the report is published. Once `published`, nothing changes (so `snapshot` is frozen) except withdrawal with a reason, and the server storing the PDF path once; a withdrawn row never changes. Corrections create version + 1 once the old row is `withdrawn`. Never deleted; audited (D43). Signed-in users change reports only through the workflow functions (`generate_report_drafts`, `submit_class_reports`, `return_class_reports`, `set_report_head_comment`, `set_report_result_not_available`, `approve_class_reports`, `publish_class_reports`), which check the role and state; `head_comment` is at most 200 characters (D44).
 
 **report_shares**: `id, school_id, report_id, token_hash, expires_at, revoked_at, created_by`. No API access; functions only.
 

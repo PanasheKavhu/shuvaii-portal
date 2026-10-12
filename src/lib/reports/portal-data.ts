@@ -3,7 +3,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { readReportDocument, type ReportDocument } from "./document";
 import { ensureReportPdf } from "./pdf-files";
-import type { PortalReport } from "./portal";
+import type { EnrolmentYear, PortalReport } from "./portal";
 import { portalUrl } from "./portal-url";
 
 /**
@@ -16,6 +16,20 @@ export async function loadPortalReports(schoolId: string): Promise<PortalReport[
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("portal_reports", { p_school_id: schoolId });
   if (error) throw new Error("Could not load reports");
+  return data;
+}
+
+/**
+ * The years and classes of the viewer's children and themselves, newest
+ * first, up to the school's current year (US-3.5, D52), so a new year with
+ * no reports yet still shows.
+ */
+export async function loadFamilyYears(
+  schoolId: string,
+): Promise<(EnrolmentYear & { learner_id: string })[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("family_enrolment_years", { p_school_id: schoolId });
+  if (error) throw new Error("Could not load years");
   return data;
 }
 

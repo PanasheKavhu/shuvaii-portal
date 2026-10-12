@@ -3,7 +3,7 @@ import { LatestNews } from "@/components/news/latest-news";
 import { PortalHeading } from "@/components/portal/portal-heading";
 import { ReportList } from "@/components/portal/report-list";
 import { requireArea } from "@/lib/auth/viewer";
-import { loadPortalReports } from "@/lib/reports/portal-data";
+import { loadFamilyYears, loadPortalReports } from "@/lib/reports/portal-data";
 import { createClient } from "@/lib/supabase/server";
 import { loadNewsSummary } from "../news/data";
 
@@ -16,12 +16,13 @@ export const metadata: Metadata = { title: "My reports" };
  */
 export default async function MyReportsPage() {
   const { viewer, school } = await requireArea("myReports");
-  const [reports, news] = school
+  const [reports, years, news] = school
     ? await Promise.all([
         loadPortalReports(school.schoolId),
+        loadFamilyYears(school.schoolId),
         loadNewsSummary(await createClient(), school.schoolId),
       ])
-    : [[], null];
+    : [[], [], null];
 
   return (
     <section className="flex flex-col gap-5">
@@ -33,6 +34,7 @@ export default async function MyReportsPage() {
       {news && <LatestNews summary={news} />}
       <ReportList
         reports={reports.filter((r) => r.is_own)}
+        years={years}
         hrefFor={(id) => `/my-reports/${id}`}
         emptyText="No published reports yet. They appear here once the school publishes them."
       />

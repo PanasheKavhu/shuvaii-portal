@@ -9,6 +9,7 @@ import {
   shareLinkUrl,
   shortDate,
   whatsAppShareUrl,
+  yearGroupsWithEmpty,
 } from "@/lib/reports/portal";
 import { limitedUntil } from "@/lib/reports/verify";
 
@@ -29,6 +30,49 @@ describe("groupByYear", () => {
 
   it("is empty with no reports", () => {
     expect(groupByYear([])).toEqual([]);
+  });
+});
+
+describe("yearGroupsWithEmpty", () => {
+  const reports = [
+    { id: "a", year_label: "2026" },
+    { id: "b", year_label: "2026" },
+    { id: "c", year_label: "2025" },
+  ];
+
+  it("shows a new year with no reports yet first, with its class", () => {
+    const years = [
+      { year_label: "2027", class_name: "4 Blue" },
+      { year_label: "2026", class_name: "3 Blue" },
+      { year_label: "2025", class_name: "2 Blue" },
+    ];
+    expect(
+      yearGroupsWithEmpty(reports, years).map((g) => [
+        g.year,
+        g.className,
+        g.reports.map((r) => r.id),
+      ]),
+    ).toEqual([
+      ["2027", "4 Blue", []],
+      ["2026", "3 Blue", ["a", "b"]],
+      ["2025", "2 Blue", ["c"]],
+    ]);
+  });
+
+  it("keeps report years the enrolments do not list, after them", () => {
+    expect(
+      yearGroupsWithEmpty(reports, [{ year_label: "2026", class_name: "3 Blue" }]).map((g) => [
+        g.year,
+        g.className,
+      ]),
+    ).toEqual([
+      ["2026", "3 Blue"],
+      ["2025", null],
+    ]);
+  });
+
+  it("is the plain grouping with no years", () => {
+    expect(yearGroupsWithEmpty(reports, []).map((g) => g.year)).toEqual(["2026", "2025"]);
   });
 });
 

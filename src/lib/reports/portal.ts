@@ -36,6 +36,36 @@ export function groupByYear<T extends Pick<PortalReport, "year_label">>(
   return groups;
 }
 
+/** A year the learner is (or was) enrolled in, as `family_enrolment_years()` lists it. */
+export type EnrolmentYear = { year_label: string; class_name: string };
+
+/**
+ * Reports by year with every enrolment year shown, newest first (US-3.5,
+ * D52): a year with no published report yet (the new year after a
+ * rollover) is a group with no reports and its class, next to the years
+ * that have them. Years only the reports know keep their place after.
+ */
+export function yearGroupsWithEmpty<T extends Pick<PortalReport, "year_label">>(
+  reports: readonly T[],
+  years: readonly EnrolmentYear[],
+): { year: string; className: string | null; reports: T[] }[] {
+  const groups = groupByYear(reports);
+  const byYear = new Map(groups.map((g) => [g.year, g]));
+  const out: { year: string; className: string | null; reports: T[] }[] = [];
+  const seen = new Set<string>();
+  for (const y of years) {
+    if (seen.has(y.year_label)) continue;
+    seen.add(y.year_label);
+    out.push({
+      year: y.year_label,
+      className: y.class_name,
+      reports: byYear.get(y.year_label)?.reports ?? [],
+    });
+  }
+  for (const g of groups) if (!seen.has(g.year)) out.push({ ...g, className: null });
+  return out;
+}
+
 /** The child the parent asked for (`?child=`), else the first. Null with no children. */
 export function pickChild<T extends { learner_id: string }>(
   children: readonly T[],

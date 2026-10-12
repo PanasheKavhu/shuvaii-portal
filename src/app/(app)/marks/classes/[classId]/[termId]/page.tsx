@@ -71,7 +71,7 @@ export default async function ClassCommentsPage({
       <ClassReportPanel
         classId={ct.classId}
         termId={ct.term.id}
-        learners={learners}
+        learners={learners.filter((l) => !l.graduated)}
         reports={reports}
         gaps={gaps}
         isClassTeacher={isClassTeacher}
@@ -112,7 +112,10 @@ export default async function ClassCommentsPage({
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <h2 className="text-base font-semibold">{l.name}</h2>
-                      <p className="text-muted-foreground text-xs">{l.learnerNumber}</p>
+                      <p className="text-muted-foreground text-xs">
+                        {l.learnerNumber}
+                        {l.graduated && " · Graduated, read-only"}
+                      </p>
                     </div>
                     <p
                       aria-label={`Average and position for ${l.name}`}
@@ -179,7 +182,7 @@ export default async function ClassCommentsPage({
                       enrolmentId={l.enrolmentId}
                       learnerName={l.name}
                       initial={comments[l.enrolmentId]}
-                      readOnly={!canWrite}
+                      readOnly={!canWrite || l.graduated}
                       bank={bank}
                       grade={l.averageGrade}
                     />

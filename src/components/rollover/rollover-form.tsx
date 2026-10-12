@@ -35,14 +35,15 @@ export function RolloverForm({
   classes,
   nextClasses,
   levels,
-  toYearIsCurrent,
+  nextYearLearners,
 }: {
   fromLabel: string;
-  toYear: { id: string; label: string };
+  toYear: { id: string; label: string; isCurrent: boolean };
   classes: RolloverClassRow[];
   nextClasses: RolloverClass[];
   levels: RolloverLevel[];
-  toYearIsCurrent: boolean;
+  /** Learners already in the next year: then it can be made current. */
+  nextYearLearners: number;
 }) {
   const [targets, setTargets] = useState<Record<string, string>>(() =>
     Object.fromEntries(classes.map((c) => [c.id, targetValue(c.proposed)])),
@@ -80,9 +81,23 @@ export function RolloverForm({
           )}
           <NotCarried result={applied} toLabel={toYear.label} links />
         </section>
-        {!toYearIsCurrent && (
+        {!toYear.isCurrent && (
           <MakeCurrentYear yearId={toYear.id} label={toYear.label} fromLabel={fromLabel} />
         )}
+      </div>
+    );
+  }
+
+  const makeCurrent = nextYearLearners > 0 && !toYear.isCurrent && (
+    <MakeCurrentYear yearId={toYear.id} label={toYear.label} fromLabel={fromLabel} />
+  );
+  if (classes.length === 0) {
+    return (
+      <div className="flex flex-col gap-6">
+        {makeCurrent}
+        <p className="text-muted-foreground bg-muted/40 rounded-xl border border-dashed p-6">
+          Everyone in {fromLabel} has moved on: nobody is still enrolled in a {fromLabel} class.
+        </p>
       </div>
     );
   }
@@ -91,6 +106,7 @@ export function RolloverForm({
 
   return (
     <div className="flex flex-col gap-6">
+      {makeCurrent}
       <ul aria-label={`${fromLabel} classes`} className="flex flex-col gap-4">
         {classes.map((c) => {
           const target = targets[c.id] ?? "skip";

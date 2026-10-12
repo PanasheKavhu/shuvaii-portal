@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { MakeCurrentYear } from "@/components/rollover/make-current-year";
 import { RolloverForm } from "@/components/rollover/rollover-form";
 import { buttonVariants } from "@/components/ui/button";
 import { nextYearLabel } from "@/lib/setup/calendar";
@@ -79,26 +78,15 @@ export default async function RolloverPage({ searchParams }: PageProps<"/admin/r
             </nav>
           )}
 
-          {view.nextYearLearners > 0 && !toYear.isCurrent && (
-            <MakeCurrentYear yearId={toYear.id} label={toYear.label} fromLabel={fromYear.label} />
-          )}
-
-          {view.classes.length === 0 ? (
-            <Empty>
-              Everyone in {fromYear.label} has moved on: nobody is still enrolled in a{" "}
-              {fromYear.label} class.
-            </Empty>
-          ) : (
-            <RolloverForm
-              key={toYear.id}
-              fromLabel={fromYear.label}
-              toYear={{ id: toYear.id, label: toYear.label }}
-              classes={view.classes}
-              nextClasses={view.nextClasses}
-              levels={view.levels}
-              toYearIsCurrent={toYear.isCurrent}
-            />
-          )}
+          <RolloverForm
+            key={toYear.id}
+            fromLabel={fromYear.label}
+            toYear={{ id: toYear.id, label: toYear.label, isCurrent: toYear.isCurrent }}
+            classes={view.classes}
+            nextClasses={view.nextClasses}
+            levels={view.levels}
+            nextYearLearners={view.nextYearLearners}
+          />
         </>
       )}
     </section>

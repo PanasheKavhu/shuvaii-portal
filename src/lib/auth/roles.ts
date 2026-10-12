@@ -34,6 +34,13 @@ export const AREAS = {
   // reached from the overview, so no menu entry of their own.
   setup: { href: "/admin/setup", label: "School setup", roles: ["school_admin"], menuRoles: [] },
   people: { href: "/admin/people", label: "People", roles: ["school_admin"], menuRoles: [] },
+  // Year rollover (US-3.5, D52): the school admin's alone, like setup.
+  rollover: {
+    href: "/admin/rollover",
+    label: "Roll over the year",
+    roles: ["school_admin"],
+    menuRoles: [],
+  },
   head: { href: "/head", label: "Head's office", roles: ["head"] },
   department: { href: "/department", label: "Department", roles: ["hod"] },
   // Heads of department teach too (D20).

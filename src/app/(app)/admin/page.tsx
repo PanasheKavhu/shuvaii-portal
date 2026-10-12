@@ -185,7 +185,7 @@ export default async function OverviewPage({ searchParams }: PageProps<"/admin">
 
       {o.isAdmin && (
         <Section id="manage" title="Manage">
-          <ul className="grid gap-3 sm:grid-cols-3">
+          <ul className="grid gap-3 sm:grid-cols-2">
             {[
               {
                 href: "/admin/setup",
@@ -201,6 +201,11 @@ export default async function OverviewPage({ searchParams }: PageProps<"/admin">
                 href: "/admin/newsletter",
                 label: "Newsletter",
                 text: "Announcements for the school, staff, families or a class.",
+              },
+              {
+                href: "/admin/rollover",
+                label: "Roll over the year",
+                text: "At year end: classes move up, repeaters, leavers and graduates.",
               },
             ].map((l) => (
               <li key={l.href}>

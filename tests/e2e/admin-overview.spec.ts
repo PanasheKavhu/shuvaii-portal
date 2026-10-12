@@ -50,9 +50,9 @@ test("the admin's overview counts follow a mark and a published report, and lead
   await expect(count(page, "marks")).toHaveText("3");
   await expect(count(page, "reports-approved")).toHaveText("3");
   await expect(count(page, "reports-published")).toHaveText("0");
-  await expect(page.getByRole("list", { name: "Latest changes" }).getByRole("listitem")).toHaveCount(
-    20,
-  );
+  await expect(
+    page.getByRole("list", { name: "Latest changes" }).getByRole("listitem"),
+  ).toHaveCount(20);
   await expectNoSideScroll(page);
 
   // Into the grid from the class's gaps, and enter one mark.

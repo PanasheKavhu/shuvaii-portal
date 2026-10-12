@@ -390,6 +390,8 @@ Helper functions (security definer, stable): `current_school_ids()`, `has_role(s
 
 Default is deny. Each policy has a test in each direction (allowed and blocked) and a cross-school test.
 
+Oversight (D51): `oversight_counts(school)`, `oversight_reports(term)` and `oversight_guardians(school, filter)` answer only the school's admin or head; `browse_search(school, text)` answers them for the whole school and a hod for the learners and classes they teach and themselves. All four are read-only and count or list existing rows; they calculate no marks.
+
 ## 8. Storage buckets (Supabase Storage)
 
 | Bucket            | Contents                | Access                                                                                                                                                                                             |

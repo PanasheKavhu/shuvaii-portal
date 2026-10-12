@@ -314,44 +314,55 @@ function Gaps({
             t.classCommentsMissing > 0 && count(t.classCommentsMissing, "class comment"),
             t.weightProblems > 0 && `${t.weightProblems} weights not 100`,
           ].filter(Boolean);
+          const summary = (
+            <span
+              className={cn(
+                "text-sm",
+                isComplete(t)
+                  ? "text-emerald-800 dark:text-emerald-300"
+                  : "text-amber-900 dark:text-amber-200",
+              )}
+              data-testid="gap-summary"
+            >
+              {parts.length ? `${parts.join(" · ")} missing` : "Complete"}
+            </span>
+          );
+          // A teacher's line opens their profile, which lists their grids;
+          // listing every class subject twice would double the page.
+          if (view === "teacher")
+            return (
+              <li key={g.key}>
+                <a
+                  href={
+                    g.key === "none"
+                      ? `/marks/completion?term=${termId}&by=teacher`
+                      : `/admin/browse/staff/${g.key}`
+                  }
+                  className="hover:bg-muted/40 flex min-h-12 flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 py-2"
+                >
+                  <span className="text-primary font-medium">{g.name}</span>
+                  {summary}
+                </a>
+              </li>
+            );
           return (
             <li key={g.key}>
               <details>
                 <summary className="flex min-h-12 cursor-pointer list-none flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 py-2">
                   <span className="font-medium">{g.name}</span>
-                  <span
-                    className={cn(
-                      "text-sm",
-                      isComplete(t)
-                        ? "text-emerald-800 dark:text-emerald-300"
-                        : "text-amber-900 dark:text-amber-200",
-                    )}
-                    data-testid="gap-summary"
-                  >
-                    {parts.length ? `${parts.join(" · ")} missing` : "Complete"}
-                  </span>
+                  {summary}
                 </summary>
                 <ul className="flex flex-col gap-1 px-4 pb-3">
-                  {view === "teacher" && g.key !== "none" && (
+                  {
                     <li>
-                      <Link
-                        href={`/admin/browse/staff/${g.key}`}
-                        className="text-primary flex min-h-11 items-center text-sm font-medium underline-offset-4 hover:underline"
-                      >
-                        {g.name}&apos;s profile
-                      </Link>
-                    </li>
-                  )}
-                  {view === "class" && (
-                    <li>
-                      <Link
+                      <a
                         href={`/admin/browse/classes/${g.key}`}
                         className="text-primary flex min-h-11 items-center text-sm font-medium underline-offset-4 hover:underline"
                       >
                         {g.name} class profile
-                      </Link>
+                      </a>
                     </li>
-                  )}
+                  }
                   {g.classSubjects.map((cs) => {
                     const gaps = [
                       cs.marksMissing > 0 && count(cs.marksMissing, "mark"),
@@ -359,7 +370,7 @@ function Gaps({
                     ].filter(Boolean);
                     return (
                       <li key={cs.classSubjectId}>
-                        <Link
+                        <a
                           href={
                             weightsWrong(cs) && gaps.length === 0
                               ? `/marks/${cs.classSubjectId}/${termId}/assessments`
@@ -381,7 +392,7 @@ function Gaps({
                                   : `Weights ${cs.totalWeight}%`
                                 : "Complete"}
                           </span>
-                        </Link>
+                        </a>
                       </li>
                     );
                   })}
@@ -389,7 +400,7 @@ function Gaps({
                     .filter((c) => c.classCommentsMissing !== null)
                     .map((c) => (
                       <li key={c.classId}>
-                        <Link
+                        <a
                           href={`/marks/classes/${c.classId}/${termId}`}
                           className="hover:bg-muted/40 -mx-2 flex min-h-11 flex-wrap items-center justify-between gap-x-3 rounded-lg px-2 text-sm"
                         >
@@ -401,7 +412,7 @@ function Gaps({
                               ? `${count(c.classCommentsMissing, "comment")} missing`
                               : "Complete"}
                           </span>
-                        </Link>
+                        </a>
                       </li>
                     ))}
                 </ul>

@@ -21,6 +21,8 @@ describe("areaForPath", () => {
     expect(areaForPath("/admin/audit")).toBe("audit");
     expect(areaForPath("/admin/audit/x")).toBe("audit");
     expect(areaForPath("/admin/auditx")).toBe("admin");
+    expect(areaForPath("/admin/newsletter/new")).toBe("newsletter");
+    expect(areaForPath("/news/abc")).toBe("news");
     expect(areaForPath("/marks/completion")).toBe("completion");
     expect(areaForPath("/marks/abc")).toBe("marks");
   });

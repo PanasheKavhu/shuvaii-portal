@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { LatestNews } from "@/components/news/latest-news";
 import { PortalHeading } from "@/components/portal/portal-heading";
 import { ReportList } from "@/components/portal/report-list";
 import { requireArea } from "@/lib/auth/viewer";
@@ -7,6 +8,7 @@ import { pickChild } from "@/lib/reports/portal";
 import { loadPortalReports } from "@/lib/reports/portal-data";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
+import { loadNewsSummary } from "../news/data";
 
 export const metadata: Metadata = { title: "My children" };
 
@@ -20,12 +22,13 @@ export const metadata: Metadata = { title: "My children" };
 export default async function ChildrenPage({ searchParams }: PageProps<"/children">) {
   const { viewer, school } = await requireArea("children");
   const supabase = await createClient();
-  const [{ data: children, error }, reports, { child }] = await Promise.all([
+  const [{ data: children, error }, reports, { child }, news] = await Promise.all([
     school
       ? supabase.rpc("my_children", { p_school_id: school.schoolId })
       : Promise.resolve({ data: [], error: null }),
     school ? loadPortalReports(school.schoolId) : Promise.resolve([]),
     searchParams,
+    school ? loadNewsSummary(supabase, school.schoolId) : null,
   ]);
   if (error) throw new Error("Could not load your children");
   const chosen = pickChild(children, child);
@@ -37,6 +40,7 @@ export default async function ChildrenPage({ searchParams }: PageProps<"/childre
         title="My children"
         fullName={viewer.fullName}
       />
+      {news && <LatestNews summary={news} />}
 
       {children.length > 0 && (
         <nav aria-label="Children">

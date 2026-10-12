@@ -78,3 +78,30 @@ export function attachmentObjectPath(
 ): string {
   return `${schoolId}/${announcementId}/${filename}`;
 }
+
+/** The limits, as shown beside the file picker before anything is uploaded. */
+export const ATTACHMENT_LIMITS_TEXT = "PDF, PNG, JPEG or WebP, up to 5 MB each, at most 3 files.";
+
+/** For the file picker's accept attribute. */
+export const ATTACHMENT_ACCEPT =
+  ".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp";
+
+/**
+ * The browser-side check before uploading: the size, and the type the name
+ * and the browser claim. Only saves a wasted upload; the server still sniffs
+ * the bytes (sniffAttachmentType) and the bucket checks again.
+ */
+export function precheckAttachment(
+  file: { name: string; type: string; size: number } | null,
+  existingCount: number,
+): AttachmentCheck {
+  const checked = checkAttachmentFile(file, existingCount);
+  if (!checked.ok || !file) return checked;
+  const extension = /\.([A-Za-z0-9]+)$/.exec(file.name)?.[1]?.toLowerCase() ?? "";
+  const knownExtension = ["pdf", "png", "jpg", "jpeg", "webp"].includes(extension);
+  const knownType = file.type === "" || file.type in ATTACHMENT_TYPES;
+  if (!knownExtension || !knownType) {
+    return { ok: false, error: "Attach a PDF or a PNG, JPEG or WebP image." };
+  }
+  return { ok: true };
+}

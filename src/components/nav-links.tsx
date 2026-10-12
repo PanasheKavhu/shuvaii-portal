@@ -4,7 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
-export type NavLink = { href: string; label: string };
+/** `badge`: a count shown beside the label, such as unread news. */
+export type NavLink = { href: string; label: string; badge?: number };
 
 /** Role menu (US-1.8). Items come from navFor(), so it only lists allowed areas. */
 export function NavLinks({ items }: { items: NavLink[] }) {
@@ -27,6 +28,20 @@ export function NavLinks({ items }: { items: NavLink[] }) {
             )}
           >
             {item.label}
+            {item.badge !== undefined && (
+              <span
+                data-testid="nav-badge"
+                className={cn(
+                  "ml-2 inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-semibold",
+                  active
+                    ? "bg-primary-foreground text-primary"
+                    : "bg-primary text-primary-foreground",
+                )}
+              >
+                {item.badge}
+                <span className="sr-only"> unread</span>
+              </span>
+            )}
           </Link>
         );
       })}

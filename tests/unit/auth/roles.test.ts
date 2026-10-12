@@ -4,12 +4,12 @@ import { canUseArea, AREAS, homeFor, navFor } from "@/lib/auth/roles";
 const hrefs = (items: { href: string }[]) => items.map((i) => i.href);
 
 describe("navFor", () => {
-  it("shows a teacher only their classes", () => {
-    expect(hrefs(navFor(["teacher"], false))).toEqual(["/teaching", "/marks/completion"]);
+  it("shows a teacher their classes and the news", () => {
+    expect(hrefs(navFor(["teacher"], false))).toEqual(["/teaching", "/marks/completion", "/news"]);
   });
 
-  it("shows a school admin and head their area, marks, completion and the audit log", () => {
-    const shared = ["/marks", "/marks/completion", "/admin/audit"];
+  it("shows a school admin and head their area, marks, completion, the audit log and the newsletter", () => {
+    const shared = ["/marks", "/marks/completion", "/admin/audit", "/admin/newsletter"];
     expect(hrefs(navFor(["school_admin"], false))).toEqual(["/admin", ...shared]);
     expect(hrefs(navFor(["head"], false))).toEqual(["/head", ...shared]);
   });
@@ -19,6 +19,7 @@ describe("navFor", () => {
       "/department",
       "/teaching",
       "/marks/completion",
+      "/news",
     ]);
   });
 
@@ -27,7 +28,13 @@ describe("navFor", () => {
       "/teaching",
       "/marks/completion",
       "/children",
+      "/news",
     ]);
+  });
+
+  it("gives parents and learners the news after their reports", () => {
+    expect(hrefs(navFor(["parent"], false))).toEqual(["/children", "/news"]);
+    expect(hrefs(navFor(["learner"], false))).toEqual(["/my-reports", "/news"]);
   });
 
   it("shows the platform console only to platform admins", () => {

@@ -16,7 +16,11 @@ export default async function AdminPage() {
       <Link href="/admin/people" className="text-primary font-medium underline">
         People
       </Link>
-      : learners, guardians and staff, added one at a time or imported from a file. Oversight will
+      : learners, guardians and staff, added one at a time or imported from a file.{" "}
+      <Link href="/admin/newsletter" className="text-primary font-medium underline">
+        Newsletter
+      </Link>
+      : announcements for the whole school, staff, learners, parents or one class. Oversight will
       appear here too.
     </AreaHome>
   );

@@ -43,8 +43,18 @@ export const AREAS = {
   },
   // The school's audit log (D35). Inside /admin, but heads may open it too.
   audit: { href: "/admin/audit", label: "Audit log", roles: ["school_admin", "head"] },
+  // Writing announcements (US-8.1, D50). Inside /admin, but heads write too.
+  newsletter: { href: "/admin/newsletter", label: "Newsletter", roles: ["school_admin", "head"] },
   children: { href: "/children", label: "My children", roles: ["parent"] },
   myReports: { href: "/my-reports", label: "My reports", roles: ["learner"] },
+  // Reading announcements (US-8.2, D50). Anyone may open it; school admin
+  // and head have the Newsletter instead in their menu.
+  news: {
+    href: "/news",
+    label: "News",
+    roles: ["school_admin", "head", "hod", "teacher", "parent", "learner"],
+    menuRoles: ["hod", "teacher", "parent", "learner"],
+  },
   platform: { href: "/platform", label: "Platform", roles: [], platformOnly: true },
 } as const satisfies Record<string, Area>;
 

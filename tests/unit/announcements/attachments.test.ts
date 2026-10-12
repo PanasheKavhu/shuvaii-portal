@@ -4,6 +4,7 @@ import {
   attachmentFileName,
   attachmentObjectPath,
   checkAttachmentFile,
+  precheckAttachment,
   sniffAttachmentType,
 } from "@/lib/announcements/attachments";
 
@@ -73,5 +74,29 @@ describe("attachmentFileName", () => {
 describe("attachmentObjectPath", () => {
   it("puts the file in the announcement's folder of its school", () => {
     expect(attachmentObjectPath("s-1", "a-1", "notice.pdf")).toBe("s-1/a-1/notice.pdf");
+  });
+});
+
+describe("precheckAttachment", () => {
+  const file = (name: string, type: string, size = 1000) => ({ name, type, size });
+
+  it("lets a PDF or image of up to 5 MB through", () => {
+    expect(precheckAttachment(file("notice.pdf", "application/pdf"), 0)).toEqual({ ok: true });
+    expect(precheckAttachment(file("Photo.JPG", "image/jpeg", ATTACHMENT_MAX_BYTES), 2)).toEqual({
+      ok: true,
+    });
+    expect(precheckAttachment(file("scan.webp", ""), 0)).toEqual({ ok: true });
+  });
+
+  it("refuses another type, a file over 5 MB, or a fourth file before uploading", () => {
+    expect(precheckAttachment(file("notes.txt", "text/plain"), 0).ok).toBe(false);
+    expect(precheckAttachment(file("page.pdf", "text/html"), 0).ok).toBe(false);
+    expect(
+      precheckAttachment(file("big.pdf", "application/pdf", ATTACHMENT_MAX_BYTES + 1), 0),
+    ).toEqual({
+      ok: false,
+      error: "Each file must be 5 MB or smaller.",
+    });
+    expect(precheckAttachment(file("one.pdf", "application/pdf"), 3).ok).toBe(false);
   });
 });

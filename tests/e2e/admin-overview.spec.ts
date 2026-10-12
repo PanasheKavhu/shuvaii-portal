@@ -65,11 +65,17 @@ test("the admin's overview counts follow a mark and a published report, and lead
       .getByRole("group", { name: "Assessment" })
       .getByRole("button", { name: /^Essay / })
       .click();
+  // Retried as in marks-upload.spec: a fill before the grid hydrates is not
+  // saved, and React sees no change if the box already holds "40", so clear it first.
   const essay = page.getByLabel(`Essay for ${learner.name}`);
-  await essay.fill("40");
-  await expect(page.locator(`[id="${await essay.getAttribute("aria-describedby")}"]`)).toHaveText(
-    "Saved",
-  );
+  await expect(async () => {
+    await essay.fill("");
+    await essay.fill("40");
+    await expect(page.locator(`[id="${await essay.getAttribute("aria-describedby")}"]`)).toHaveText(
+      "Saved",
+      { timeout: 5_000 },
+    );
+  }).toPass({ timeout: 30_000 });
   await page.goto("/admin");
   await expect(count(page, "marks")).toHaveText("2");
 

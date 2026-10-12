@@ -29,6 +29,7 @@ test("a head lands on the head's office and sees only their menu", async ({ page
     "Marks",
     "Completion",
     "Audit log",
+    "Newsletter",
   ]);
   await expect(page.getByRole("contentinfo")).toHaveText("Implemented by Panashe and Shuvai 2026");
 });
@@ -41,13 +42,19 @@ test("a school admin lands on the admin area", async ({ page }) => {
     "Marks",
     "Completion",
     "Audit log",
+    "Newsletter",
   ]);
 });
 
 test("a teacher is told 'not allowed' on admin and head pages", async ({ page }) => {
   await signIn(page, TEACHER);
   await expect(page).toHaveURL("/teaching");
-  await expect(mainNav(page).getByRole("link")).toHaveText(["My classes", "Completion"]);
+  await expect(mainNav(page).getByRole("link")).toHaveText([
+    "My classes",
+    "Completion",
+    // With the unread count, when there is one (D50).
+    /^News/,
+  ]);
 
   for (const path of ["/admin", "/head", "/platform"]) {
     const res = await page.goto(path);

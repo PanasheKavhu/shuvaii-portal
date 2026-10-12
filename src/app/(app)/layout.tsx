@@ -3,19 +3,28 @@ import { NavLinks } from "@/components/nav-links";
 import { SchoolLogo } from "@/components/theme/school-logo";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { navFor } from "@/lib/auth/roles";
+import { AREAS, navFor } from "@/lib/auth/roles";
 import { getActiveSchool, requireViewer } from "@/lib/auth/viewer";
 import { NO_BRANDING, logoUrl } from "@/lib/branding/theme";
 import { supabaseUrl } from "@/lib/supabase/env";
+import { createClient } from "@/lib/supabase/server";
 import { signOut } from "./actions";
+import { loadNewsSummary } from "./news/data";
 
 /** Shell for signed-in pages: school brand, role menu, switch school, sign out. */
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const viewer = await requireViewer();
   const school = await getActiveSchool(viewer);
-  const items = navFor(school?.roles ?? [], viewer.isPlatformAdmin).map(({ href, label }) => ({
+  const areas = navFor(school?.roles ?? [], viewer.isPlatformAdmin);
+  // The News entry carries the unread count (US-8.2, D50).
+  const unread =
+    school && areas.some((a) => a.href === AREAS.news.href)
+      ? (await loadNewsSummary(await createClient(), school.schoolId)).unreadCount
+      : 0;
+  const items = areas.map(({ href, label }) => ({
     href,
     label,
+    badge: href === AREAS.news.href && unread > 0 ? unread : undefined,
   }));
   const title = school?.schoolName ?? (viewer.isPlatformAdmin ? "Platform" : "Choose a school");
   const branding = school?.branding ?? NO_BRANDING;

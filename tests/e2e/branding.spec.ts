@@ -15,13 +15,13 @@ const cssVar = (page: Page, name: string) =>
 test("each school's colours are applied from the database", async ({ page }) => {
   // seed/schools.csv: Msasa primary #0B5FA5, Kudzai primary #1B7F5C.
   await signIn(page, "pzimu@msasa.demo.spportal.test");
-  await expect(page).toHaveURL("/head");
+  await expect(page).toHaveURL("/admin");
   expect(await cssVar(page, "--primary")).toBe("#0b5fa5");
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL("/sign-in");
 
   await signIn(page, "rchirw@kudzai.demo.spportal.test");
-  await expect(page).toHaveURL("/head");
+  await expect(page).toHaveURL("/admin");
   expect(await cssVar(page, "--primary")).toBe("#1b7f5c");
 });
 

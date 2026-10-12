@@ -168,7 +168,7 @@ test("after the deadline a teacher cannot edit; a head unlocks with a reason, th
   const headContext = await browser.newContext({ viewport: page.viewportSize()! });
   const headPage = await headContext.newPage();
   await signIn(headPage, school.headEmail!);
-  await expect(headPage).toHaveURL("/head");
+  await expect(headPage).toHaveURL("/admin");
   await headPage.goto(`/marks?term=${school.termId}`);
   await headPage
     .getByRole("list", { name: "4 Blue subjects" })

@@ -41,7 +41,7 @@ test("the head withdraws a report with a reason and the reissued version replace
 
   // Publish the class and let its PDFs be made.
   await signIn(page, school.headEmail!);
-  await expect(page).toHaveURL("/head");
+  await expect(page).toHaveURL("/admin");
   const classPage = `/head/reports/${school.classId}/${school.termId}`;
   await page.goto(classPage);
   await page.getByRole("button", { name: "Publish 3 reports" }).click();

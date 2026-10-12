@@ -154,6 +154,8 @@ export type ClassLearnerResult = {
   averageGrade: string | null;
   position: number | null;
   classSize: number | null;
+  /** Finished the year in this class and left school (D53): shown, ranked, read-only. */
+  graduated: boolean;
 };
 
 export type ClassCommentLock = {
@@ -223,8 +225,11 @@ export async function loadClassResults(ct: ClassTerm): Promise<{
   const order = (id: string) => subjectInfo.get(id)?.order ?? 0;
   const positionOf = new Map(rows(positions).map((p) => [p.enrolment_id, p]));
 
+  // Everyone class_positions() ranks: graduates finished the year in the
+  // class, so a past term shows them (read-only) with their position (D31,
+  // D37, D53). Learners who moved or left mid-year are not listed.
   const learners = rows(enrolments)
-    .filter((e) => isStillInClass(e.status))
+    .filter((e) => isStillInClass(e.status) || e.status === "graduated")
     .map((e) => {
       const p = positionOf.get(e.id);
       const average = p?.average == null ? null : Number(p.average);
@@ -243,6 +248,7 @@ export async function loadClassResults(ct: ClassTerm): Promise<{
         averageGrade: averageGrade(bands, average),
         position: p?.position ?? null,
         classSize: p?.class_size ?? null,
+        graduated: e.status === "graduated",
       };
     })
     .sort((a, b) => a.lastName.localeCompare(b.lastName) || a.name.localeCompare(b.name));

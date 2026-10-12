@@ -62,7 +62,7 @@ export default async function HeadClassReportsPage({
   ]);
   const counts = countByStatus(reports);
   const reportOf = new Map(reports.map((r) => [r.enrolmentId, r]));
-  const noReport = learners.filter((l) => !reportOf.has(l.enrolmentId));
+  const noReport = learners.filter((l) => !l.graduated && !reportOf.has(l.enrolmentId));
   const ordered = learners
     .map((l) => ({ name: l.name, report: reportOf.get(l.enrolmentId) }))
     .filter((l): l is { name: string; report: ClassReport } => !!l.report);

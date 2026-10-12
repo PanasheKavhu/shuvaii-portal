@@ -31,6 +31,15 @@ export default async function SetupPage() {
             Report settings
           </Link>
           <Link
+            href="/admin/rollover"
+            className={buttonVariants({
+              variant: "outline",
+              className: "h-11 rounded-full px-5 text-base",
+            })}
+          >
+            Roll over the year
+          </Link>
+          <Link
             href="/admin/setup/new"
             className={buttonVariants({ className: "h-11 rounded-full px-5 text-base" })}
           >

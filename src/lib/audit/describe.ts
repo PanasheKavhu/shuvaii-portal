@@ -325,6 +325,22 @@ export function describeAuditEntry(e: AuditEntry): AuditLine {
           : `${actor} attached ${file} to an announcement`;
       return { summary, changes: [], reason };
     }
+    case "academic_years": {
+      if (e.event === "year_rolled_over") {
+        const n = (key: string) => Number(data[key]) || 0;
+        const parts = [
+          [n("promoted"), "moved up"],
+          [n("repeating"), "repeating"],
+          [n("left"), "left"],
+          [n("graduated"), "graduated"],
+        ]
+          .filter(([count]) => (count as number) > 0)
+          .map(([count, what]) => `${count} ${what}`);
+        summary = `${actor} rolled ${text(data.from_year) ?? "the year"} over into ${text(data.to_year) ?? "the next year"}${parts.length ? `: ${parts.join(", ")}` : ""}`;
+        return { summary, changes: [], reason };
+      }
+      return { summary: `${actor} changed an academic year`, changes: [], reason };
+    }
     case "invites": {
       const name = e.personName ?? "a guardian";
       summary =

@@ -429,3 +429,31 @@ describe("describeAuditEntry: announcements", () => {
     expect(at("delete")).toBe("Mrs Dube removed the file map.png from an announcement");
   });
 });
+
+describe("describeAuditEntry: year rollover", () => {
+  it("says who rolled which year over and how many of each, leaving out none", () => {
+    expect(
+      describeAuditEntry(
+        entry({
+          table: "academic_years",
+          action: "event",
+          event: "year_rolled_over",
+          actorName: "Mrs Tembo",
+          newData: {
+            from_year: "2026",
+            to_year: "2027",
+            promoted: 58,
+            repeating: 1,
+            left: 1,
+            graduated: 0,
+            classes_created: 3,
+          },
+        }),
+      ),
+    ).toEqual({
+      summary: "Mrs Tembo rolled 2026 over into 2027: 58 moved up, 1 repeating, 1 left",
+      changes: [],
+      reason: null,
+    });
+  });
+});

@@ -207,6 +207,11 @@ export default async function OverviewPage({ searchParams }: PageProps<"/admin">
                 label: "Exports",
                 text: "Learners, marks and comments as Excel files.",
               },
+              {
+                href: "/admin/rollover",
+                label: "Roll over the year",
+                text: "At year end: classes move up, repeaters, leavers and graduates.",
+              },
             ].map((l) => (
               <li key={l.href}>
                 <Link

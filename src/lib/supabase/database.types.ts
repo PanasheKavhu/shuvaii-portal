@@ -2093,6 +2093,16 @@ export type Database = {
           term_name: string
         }[]
       }
+      browse_search: {
+        Args: { p_query: string; p_school_id: string }
+        Returns: {
+          detail: string
+          id: string
+          kind: string
+          label: string
+          roles: Database["public"]["Enums"]["app_role"][]
+        }[]
+      }
       class_comment_lock: {
         Args: { p_class_id: string; p_term_id: string }
         Returns: {
@@ -2345,6 +2355,47 @@ export type Database = {
           pdf_path: string
           reference_code: string
           share_id: string
+        }[]
+      }
+      oversight_counts: {
+        Args: { p_school_id: string }
+        Returns: {
+          active_learners: number
+          guardians: number
+          guardians_never_signed_in: number
+          parents_linked: number
+          staff: number
+        }[]
+      }
+      oversight_guardians: {
+        Args: {
+          p_filter: string
+          p_limit?: number
+          p_offset?: number
+          p_school_id: string
+        }
+        Returns: {
+          full_name: string
+          guardian_id: string
+          has_login: boolean
+          last_sign_in_at: string
+          learners: Json
+          phone: string
+          total: number
+        }[]
+      }
+      oversight_reports: {
+        Args: { p_term_id: string }
+        Returns: {
+          approved: number
+          class_id: string
+          class_name: string
+          class_teacher_name: string
+          drafts: number
+          published: number
+          returned: number
+          submitted: number
+          withdrawn: number
         }[]
       }
       parent_invite_preview: {

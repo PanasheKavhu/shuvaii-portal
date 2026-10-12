@@ -112,6 +112,15 @@ const FIELDS: Record<string, Field[]> = {
     { key: "return_note", label: "Return note" },
     { key: "reference_code", label: "Reference" },
   ],
+  announcements: [
+    { key: "title", label: "Title" },
+    { key: "body", label: "Text" },
+    { key: "audience", label: "For", format: words },
+    { key: "status", label: "Status", format: words },
+    { key: "pinned", label: "Pinned", format: yesNo },
+    { key: "expires_at", label: "Expires" },
+  ],
+  announcement_attachments: [{ key: "filename", label: "File" }],
   schools: [
     { key: "primary_color", label: "Main colour" },
     { key: "accent_color", label: "Accent colour" },
@@ -292,6 +301,28 @@ export function describeAuditEntry(e: AuditEntry): AuditLine {
           : `${actor} changed the school's colours or logo`;
       if (e.event === "school_created") return { summary, changes: [], reason };
       break;
+    case "announcements": {
+      const title = `the announcement "${text(data.title) ?? "untitled"}"`;
+      const from = e.oldData?.status;
+      const to = e.newData?.status;
+      summary =
+        e.action === "insert"
+          ? `${actor} ${to === "published" ? "posted" : "wrote a draft of"} ${title}`
+          : from !== to && to === "published"
+            ? `${actor} ${from === "archived" ? "published again" : "published"} ${title}`
+            : from !== to && to === "archived"
+              ? `${actor} archived ${title}`
+              : `${actor} changed ${title}`;
+      break;
+    }
+    case "announcement_attachments": {
+      const file = text(data.filename) ? `the file ${text(data.filename)}` : "a file";
+      summary =
+        e.action === "delete"
+          ? `${actor} removed ${file} from an announcement`
+          : `${actor} attached ${file} to an announcement`;
+      return { summary, changes: [], reason };
+    }
     case "invites": {
       const name = e.personName ?? "a guardian";
       summary =

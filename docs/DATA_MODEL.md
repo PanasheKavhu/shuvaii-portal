@@ -36,24 +36,25 @@ Reading it: a learner is enrolled in one class per year; each learner takes some
 
 ## 3. Enums
 
-| Enum                | Values                                                                                     |
-| ------------------- | ------------------------------------------------------------------------------------------ |
-| `school_stage`      | primary, secondary, combined                                                               |
-| `app_role`          | school_admin, head, hod, teacher, parent, learner (super admin lives in `platform_admins`) |
-| `membership_status` | invited, active, disabled                                                                  |
-| `level_stage`       | ecd, primary, o_level, a_level                                                             |
-| `term_kind`         | term, vacation, mock                                                                       |
-| `term_status`       | planned, open, locked, closed                                                              |
-| `assessment_type`   | test, assignment, exam, practical, vacation                                                |
-| `mark_status`       | present, absent, excused                                                                   |
-| `comment_status`    | draft, submitted                                                                           |
-| `report_status`     | draft, submitted, approved, published, withdrawn                                           |
-| `enrolment_status`  | enrolled, promoted, repeating, transferred, left, graduated                                |
-| `audience_type`     | all, staff, learners, parents, class                                                       |
-| `sex`               | F, M (Q27)                                                                                 |
-| `learner_status`    | active, left, graduated                                                                    |
-| `import_kind`       | staff, learners, marks                                                                     |
-| `import_status`     | validated, committed, failed                                                               |
+| Enum                  | Values                                                                                     |
+| --------------------- | ------------------------------------------------------------------------------------------ |
+| `school_stage`        | primary, secondary, combined                                                               |
+| `app_role`            | school_admin, head, hod, teacher, parent, learner (super admin lives in `platform_admins`) |
+| `membership_status`   | invited, active, disabled                                                                  |
+| `level_stage`         | ecd, primary, o_level, a_level                                                             |
+| `term_kind`           | term, vacation, mock                                                                       |
+| `term_status`         | planned, open, locked, closed                                                              |
+| `assessment_type`     | test, assignment, exam, practical, vacation                                                |
+| `mark_status`         | present, absent, excused                                                                   |
+| `comment_status`      | draft, submitted                                                                           |
+| `report_status`       | draft, submitted, approved, published, withdrawn                                           |
+| `enrolment_status`    | enrolled, promoted, repeating, transferred, left, graduated                                |
+| `audience_type`       | all, staff, learners, parents, class                                                       |
+| `announcement_status` | draft, published, archived (D49)                                                           |
+| `sex`                 | F, M (Q27)                                                                                 |
+| `learner_status`      | active, left, graduated                                                                    |
+| `import_kind`         | staff, learners, marks                                                                     |
+| `import_status`       | validated, committed, failed                                                               |
 
 ## 4. Tables
 
@@ -324,8 +325,10 @@ id, school_id, title, body, audience audience_type, class_id null, pinned,
 status ('draft'|'published'|'archived'), published_at, expires_at, author_id
 ```
 
-**announcement_attachments**: `id, school_id, announcement_id, path, filename, size_bytes`
+**announcement_attachments**: `id, school_id, announcement_id, path, filename, content_type, size_bytes` (at most 3 per announcement, 5 MB, PDF, PNG, JPEG or WebP; `path` is `{school_id}/{announcement_id}/{filename}`)
 **announcement_reads**: `school_id, announcement_id, user_id, read_at` (pk on the three ids)
+
+`status` is the `announcement_status` enum; `class_id` is set exactly when `audience` is `class`. Never deleted, only archived; changes audited. Read through `my_announcements(school)` (pinned live ones first, newest first, with an unread flag); counts through `announcement_read_counts(school)` (D49).
 
 **audit_log**
 
@@ -381,20 +384,21 @@ Helper functions (security definer, stable): `current_school_ids()`, `has_role(s
 | comment_bank                                                                       | owner; the school's active staff when shared                                                                             | owner                                                                            |
 | reports                                                                            | admin, head; whoever teaches in the class, every state; hod every published; parents and learners only `published` (D43) | class teacher (draft, submit); head (return, approve, publish, withdraw)         |
 | report_templates, report_shares, report_share_opens                                | staff (templates); nobody (shares and opens, functions only, D47)                                                        | school admin (templates)                                                         |
-| announcements                                                                      | members in the audience while published                                                                                  | school admin, head                                                               |
+| announcements, announcement_attachments                                            | admin, head every state; members in the audience while published and unexpired (D49)                                     | school admin, head                                                               |
+| announcement_reads                                                                 | own rows; admin and head counts only, through `announcement_read_counts()` (D49)                                         | own rows, once, for announcements the person can see                             |
 | audit_log                                                                          | admin, head                                                                                                              | triggers only                                                                    |
 
 Default is deny. Each policy has a test in each direction (allowed and blocked) and a cross-school test.
 
 ## 8. Storage buckets (Supabase Storage)
 
-| Bucket            | Contents                | Access                                                                                                                                                 |
-| ----------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `school-branding` | logos                   | public read; write by platform admin (D15)                                                                                                             |
-| `report-assets`   | stamp, head's signature | private; upload by the school admin, no read through the API (report rendering only, D43)                                                              |
-| `reports`         | published PDFs          | private; written by the server only; read through short signed URLs by whoever can read the report (D43), or by the server for a live share link (D47) |
-| `attachments`     | newsletter files        | private; signed URLs for audience                                                                                                                      |
-| `imports`         | uploaded CSV/Excel      | private; school admin and head (D24); a class subject's teacher for `{school}/marks/{class_subject}/` (D33); deleted after 30 days (not yet automated) |
+| Bucket            | Contents                | Access                                                                                                                                                                                             |
+| ----------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `school-branding` | logos                   | public read; write by platform admin (D15)                                                                                                                                                         |
+| `report-assets`   | stamp, head's signature | private; upload by the school admin, no read through the API (report rendering only, D43)                                                                                                          |
+| `reports`         | published PDFs          | private; written by the server only; read through short signed URLs by whoever can read the report (D43), or by the server for a live share link (D47)                                             |
+| `attachments`     | newsletter files        | private; `{school_id}/{announcement_id}/{filename}`, at most 3 per announcement, 5 MB, PDF and images; upload by admin and head; 60-second signed URLs for whoever can read the announcement (D49) |
+| `imports`         | uploaded CSV/Excel      | private; school admin and head (D24); a class subject's teacher for `{school}/marks/{class_subject}/` (D33); deleted after 30 days (not yet automated)                                             |
 
 Object paths start with the school id (`{school_id}/...`) so storage policies can check it.
 

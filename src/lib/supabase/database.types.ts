@@ -53,6 +53,170 @@ export type Database = {
           },
         ]
       }
+      announcement_attachments: {
+        Row: {
+          announcement_id: string
+          content_type: string
+          created_at: string
+          filename: string
+          id: string
+          path: string
+          school_id: string
+          size_bytes: number
+          updated_at: string
+        }
+        Insert: {
+          announcement_id: string
+          content_type: string
+          created_at?: string
+          filename: string
+          id?: string
+          path: string
+          school_id: string
+          size_bytes: number
+          updated_at?: string
+        }
+        Update: {
+          announcement_id?: string
+          content_type?: string
+          created_at?: string
+          filename?: string
+          id?: string
+          path?: string
+          school_id?: string
+          size_bytes?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcement_attachments_announcement_id_school_id_fkey"
+            columns: ["announcement_id", "school_id"]
+            isOneToOne: false
+            referencedRelation: "announcements"
+            referencedColumns: ["id", "school_id"]
+          },
+          {
+            foreignKeyName: "announcement_attachments_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      announcement_reads: {
+        Row: {
+          announcement_id: string
+          read_at: string
+          school_id: string
+          user_id: string
+        }
+        Insert: {
+          announcement_id: string
+          read_at?: string
+          school_id: string
+          user_id: string
+        }
+        Update: {
+          announcement_id?: string
+          read_at?: string
+          school_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcement_reads_announcement_id_school_id_fkey"
+            columns: ["announcement_id", "school_id"]
+            isOneToOne: false
+            referencedRelation: "announcements"
+            referencedColumns: ["id", "school_id"]
+          },
+          {
+            foreignKeyName: "announcement_reads_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "announcement_reads_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      announcements: {
+        Row: {
+          audience: Database["public"]["Enums"]["audience_type"]
+          author_id: string
+          body: string
+          class_id: string | null
+          created_at: string
+          expires_at: string | null
+          id: string
+          pinned: boolean
+          published_at: string | null
+          school_id: string
+          status: Database["public"]["Enums"]["announcement_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          audience?: Database["public"]["Enums"]["audience_type"]
+          author_id: string
+          body: string
+          class_id?: string | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          pinned?: boolean
+          published_at?: string | null
+          school_id: string
+          status?: Database["public"]["Enums"]["announcement_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          audience?: Database["public"]["Enums"]["audience_type"]
+          author_id?: string
+          body?: string
+          class_id?: string | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          pinned?: boolean
+          published_at?: string | null
+          school_id?: string
+          status?: Database["public"]["Enums"]["announcement_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcements_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "announcements_class_id_school_id_fkey"
+            columns: ["class_id", "school_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id", "school_id"]
+          },
+          {
+            foreignKeyName: "announcements_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assessment_set_items: {
         Row: {
           created_at: string
@@ -1869,6 +2033,14 @@ export type Database = {
         }[]
       }
       accept_my_invites: { Args: never; Returns: number }
+      announcement_read_counts: {
+        Args: { p_school_id: string }
+        Returns: {
+          announcement_id: string
+          audience_count: number
+          read_count: number
+        }[]
+      }
       approve_class_reports: {
         Args: { p_class_id: string; p_term_id: string }
         Returns: number
@@ -2086,6 +2258,25 @@ export type Database = {
         Returns: {
           full_name: string
           role: Database["public"]["Enums"]["app_role"]
+        }[]
+      }
+      my_announcements: {
+        Args: { p_school_id: string }
+        Returns: {
+          attachment_count: number
+          audience: Database["public"]["Enums"]["audience_type"]
+          author_name: string
+          body: string
+          class_id: string
+          class_name: string
+          expires_at: string
+          id: string
+          is_live: boolean
+          is_unread: boolean
+          pinned: boolean
+          published_at: string
+          status: Database["public"]["Enums"]["announcement_status"]
+          title: string
         }[]
       }
       my_children: {
@@ -2308,6 +2499,7 @@ export type Database = {
       }
     }
     Enums: {
+      announcement_status: "draft" | "published" | "archived"
       app_role:
         | "school_admin"
         | "head"
@@ -2316,6 +2508,7 @@ export type Database = {
         | "parent"
         | "learner"
       assessment_type: "test" | "assignment" | "exam" | "practical" | "vacation"
+      audience_type: "all" | "staff" | "learners" | "parents" | "class"
       audit_action: "insert" | "update" | "delete" | "event"
       comment_status: "draft" | "submitted"
       enrolment_status:
@@ -2468,8 +2661,10 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      announcement_status: ["draft", "published", "archived"],
       app_role: ["school_admin", "head", "hod", "teacher", "parent", "learner"],
       assessment_type: ["test", "assignment", "exam", "practical", "vacation"],
+      audience_type: ["all", "staff", "learners", "parents", "class"],
       audit_action: ["insert", "update", "delete", "event"],
       comment_status: ["draft", "submitted"],
       enrolment_status: [

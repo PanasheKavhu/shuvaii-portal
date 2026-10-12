@@ -2,7 +2,8 @@
 // Seeds the local Supabase stack from seed/*.csv: creates an auth user for
 // every row in profiles.csv (triggering public.handle_new_user), then loads
 // schools, platform_admins, memberships, the academic structure tables, the
-// people tables, assessments and marks, and subject and class comments. See seed/README.md for the load order and what is
+// people tables, assessments and marks, subject and class comments, and
+// announcements. See seed/README.md for the load order and what is
 // deliberately not seeded.
 //
 // Usage: npm run db:seed  (reads SUPABASE env vars from .env.local; see
@@ -265,6 +266,15 @@ async function seedComments() {
 }
 
 /**
+ * Announcements (D49), last in the documented order. The service role has no
+ * user, so the CSV's author and published date are kept. Announcements are
+ * audited, so a re-run adds audit rows for them.
+ */
+async function seedAnnouncements() {
+  await upsertCsv("announcements");
+}
+
+/**
  * Seeded learner logins (learners.user_id set) become learner-number-and-PIN
  * accounts, as src/lib/auth/learner-accounts.ts makes them: app_metadata
  * names the learner and the password is an HMAC of DEMO_PIN keyed by
@@ -291,7 +301,7 @@ async function seedLearnerLogins() {
 async function main() {
   // Load order per seed/README.md: auth users (-> profiles), schools,
   // platform_admins, memberships, the academic structure, people, then
-  // assessments and marks, then comments.
+  // assessments and marks, then comments, then announcements.
   await seedAuthUsersAndProfiles();
   await seedSchools();
   await seedPlatformAdmins();
@@ -300,6 +310,7 @@ async function main() {
   await seedPeople();
   await seedAssessments();
   await seedComments();
+  await seedAnnouncements();
   await seedLearnerLogins();
   console.log("Seed complete.");
 }

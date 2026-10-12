@@ -362,3 +362,70 @@ describe("describeAuditEntry: grading bands (D40)", () => {
     ]);
   });
 });
+
+describe("describeAuditEntry: announcements", () => {
+  const post = {
+    title: "Sports day",
+    body: "Friday.",
+    audience: "all",
+    status: "draft",
+    pinned: false,
+  };
+
+  it("says who wrote, published, edited and archived which announcement", () => {
+    const at = (
+      oldData: Record<string, unknown> | null,
+      newData: Record<string, unknown> | null,
+      action: AuditEntry["action"],
+    ) =>
+      describeAuditEntry(
+        entry({ table: "announcements", actorName: "Mrs Dube", oldData, newData, action }),
+      ).summary;
+    expect(at(null, post, "insert")).toBe(
+      'Mrs Dube wrote a draft of the announcement "Sports day"',
+    );
+    expect(at(null, { ...post, status: "published" }, "insert")).toBe(
+      'Mrs Dube posted the announcement "Sports day"',
+    );
+    expect(at(post, { ...post, status: "published" }, "update")).toBe(
+      'Mrs Dube published the announcement "Sports day"',
+    );
+    expect(at({ ...post, status: "published" }, { ...post, status: "archived" }, "update")).toBe(
+      'Mrs Dube archived the announcement "Sports day"',
+    );
+    expect(at({ ...post, status: "archived" }, { ...post, status: "published" }, "update")).toBe(
+      'Mrs Dube published again the announcement "Sports day"',
+    );
+  });
+
+  it("shows an edited published announcement's text before and after", () => {
+    const line = describeAuditEntry(
+      entry({
+        table: "announcements",
+        actorName: "Mrs Dube",
+        oldData: { ...post, status: "published" },
+        newData: { ...post, status: "published", body: "Saturday.", pinned: true },
+      }),
+    );
+    expect(line.summary).toBe('Mrs Dube changed the announcement "Sports day"');
+    expect(line.changes).toEqual([
+      { label: "Text", from: "Friday.", to: "Saturday." },
+      { label: "Pinned", from: "no", to: "yes" },
+    ]);
+  });
+
+  it("names an attached or removed file", () => {
+    const at = (action: AuditEntry["action"]) =>
+      describeAuditEntry(
+        entry({
+          table: "announcement_attachments",
+          actorName: "Mrs Dube",
+          action,
+          oldData: action === "delete" ? { filename: "map.png" } : null,
+          newData: action === "delete" ? null : { filename: "map.png" },
+        }),
+      ).summary;
+    expect(at("insert")).toBe("Mrs Dube attached the file map.png to an announcement");
+    expect(at("delete")).toBe("Mrs Dube removed the file map.png from an announcement");
+  });
+});

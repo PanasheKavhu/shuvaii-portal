@@ -19,7 +19,7 @@
 -- subjects and has a published Term 1 report.
 begin;
 
-select plan(40);
+select plan(42);
 
 insert into auth.users (
   id, instance_id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -61,6 +61,12 @@ insert into public.academic_years (id, school_id, label, starts_on, ends_on, is_
   ('a3000000-0000-0000-0000-0000000c2027', 'a0000000-0000-0000-0000-0000000000c1', '2027', '2027-01-12', '2027-12-03', false);
 insert into public.academic_years (id, school_id, label, starts_on, ends_on, is_current) values
   ('b3000000-0000-0000-0000-0000000c2027', 'b0000000-0000-0000-0000-0000000000c2', '2027', '2027-01-12', '2027-12-03', false);
+insert into public.grading_scales (id, school_id, name, stage)
+values ('b1000000-0000-0000-0000-0000000000c2', 'b0000000-0000-0000-0000-0000000000c2', 'Key', 'o_level');
+insert into public.grade_levels (id, school_id, name, stage, sort_order, grading_scale_id) values
+  ('b2000000-0000-0000-0000-0000000000c4', 'b0000000-0000-0000-0000-0000000000c2', 'Form 4', 'o_level', 4, 'b1000000-0000-0000-0000-0000000000c2');
+insert into public.classes (id, school_id, academic_year_id, grade_level_id, name) values
+  ('cb000000-0000-0000-0000-0000000c4b27', 'b0000000-0000-0000-0000-0000000000c2', 'b3000000-0000-0000-0000-0000000c2027', 'b2000000-0000-0000-0000-0000000000c4', '4 Blue');
 insert into public.terms (id, school_id, academic_year_id, name, kind, starts_on, ends_on, status) values
   ('7c000000-0000-0000-0000-000000002601', 'a0000000-0000-0000-0000-0000000000c1', 'a3000000-0000-0000-0000-0000000c2026', 'Term 1', 'term', '2026-01-13', '2026-04-09', 'open');
 insert into public.classes (id, school_id, academic_year_id, grade_level_id, name, class_teacher_id) values
@@ -221,6 +227,18 @@ select throws_ok(
 select throws_ok(
   $$ select public.roll_over_year(jsonb_set((select body from plan), '{from_year_id}', '"a3000000-0000-0000-0000-0000000c2027"'), true) $$,
   '22023', 'only the current year can be rolled over', 'only the current year rolls over');
+select throws_ok(
+  $$ select public.roll_over_year((select body from plan)
+       || '{"new_classes": [], "learners": [{"enrolment_id": "ec100000-0000-0000-0000-000000000001", "outcome": "promoted",
+                          "to_class": "cb000000-0000-0000-0000-0000000c4b27"}]}', true) $$,
+  '22023', 'choose a 2027 class for Lungi Moyo (R-01)',
+  'a learner cannot be moved into another school''s class');
+select throws_ok(
+  $$ select public.roll_over_year((select body from plan)
+       || '{"new_classes": [{"key": "n1", "name": "4 Red", "grade_level_id": "a2000000-0000-0000-0000-0000000000c4",
+                             "copy_from_class_id": "cb000000-0000-0000-0000-0000000c4b27"}],
+            "learners": [{"enrolment_id": "ec100000-0000-0000-0000-000000000001", "outcome": "promoted", "to_class": "n1"}]}', true) $$,
+  '22023', null, 'nor can a new class copy another school''s class');
 
 -- Preview and all or nothing --------------------------------------------------------------------
 

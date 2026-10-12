@@ -8,8 +8,10 @@
 --    to promoted, repeating, left or graduated (and a leaver's or graduate's
 --    learner status to match). Marks, comments and reports are never touched.
 --    With apply = false the same work runs and is rolled back, so the
---    preview is exactly what applying would do. Security invoker: RLS and
---    the existing triggers apply, and only the school admin passes.
+--    preview is exactly what applying would do. Security definer with the
+--    school and role checks made once up front (row-by-row policy checks
+--    were too slow for a large school); the existing triggers still apply,
+--    and only the school admin passes.
 -- 2. One audit event per rollover (who, which years, how many of each), on
 --    top of the enrolment rows the audit trigger already records.
 -- 3. public.family_enrolment_years(school) lists each family learner's years
@@ -67,6 +69,7 @@ grant execute on function private.log_year_rollover(uuid, uuid, jsonb) to authen
 create function public.roll_over_year(p_plan jsonb, p_apply boolean default false)
 returns jsonb
 language plpgsql
+security definer
 set search_path = public
 as $$
 declare
@@ -77,17 +80,11 @@ declare
   v_created jsonb := '[]';
   v_moves jsonb := '[]';
   v_not_carried jsonb := '[]';
-  v_counts jsonb := '{"promoted": 0, "repeating": 0, "left": 0, "graduated": 0}';
+  v_counts jsonb;
   nc jsonb;
   item jsonb;
   src public.classes;
   new_class_id uuid;
-  old_enrolment public.enrolments;
-  learner public.learners;
-  target public.classes;
-  target_ref text;
-  new_enrolment_id uuid;
-  v_outcome public.enrolment_status;
 begin
   if jsonb_typeof(p_plan) <> 'object'
      or jsonb_typeof(p_plan -> 'learners') <> 'array'
@@ -97,7 +94,13 @@ begin
 
   select * into v_from from public.academic_years where id = (p_plan ->> 'from_year_id')::uuid;
   select * into v_to from public.academic_years where id = (p_plan ->> 'to_year_id')::uuid;
-  if v_from.id is null or v_to.id is null then
+  -- Security definer, so row security does not apply below: the caller must
+  -- see both years as staff (else they are "not found", as under RLS), must
+  -- be the from-year school's admin, and every row read or written is tied
+  -- to these two years. Checking that once, not per row through the
+  -- policies, keeps a 2,000-learner school well inside the API timeout (D52).
+  if v_from.id is null or v_to.id is null
+     or not public.is_staff(v_from.school_id) or not public.is_staff(v_to.school_id) then
     raise exception 'academic year not found' using errcode = 'P0002';
   end if;
   if not public.has_role(v_from.school_id, 'school_admin') then
@@ -146,110 +149,181 @@ begin
       v_created := v_created || jsonb_build_object('id', new_class_id, 'name', trim(nc ->> 'name'));
     end loop;
 
-    for item in select * from jsonb_array_elements(p_plan -> 'learners')
-    loop
-      select * into old_enrolment
-      from public.enrolments
-      where id = (item ->> 'enrolment_id')::uuid
-      for update;
-      if old_enrolment.id is null or old_enrolment.academic_year_id <> v_from.id then
-        raise exception 'a learner in the plan is not enrolled in %', v_from.label using errcode = '22023';
-      end if;
-      select * into learner from public.learners where id = old_enrolment.learner_id;
-      if old_enrolment.status <> 'enrolled' then
-        raise exception '% (%) has already been moved on from %',
-          learner.first_name || ' ' || learner.last_name, learner.learner_number, v_from.label
-          using errcode = '22023';
-      end if;
+    -- The learners, set-based so a school of a few thousand rolls over well
+    -- within the API's statement timeout.
+    if to_regclass('pg_temp.rollover_items') is null then
+      create temporary table rollover_items (
+        ord int,
+        enrolment_id uuid,
+        outcome text,
+        to_ref text,
+        learner_id uuid,
+        learner_name text,
+        learner_number text,
+        old_status public.enrolment_status,
+        old_class_id uuid,
+        year_id uuid,
+        target_id uuid,
+        new_enrolment_id uuid
+      ) on commit drop;
+    end if;
+    truncate rollover_items;
 
-      v_outcome := case item ->> 'outcome'
-        when 'promoted' then 'promoted'::public.enrolment_status
-        when 'repeating' then 'repeating'
-        when 'left' then 'left'
-        when 'graduated' then 'graduated'
-      end;
-      if v_outcome is null then
-        raise exception 'choose what happens to % (%)',
-          learner.first_name || ' ' || learner.last_name, learner.learner_number
-          using errcode = '22023';
-      end if;
+    insert into rollover_items (ord, enrolment_id, outcome, to_ref)
+    select t.ordinality, (t.x ->> 'enrolment_id')::uuid, t.x ->> 'outcome', t.x ->> 'to_class'
+    from jsonb_array_elements(p_plan -> 'learners') with ordinality as t (x, ordinality);
 
-      target := null;
-      if v_outcome in ('promoted', 'repeating') then
-        target_ref := item ->> 'to_class';
-        select * into target
-        from public.classes
-        where id = coalesce((v_class_ids ->> target_ref)::uuid,
-                            case when target_ref ~* '^[0-9a-f-]{36}$' then target_ref::uuid end)
-          and academic_year_id = v_to.id;
-        if target.id is null then
-          raise exception 'choose a % class for % (%)', v_to.label,
-            learner.first_name || ' ' || learner.last_name, learner.learner_number
-            using errcode = '22023';
-        end if;
-        if exists (
-          select 1 from public.enrolments
-          where learner_id = learner.id and academic_year_id = v_to.id
-        ) then
-          raise exception '% (%) is already in a % class', learner.first_name || ' ' || learner.last_name,
-            learner.learner_number, v_to.label
-            using errcode = '22023';
-        end if;
+    if exists (select 1 from rollover_items group by enrolment_id having count(*) > 1) then
+      raise exception 'a learner is in the plan twice' using errcode = '22023';
+    end if;
 
-        insert into public.enrolments (school_id, learner_id, class_id, academic_year_id)
-        values (learner.school_id, learner.id, target.id, v_to.id)
-        returning id into new_enrolment_id;
+    perform 1 from public.enrolments
+    where id in (select enrolment_id from rollover_items)
+    for update;
+    update rollover_items i
+    set learner_id = e.learner_id,
+        learner_name = l.first_name || ' ' || l.last_name,
+        learner_number = l.learner_number,
+        old_status = e.status,
+        old_class_id = e.class_id,
+        year_id = e.academic_year_id
+    from public.enrolments e
+    join public.learners l on l.id = e.learner_id
+    where e.id = i.enrolment_id;
 
-        -- Subject choices carry over where the new class teaches the same
-        -- subject; the rest are listed for the admin.
-        insert into public.enrolment_subjects (school_id, enrolment_id, class_subject_id)
-        select learner.school_id, new_enrolment_id, ncs.id
-        from public.enrolment_subjects es
-        join public.class_subjects ocs on ocs.id = es.class_subject_id
-        join public.class_subjects ncs on ncs.class_id = target.id and ncs.subject_id = ocs.subject_id
-        where es.enrolment_id = old_enrolment.id;
-        -- A primary (or ECD) learner takes every subject of their class (US-3.4).
-        perform private.add_default_subjects(new_enrolment_id);
+    if exists (select 1 from rollover_items where year_id is distinct from v_from.id) then
+      raise exception 'a learner in the plan is not enrolled in %', v_from.label using errcode = '22023';
+    end if;
+    select to_jsonb(i) into item from rollover_items i where old_status <> 'enrolled' order by ord limit 1;
+    if item is not null then
+      raise exception '% (%) has already been moved on from %',
+        item ->> 'learner_name', item ->> 'learner_number', v_from.label
+        using errcode = '22023';
+    end if;
+    select to_jsonb(i) into item from rollover_items i
+      where outcome is null or outcome not in ('promoted', 'repeating', 'left', 'graduated')
+      order by ord limit 1;
+    if item is not null then
+      raise exception 'choose what happens to % (%)',
+        item ->> 'learner_name', item ->> 'learner_number'
+        using errcode = '22023';
+    end if;
 
-        v_not_carried := v_not_carried || coalesce((
-          select jsonb_agg(jsonb_build_object(
-                   'learner_id', learner.id,
-                   'learner_name', learner.first_name || ' ' || learner.last_name,
-                   'learner_number', learner.learner_number,
-                   'subject', s.name,
-                   'to_class', target.name
-                 ) order by s.sort_order, s.name)
-          from public.enrolment_subjects es
-          join public.class_subjects ocs on ocs.id = es.class_subject_id
-          join public.subjects s on s.id = ocs.subject_id
-          where es.enrolment_id = old_enrolment.id
-            and not exists (
-              select 1 from public.class_subjects ncs
-              where ncs.class_id = target.id and ncs.subject_id = ocs.subject_id
-            )
-        ), '[]');
-      elsif item ? 'to_class' and item ->> 'to_class' is not null then
-        raise exception '% (%) is leaving, so has no % class',
-          learner.first_name || ' ' || learner.last_name, learner.learner_number, v_to.label
-          using errcode = '22023';
-      end if;
+    update rollover_items i
+    set target_id = c.id
+    from public.classes c
+    where i.outcome in ('promoted', 'repeating')
+      and c.academic_year_id = v_to.id
+      and c.id = coalesce((v_class_ids ->> i.to_ref)::uuid,
+                          case when i.to_ref ~* '^[0-9a-f-]{36}$' then i.to_ref::uuid end);
+    select to_jsonb(i) into item from rollover_items i
+      where outcome in ('promoted', 'repeating') and target_id is null
+      order by ord limit 1;
+    if item is not null then
+      raise exception 'choose a % class for % (%)', v_to.label,
+        item ->> 'learner_name', item ->> 'learner_number'
+        using errcode = '22023';
+    end if;
+    select to_jsonb(i) into item from rollover_items i
+      where outcome in ('left', 'graduated') and to_ref is not null
+      order by ord limit 1;
+    if item is not null then
+      raise exception '% (%) is leaving, so has no % class',
+        item ->> 'learner_name', item ->> 'learner_number', v_to.label
+        using errcode = '22023';
+    end if;
+    select to_jsonb(i) into item from rollover_items i
+      where target_id is not null
+        and exists (
+          select 1 from public.enrolments e
+          where e.learner_id = i.learner_id and e.academic_year_id = v_to.id
+        )
+      order by ord limit 1;
+    if item is not null then
+      raise exception '% (%) is already in a % class',
+        item ->> 'learner_name', item ->> 'learner_number', v_to.label
+        using errcode = '22023';
+    end if;
 
-      update public.enrolments set status = v_outcome where id = old_enrolment.id;
-      if v_outcome in ('left', 'graduated') then
-        update public.learners set status = v_outcome::text::public.learner_status
-        where id = learner.id;
-      end if;
+    -- New enrolments for those who move up or repeat.
+    with added as (
+      insert into public.enrolments (school_id, learner_id, class_id, academic_year_id)
+      select v_from.school_id, i.learner_id, i.target_id, v_to.id
+      from rollover_items i
+      where i.target_id is not null
+      order by i.ord
+      returning id, learner_id
+    )
+    update rollover_items i
+    set new_enrolment_id = added.id
+    from added
+    where added.learner_id = i.learner_id;
 
-      v_counts := jsonb_set(v_counts, array[v_outcome::text], to_jsonb((v_counts ->> v_outcome::text)::int + 1));
-      v_moves := v_moves || jsonb_build_object(
-        'learner_id', learner.id,
-        'learner_name', learner.first_name || ' ' || learner.last_name,
-        'learner_number', learner.learner_number,
-        'outcome', v_outcome,
-        'from_class', (select name from public.classes where id = old_enrolment.class_id),
-        'to_class', target.name
-      );
-    end loop;
+    -- Subject choices carry over where the new class teaches the same
+    -- subject; the rest are listed for the admin.
+    insert into public.enrolment_subjects (school_id, enrolment_id, class_subject_id)
+    select v_from.school_id, i.new_enrolment_id, ncs.id
+    from rollover_items i
+    join public.enrolment_subjects es on es.enrolment_id = i.enrolment_id
+    join public.class_subjects ocs on ocs.id = es.class_subject_id
+    join public.class_subjects ncs on ncs.class_id = i.target_id and ncs.subject_id = ocs.subject_id
+    where i.new_enrolment_id is not null;
+    -- A primary (or ECD) learner takes every subject of their class (US-3.4).
+    insert into public.enrolment_subjects (school_id, enrolment_id, class_subject_id)
+    select v_from.school_id, i.new_enrolment_id, cs.id
+    from rollover_items i
+    join public.classes c on c.id = i.target_id
+    join public.grade_levels gl on gl.id = c.grade_level_id
+    join public.class_subjects cs on cs.class_id = c.id
+    where i.new_enrolment_id is not null and gl.stage in ('ecd', 'primary')
+    on conflict (enrolment_id, class_subject_id) do nothing;
+
+    select coalesce(jsonb_agg(jsonb_build_object(
+             'learner_id', i.learner_id,
+             'learner_name', i.learner_name,
+             'learner_number', i.learner_number,
+             'subject', s.name,
+             'to_class', tc.name
+           ) order by i.ord, s.sort_order, s.name), '[]')
+    into v_not_carried
+    from rollover_items i
+    join public.classes tc on tc.id = i.target_id
+    join public.enrolment_subjects es on es.enrolment_id = i.enrolment_id
+    join public.class_subjects ocs on ocs.id = es.class_subject_id
+    join public.subjects s on s.id = ocs.subject_id
+    where not exists (
+      select 1 from public.class_subjects ncs
+      where ncs.class_id = i.target_id and ncs.subject_id = ocs.subject_id
+    );
+
+    update public.enrolments e
+    set status = i.outcome::public.enrolment_status
+    from rollover_items i
+    where e.id = i.enrolment_id;
+    update public.learners l
+    set status = i.outcome::public.learner_status
+    from rollover_items i
+    where l.id = i.learner_id and i.outcome in ('left', 'graduated');
+
+    select jsonb_build_object(
+             'promoted', count(*) filter (where outcome = 'promoted'),
+             'repeating', count(*) filter (where outcome = 'repeating'),
+             'left', count(*) filter (where outcome = 'left'),
+             'graduated', count(*) filter (where outcome = 'graduated'))
+    into v_counts
+    from rollover_items;
+    select coalesce(jsonb_agg(jsonb_build_object(
+             'learner_id', i.learner_id,
+             'learner_name', i.learner_name,
+             'learner_number', i.learner_number,
+             'outcome', i.outcome,
+             'from_class', oc.name,
+             'to_class', tc.name
+           ) order by i.ord), '[]')
+    into v_moves
+    from rollover_items i
+    join public.classes oc on oc.id = i.old_class_id
+    left join public.classes tc on tc.id = i.target_id;
 
     v_result := v_counts || jsonb_build_object(
       'classes_created', v_created,

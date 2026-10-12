@@ -77,14 +77,15 @@ describe("canUseArea", () => {
     expect(canUseArea(AREAS.head, ["teacher"], false)).toBe(false);
   });
 
-  it("opens the overview to school admin, head and hod, and setup and people to the school admin only", () => {
+  it("opens the overview to school admin, head and hod, and setup, people and exports to the school admin only", () => {
     for (const role of ["school_admin", "head", "hod"] as const)
       expect(canUseArea(AREAS.admin, [role], false)).toBe(true);
     for (const role of ["teacher", "parent", "learner"] as const)
       expect(canUseArea(AREAS.admin, [role], false)).toBe(false);
-    for (const area of [AREAS.setup, AREAS.people]) {
+    for (const area of [AREAS.setup, AREAS.people, AREAS.exports]) {
       expect(canUseArea(area, ["school_admin"], false)).toBe(true);
-      for (const role of ["head", "hod", "teacher"] as const)
+      expect(canUseArea(area, [], true)).toBe(false);
+      for (const role of ["head", "hod", "teacher", "parent", "learner"] as const)
         expect(canUseArea(area, [role], false)).toBe(false);
     }
   });

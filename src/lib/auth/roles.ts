@@ -34,6 +34,9 @@ export const AREAS = {
   // reached from the overview, so no menu entry of their own.
   setup: { href: "/admin/setup", label: "School setup", roles: ["school_admin"], menuRoles: [] },
   people: { href: "/admin/people", label: "People", roles: ["school_admin"], menuRoles: [] },
+  // Excel exports carry personal data: the school admin's alone (SPEC
+  // section 2, US-9.4; D52). Reached from the overview's Manage section.
+  exports: { href: "/admin/exports", label: "Exports", roles: ["school_admin"], menuRoles: [] },
   head: { href: "/head", label: "Head's office", roles: ["head"] },
   department: { href: "/department", label: "Department", roles: ["hod"] },
   // Heads of department teach too (D20).

@@ -2180,6 +2180,14 @@ export type Database = {
       }
       current_school_ids: { Args: never; Returns: string[] }
       decline_my_invites: { Args: never; Returns: number }
+      family_enrolment_years: {
+        Args: { p_school_id: string }
+        Returns: {
+          class_name: string
+          learner_id: string
+          year_label: string
+        }[]
+      }
       generate_report_drafts: {
         Args: {
           p_class_id: string
@@ -2478,6 +2486,10 @@ export type Database = {
         Returns: undefined
       }
       revoke_report_share: { Args: { p_share_id: string }; Returns: undefined }
+      roll_over_year: {
+        Args: { p_apply?: boolean; p_plan: Json }
+        Returns: Json
+      }
       save_announcement: {
         Args: {
           p_announcement_id?: string

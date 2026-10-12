@@ -66,13 +66,12 @@ _None._
 
 ## Next
 
-- US-3.5 promotion and year rollover.
 - US-10.3 feature flags and US-10.4 usage in the console.
 
 ## Known gaps
 
 - Search boxes (audit log learner, people lists) put the typed name in the address (`?q=`), so it can reach hosting access logs (D37); see the go-live checklist.
-- The class teacher's screen hides graduated learners while past-term positions still count them (D31, D37); settle with US-3.5 year rollover.
+- A learner marked as leaving at the year rollover drops out of that year's live positions, as any leaver does (D31, D52); their published reports keep the printed position.
 - CI runs `test:db` (D29) but not `test:e2e`; run e2e locally before calling a story done.
 - `sign_in_attempts` rows are never pruned (D8); report verification lookups add to it (D45).
 - Newsletter (D50): no email, SMS or push when something is published; an admin cannot see who has read, only how many (US-8.4); a published post's audience can be changed by editing it, and readers outside the new audience keep their read in the count.

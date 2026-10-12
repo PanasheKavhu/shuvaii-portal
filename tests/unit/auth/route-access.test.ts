@@ -27,13 +27,19 @@ describe("areaForPath", () => {
     expect(areaForPath("/marks/abc")).toBe("marks");
   });
 
-  it("lets a head into the overview and audit log but not setup or people", () => {
+  it("lets a head into the overview and audit log but not setup, people or exports", () => {
     const head = { isPlatformAdmin: false, schools: [school("a", ["head"])] };
     for (const path of ["/admin", "/admin/browse/learners/x", "/admin/audit"])
       expect(decideAreaAccess(areaForPath(path)!, head, undefined)).toMatchObject({
         kind: "allow",
       });
-    for (const path of ["/admin/setup", "/admin/setup/x", "/admin/people/learners"])
+    for (const path of [
+      "/admin/setup",
+      "/admin/setup/x",
+      "/admin/people/learners",
+      "/admin/exports",
+      "/admin/exports/download",
+    ])
       expect(decideAreaAccess(areaForPath(path)!, head, undefined)).toEqual({
         kind: "forbidden",
       });

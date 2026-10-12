@@ -2180,6 +2180,15 @@ export type Database = {
       }
       current_school_ids: { Args: never; Returns: string[] }
       decline_my_invites: { Args: never; Returns: number }
+      export_class_comments: {
+        Args: { p_class_id: string; p_term_id: string }
+        Returns: Json
+      }
+      export_class_marks: {
+        Args: { p_class_id: string; p_term_id: string }
+        Returns: Json
+      }
+      export_learners: { Args: { p_school_id: string }; Returns: Json }
       generate_report_drafts: {
         Args: {
           p_class_id: string

@@ -71,8 +71,9 @@ export function parseCsv(input: string): string[][] {
  * A cell Excel would run as a formula (=, +, -, @, tab or carriage return
  * first) gets a leading apostrophe, so a name like =HYPERLINK(...) stays
  * text when the file is opened. Plain numbers such as -5 are left alone.
+ * Also used for the text cells of the Excel exports (D52).
  */
-function csvSafe(cell: string): string {
+export function formulaSafe(cell: string): string {
   if (/^[-+]?\d+(\.\d+)?$/.test(cell)) return cell;
   return /^[=+\-@\t\r]/.test(cell) ? `'${cell}` : cell;
 }
@@ -80,7 +81,7 @@ function csvSafe(cell: string): string {
 /** One CSV line from cells, quoting where needed (used for the templates). */
 export function toCsvLine(cells: readonly string[]): string {
   return cells
-    .map(csvSafe)
+    .map(formulaSafe)
     .map((c) => (/[",;\r\n]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c))
     .join(",");
 }

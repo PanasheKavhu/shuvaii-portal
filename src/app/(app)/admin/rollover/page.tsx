@@ -9,7 +9,7 @@ import { loadRollover } from "./data";
 export const metadata: Metadata = { title: "Roll over the year" };
 
 /**
- * US-3.5 (D52): at year end the school admin moves the current year's
+ * US-3.5 (D53): at year end the school admin moves the current year's
  * learners into the next year. Each class gets a proposed class at the next
  * level (or graduates); single learners can repeat, leave or graduate; a
  * preview shows exactly what will happen before anything changes, and the

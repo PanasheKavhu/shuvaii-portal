@@ -6,7 +6,7 @@ import { yearGroupsWithEmpty, type EnrolmentYear, type PortalReport } from "@/li
  * Published reports by year and term, newest first, earlier years included
  * (US-7.1, US-7.5; D47). Each opens on screen. A year the learner is
  * enrolled in with nothing published yet (a new year after the rollover)
- * shows its class and "No reports yet" (US-3.5, D52).
+ * shows its class and "No reports yet" (US-3.5, D53).
  */
 export function ReportList({
   reports,

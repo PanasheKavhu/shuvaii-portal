@@ -41,7 +41,7 @@ export type EnrolmentYear = { year_label: string; class_name: string };
 
 /**
  * Reports by year with every enrolment year shown, newest first (US-3.5,
- * D52): a year with no published report yet (the new year after a
+ * D53): a year with no published report yet (the new year after a
  * rollover) is a group with no reports and its class, next to the years
  * that have them. Years only the reports know keep their place after.
  */

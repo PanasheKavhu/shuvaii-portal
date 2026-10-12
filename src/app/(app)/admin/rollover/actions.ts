@@ -18,7 +18,7 @@ import { createClient } from "@/lib/supabase/server";
 import { loadRollover } from "./data";
 
 /**
- * The Roll over screen's two actions (US-3.5, D52). Both rebuild the plan
+ * The Roll over screen's two actions (US-3.5, D53). Both rebuild the plan
  * on the server from the school admin's choices and the database as it is
  * now, then call roll_over_year(): once to preview (rolled back) and once
  * to apply, so what is applied is what was previewed unless something

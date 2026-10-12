@@ -8,7 +8,7 @@ import { makeCurrentYear } from "@/app/(app)/admin/setup/actions";
 import { idle, type FormState } from "@/app/(app)/platform/form-state";
 
 /**
- * The last step of a rollover (US-3.5, D52): the next year becomes the
+ * The last step of a rollover (US-3.5, D53): the next year becomes the
  * school's current year only when the admin ticks that they have checked it
  * and confirms. Until then teachers and families keep seeing the old year.
  */

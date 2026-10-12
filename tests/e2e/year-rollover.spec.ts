@@ -8,14 +8,14 @@ import {
   serviceClient,
 } from "./report-helpers";
 
-// US-3.5 (D52): the school admin rolls a school over at 360 px with one
+// US-3.5 (D53): the school admin rolls a school over at 360 px with one
 // repeater and one leaver, previewing first, then makes the next year
 // current; the parent of the learner who moved up still sees last year's
 // published report next to the new year's empty list. It runs on a school
 // of its own shaped like the seed's (Form 4 class 4 Blue with published
 // reports, and a Form 5 to move into): rolling the shared seed school over
 // would change what every other spec reads, and nothing a rollover does can
-// be undone (D52).
+// be undone (D53).
 
 test.beforeEach(async ({ page }, testInfo) => {
   if (testInfo.project.name === "mobile") await page.setViewportSize({ width: 360, height: 780 });

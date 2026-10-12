@@ -203,6 +203,11 @@ export default async function OverviewPage({ searchParams }: PageProps<"/admin">
                 text: "Announcements for the school, staff, families or a class.",
               },
               {
+                href: "/admin/exports",
+                label: "Exports",
+                text: "Learners, marks and comments as Excel files.",
+              },
+              {
                 href: "/admin/rollover",
                 label: "Roll over the year",
                 text: "At year end: classes move up, repeaters, leavers and graduates.",

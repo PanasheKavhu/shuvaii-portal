@@ -1,4 +1,4 @@
--- Promotion and year rollover (US-3.5, D52).
+-- Promotion and year rollover (US-3.5, D53).
 --
 -- 1. public.roll_over_year(plan, apply) moves the current year's learners
 --    into the next year in one transaction: it creates the new classes the
@@ -98,7 +98,7 @@ begin
   -- see both years as staff (else they are "not found", as under RLS), must
   -- be the from-year school's admin, and every row read or written is tied
   -- to these two years. Checking that once, not per row through the
-  -- policies, keeps a 2,000-learner school well inside the API timeout (D52).
+  -- policies, keeps a 2,000-learner school well inside the API timeout (D53).
   if v_from.id is null or v_to.id is null
      or not public.is_staff(v_from.school_id) or not public.is_staff(v_to.school_id) then
     raise exception 'academic year not found' using errcode = 'P0002';
@@ -355,7 +355,7 @@ end;
 $$;
 
 comment on function public.roll_over_year(jsonb, boolean) is
-  'US-3.5: moves the current year''s learners into the next year in one transaction (new classes, enrolments, carried subject choices, old enrolments promoted, repeating, left or graduated). apply = false previews and rolls back. School admin only (D52).';
+  'US-3.5: moves the current year''s learners into the next year in one transaction (new classes, enrolments, carried subject choices, old enrolments promoted, repeating, left or graduated). apply = false previews and rolls back. School admin only (D53).';
 
 revoke execute on function public.roll_over_year(jsonb, boolean) from public, anon;
 grant execute on function public.roll_over_year(jsonb, boolean) to authenticated;
@@ -384,7 +384,7 @@ as $$
 $$;
 
 comment on function public.family_enrolment_years(uuid) is
-  'The caller''s children''s (and their own) years and classes in a school, newest first, up to the current year, so the portal can show a year with no reports yet (US-3.5, D52).';
+  'The caller''s children''s (and their own) years and classes in a school, newest first, up to the current year, so the portal can show a year with no reports yet (US-3.5, D53).';
 
 revoke execute on function public.family_enrolment_years(uuid) from public, anon;
 grant execute on function public.family_enrolment_years(uuid) to authenticated;

@@ -16,7 +16,7 @@ export const metadata: Metadata = { title: "My children" };
  * Parent home (US-7.1, US-7.4, US-7.5; D47): the linked children with a
  * one-tap switcher, and the chosen child's published reports by year and
  * term, newest first. A child who has left the school keeps their reports
- * here, and a new year shows with its class before any report (D52). Primary learners have no login (D26), so this is where their
+ * here, and a new year shows with its class before any report (D53). Primary learners have no login (D26), so this is where their
  * reports reach the family.
  */
 export default async function ChildrenPage({ searchParams }: PageProps<"/children">) {

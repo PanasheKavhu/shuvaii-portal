@@ -27,7 +27,7 @@ describe("areaForPath", () => {
     expect(areaForPath("/marks/abc")).toBe("marks");
   });
 
-  it("lets a head into the overview and audit log but not setup, people or rollover", () => {
+  it("lets a head into the overview and audit log but not setup, people, exports or rollover", () => {
     const head = { isPlatformAdmin: false, schools: [school("a", ["head"])] };
     for (const path of ["/admin", "/admin/browse/learners/x", "/admin/audit"])
       expect(decideAreaAccess(areaForPath(path)!, head, undefined)).toMatchObject({
@@ -37,6 +37,8 @@ describe("areaForPath", () => {
       "/admin/setup",
       "/admin/setup/x",
       "/admin/people/learners",
+      "/admin/exports",
+      "/admin/exports/download",
       "/admin/rollover",
     ])
       expect(decideAreaAccess(areaForPath(path)!, head, undefined)).toEqual({

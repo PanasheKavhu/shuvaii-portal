@@ -21,7 +21,7 @@ export async function loadPortalReports(schoolId: string): Promise<PortalReport[
 
 /**
  * The years and classes of the viewer's children and themselves, newest
- * first, up to the school's current year (US-3.5, D52), so a new year with
+ * first, up to the school's current year (US-3.5, D53), so a new year with
  * no reports yet still shows.
  */
 export async function loadFamilyYears(

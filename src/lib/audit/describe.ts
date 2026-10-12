@@ -295,6 +295,8 @@ export function describeAuditEntry(e: AuditEntry): AuditLine {
       summary = `${actor} changed the grading bands of ${text(data.scale_name) ?? "a grading scale"}`;
       break;
     case "schools":
+      if (e.event === "data_exported")
+        return { summary: exportSummary(actor, e), changes: [], reason };
       summary =
         e.event === "school_created"
           ? `${actor} created the school ${e.personName ?? ""}`.trim()
@@ -352,6 +354,23 @@ export function describeAuditEntry(e: AuditEntry): AuditLine {
   }
 
   return { summary, changes, reason };
+}
+
+/**
+ * "Alice Admin exported 4 Blue's Term 3 marks to Excel (38 learners)" (D52).
+ * The class and term are the names recorded at the time of the export.
+ */
+function exportSummary(actor: string, e: AuditEntry): string {
+  const data = e.newData ?? {};
+  const n = Number(data.rows);
+  const count = Number.isFinite(n) ? ` (${n} ${n === 1 ? "learner" : "learners"})` : "";
+  const klass = text(data.class_name) ?? e.className;
+  const term = text(data.term_name);
+  const what =
+    data.kind === "learners"
+      ? "the learners and guardians"
+      : `${klass ? `${possessive(klass)} ` : ""}${term ? `${term} ` : ""}${data.kind === "comments" ? "comments" : "marks"}`;
+  return `${actor} exported ${what} to Excel${count}`;
 }
 
 /** The listed fields that differ between the old and new row, as words. */

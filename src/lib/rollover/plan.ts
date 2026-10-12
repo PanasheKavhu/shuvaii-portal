@@ -1,5 +1,5 @@
 /**
- * Year rollover (US-3.5, D52): the pure rules behind the Roll over screen.
+ * Year rollover (US-3.5, D53): the pure rules behind the Roll over screen.
  * Which level a class moves up to, the name proposed for its new class,
  * each class's proposed target, and the plan sent to public.roll_over_year().
  * No I/O, so the screen, the server action and the unit tests share them.

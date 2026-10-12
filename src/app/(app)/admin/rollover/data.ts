@@ -14,7 +14,7 @@ import { createClient } from "@/lib/supabase/server";
 import { listClasses, listLevels, listYears, type YearRow } from "../setup/data";
 
 /**
- * Reads for the Roll over screen (US-3.5, D52), through the school admin's
+ * Reads for the Roll over screen (US-3.5, D53), through the school admin's
  * own client: the current year, the later years it can roll into, and
  * every class of the current year with the learners still enrolled in it.
  */

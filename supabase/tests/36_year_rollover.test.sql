@@ -1,4 +1,4 @@
--- pgTAP: promotion and year rollover (US-3.5; D52). Migration
+-- pgTAP: promotion and year rollover (US-3.5; D53). Migration
 -- 20261012130000_year_rollover.
 --
 -- roll_over_year() is the school admin's alone and stays inside their school;
@@ -369,7 +369,7 @@ select is(
   (select (p.average is not null, p.position)::text
    from public.class_positions('cc000000-0000-0000-0000-0000000c3b26', '7c000000-0000-0000-0000-000000002601') p
    where p.enrolment_id = 'ec100000-0000-0000-0000-000000000004'),
-  '(t,)', 'while the leaver keeps her average with no position, as any leaver (D31, D52)');
+  '(t,)', 'while the leaver keeps her average with no position, as any leaver (D31, D53)');
 
 select pg_temp.as_user('ec000000-0000-0000-0000-000000000004');
 select is(

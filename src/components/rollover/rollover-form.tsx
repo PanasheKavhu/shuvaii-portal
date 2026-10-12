@@ -22,7 +22,7 @@ import {
 import { MakeCurrentYear } from "./make-current-year";
 
 /**
- * The rollover choices (US-3.5, D52): one card per class with where it goes,
+ * The rollover choices (US-3.5, D53): one card per class with where it goes,
  * and inside it each learner's outcome (moves up by default; repeats,
  * leaves or graduates). "Preview" asks the database what would happen and
  * changes nothing; "Roll over now" does exactly that in one transaction.

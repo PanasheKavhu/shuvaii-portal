@@ -154,7 +154,7 @@ export type ClassLearnerResult = {
   averageGrade: string | null;
   position: number | null;
   classSize: number | null;
-  /** Finished the year in this class and left school (D52): shown, ranked, read-only. */
+  /** Finished the year in this class and left school (D53): shown, ranked, read-only. */
   graduated: boolean;
 };
 
@@ -227,7 +227,7 @@ export async function loadClassResults(ct: ClassTerm): Promise<{
 
   // Everyone class_positions() ranks: graduates finished the year in the
   // class, so a past term shows them (read-only) with their position (D31,
-  // D37, D52). Learners who moved or left mid-year are not listed.
+  // D37, D53). Learners who moved or left mid-year are not listed.
   const learners = rows(enrolments)
     .filter((e) => isStillInClass(e.status) || e.status === "graduated")
     .map((e) => {

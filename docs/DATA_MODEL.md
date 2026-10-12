@@ -328,7 +328,7 @@ status ('draft'|'published'|'archived'), published_at, expires_at, author_id
 **announcement_attachments**: `id, school_id, announcement_id, path, filename, content_type, size_bytes` (at most 3 per announcement, 5 MB, PDF, PNG, JPEG or WebP; `path` is `{school_id}/{announcement_id}/{filename}`)
 **announcement_reads**: `school_id, announcement_id, user_id, read_at` (pk on the three ids)
 
-`status` is the `announcement_status` enum; `class_id` is set exactly when `audience` is `class`. Never deleted, only archived; changes audited. Read through `my_announcements(school)` (pinned live ones first, newest first, with an unread flag); counts through `announcement_read_counts(school)` (D49).
+`status` is the `announcement_status` enum; `class_id` is set exactly when `audience` is `class`. Never deleted, only archived; changes audited. Read through `my_announcements(school)` (pinned live ones first, newest first, with an unread flag); counts through `announcement_read_counts(school)` (D49). The newsletter screens write through `save_announcement()`, `publish_announcement()` and `archive_announcement()`, record reads through `mark_announcement_read()` and list the feed through `my_news(school)` and `my_news_summary(school)` (D50).
 
 **audit_log**
 

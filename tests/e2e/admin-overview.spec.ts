@@ -101,7 +101,10 @@ test("the admin's overview counts follow a mark and a published report, and lead
   await expectNoSideScroll(page);
 });
 
-test("a head sees the same overview and profiles; a teacher gets 403", async ({ page }) => {
+test("a head sees the same overview and profiles; a teacher gets 403", async ({
+  page,
+  browser,
+}) => {
   test.setTimeout(150_000);
   const school = await overviewSchool("overview-head");
 
@@ -125,18 +128,20 @@ test("a head sees the same overview and profiles; a teacher gets 403", async ({ 
   await expect(page.getByRole("list", { name: "Reports by status" })).toContainText("3 approved");
   await expectNoSideScroll(page);
 
-  await page.getByRole("button", { name: "Sign out" }).click();
-  await signIn(page, school.teacherEmail);
-  await expect(page).toHaveURL("/teaching");
+  const teacherContext = await browser.newContext({ viewport: page.viewportSize()! });
+  const teacher = await teacherContext.newPage();
+  await signIn(teacher, school.teacherEmail);
+  await expect(teacher).toHaveURL("/teaching");
   for (const path of [
     "/admin",
     `/admin/browse/learners/${school.learners[0]!.id}`,
     `/admin/browse/classes/${school.classId}`,
     "/admin/parents",
   ]) {
-    const res = await page.goto(path);
+    const res = await teacher.goto(path);
     expect(res?.status(), path).toBe(403);
   }
+  await teacherContext.close();
 });
 
 test("a hod finds only their own classes' learners and sees no school-wide numbers", async ({

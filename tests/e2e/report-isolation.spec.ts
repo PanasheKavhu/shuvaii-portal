@@ -100,7 +100,7 @@ test("another family and another school reach no report by any route", async ({
   const headContext = await browser.newContext();
   const head = await headContext.newPage();
   await signIn(head, elsewhere.headEmail!);
-  await expect(head).toHaveURL("/head");
+  await expect(head).toHaveURL("/admin");
   expect((await head.request.get(`/reports/${theirs.id}/pdf`, { maxRedirects: 0 })).status()).toBe(
     404,
   );

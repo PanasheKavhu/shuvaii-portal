@@ -30,7 +30,7 @@ test("publishing a class makes its PDFs; a PDF opens and its QR address checks o
   const second = school.learners[1]!;
 
   await signIn(page, school.headEmail!);
-  await expect(page).toHaveURL("/head");
+  await expect(page).toHaveURL("/admin");
   await page.goto(`/head/reports/${school.classId}/${school.termId}`);
   await page.getByRole("button", { name: "Publish 3 reports" }).click();
   const pdfs = page.getByRole("region", { name: "Report PDFs" });

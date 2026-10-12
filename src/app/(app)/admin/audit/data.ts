@@ -41,6 +41,7 @@ export async function loadAuditPage(
   schoolId: string,
   filters: AuditFilters,
   before: AuditCursor | null,
+  pageSize = AUDIT_PAGE_SIZE,
 ): Promise<{ items: AuditListItem[]; next: AuditCursor | null }> {
   const supabase = await createClient();
   const [result, school] = await Promise.all([
@@ -53,12 +54,12 @@ export async function loadAuditPage(
       p_to: filters.to ?? undefined,
       p_before_at: before?.createdAt,
       p_before_id: before?.id,
-      p_limit: AUDIT_PAGE_SIZE + 1,
+      p_limit: pageSize + 1,
     }),
     supabase.from("schools").select("timezone").eq("id", schoolId).maybeSingle(),
   ]);
   const found = rows(result);
-  const page = found.slice(0, AUDIT_PAGE_SIZE);
+  const page = found.slice(0, pageSize);
   const when = new Intl.DateTimeFormat("en-GB", {
     dateStyle: "medium",
     timeStyle: "short",
@@ -91,8 +92,7 @@ export async function loadAuditPage(
         otherClassName: r.other_class_name,
       }),
     })),
-    next:
-      found.length > AUDIT_PAGE_SIZE && last ? { createdAt: last.created_at, id: last.id } : null,
+    next: found.length > pageSize && last ? { createdAt: last.created_at, id: last.id } : null,
   };
 }
 

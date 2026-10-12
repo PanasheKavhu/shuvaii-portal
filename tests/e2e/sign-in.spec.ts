@@ -19,12 +19,13 @@ async function signIn(page: Page, email: string, password = PASSWORD) {
 const formError = (page: Page) => page.locator("form").getByRole("alert");
 const mainNav = (page: Page) => page.getByRole("navigation", { name: "Main" });
 
-test("a head lands on the head's office and sees only their menu", async ({ page }) => {
+test("a head lands on the overview and sees only their menu", async ({ page }) => {
   await signIn(page, HEAD);
-  await expect(page).toHaveURL("/head");
-  await expect(page.getByRole("heading", { name: "Head's office" })).toBeVisible();
+  await expect(page).toHaveURL("/admin");
+  await expect(page.getByRole("heading", { name: "Overview", level: 1 })).toBeVisible();
   await expect(page.getByTestId("school-name")).toHaveText("Msasa Demo High School");
   await expect(mainNav(page).getByRole("link")).toHaveText([
+    "Overview",
     "Head's office",
     "Marks",
     "Completion",
@@ -38,7 +39,7 @@ test("a school admin lands on the admin area", async ({ page }) => {
   await signIn(page, ADMIN);
   await expect(page).toHaveURL("/admin");
   await expect(mainNav(page).getByRole("link")).toHaveText([
-    "School admin",
+    "Overview",
     "Marks",
     "Completion",
     "Audit log",

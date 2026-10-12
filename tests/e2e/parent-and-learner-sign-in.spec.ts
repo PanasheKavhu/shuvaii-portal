@@ -76,7 +76,7 @@ test("a learner signs in with their learner number and PIN", async ({ page }) =>
   await expect(page).toHaveURL("/my-reports");
   await expect(page.getByRole("heading", { name: "My reports" })).toBeVisible();
   await expect(page.getByText(`Welcome, ${SEED_LEARNER.name}.`)).toBeVisible();
-  await expect(page.getByRole("link", { name: "School admin" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Overview" })).toHaveCount(0);
 
   // A learner cannot open staff areas.
   const response = await page.goto("/admin/people");

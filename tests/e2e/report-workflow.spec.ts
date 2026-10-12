@@ -79,7 +79,8 @@ test("a class's reports go from drafts to published, and a published report stay
   const headContext = await browser.newContext({ viewport: page.viewportSize()! });
   const head = await headContext.newPage();
   await signIn(head, school.headEmail!);
-  await expect(head).toHaveURL("/head");
+  await expect(head).toHaveURL("/admin");
+  await head.goto("/head");
   await head
     .getByRole("list", { name: "Classes" })
     .getByRole("link", { name: /4 Blue/ })
@@ -235,7 +236,7 @@ test("the head is warned when a mark changes after the drafts, and returns or ap
   expect(edit.data).toHaveLength(1);
 
   await signIn(page, school.headEmail!);
-  await expect(page).toHaveURL("/head");
+  await expect(page).toHaveURL("/admin");
   await page.goto(`/head/reports/${school.classId}/${school.termId}`);
   const warning = page.getByRole("note", { name: "Changed since the reports were made" });
   await expect(warning).toContainText(second.name);

@@ -123,7 +123,7 @@ export async function publishWithPdfs(
   count: number,
 ) {
   await signIn(page, school.headEmail!);
-  await expect(page).toHaveURL("/head");
+  await expect(page).toHaveURL("/admin");
   await page.goto(`/head/reports/${school.classId}/${school.termId}`);
   await page.getByRole("button", { name: `Publish ${count} reports` }).click();
   await expect(page.getByRole("region", { name: "Report PDFs" }).getByRole("status")).toHaveText(

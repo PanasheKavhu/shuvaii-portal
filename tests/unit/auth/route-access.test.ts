@@ -27,14 +27,24 @@ describe("areaForPath", () => {
     expect(areaForPath("/marks/abc")).toBe("marks");
   });
 
-  it("lets a head into the audit log but not the rest of /admin", () => {
+  it("lets a head into the overview and audit log but not setup or people", () => {
     const head = { isPlatformAdmin: false, schools: [school("a", ["head"])] };
-    expect(decideAreaAccess(areaForPath("/admin/audit")!, head, undefined)).toMatchObject({
-      kind: "allow",
-    });
-    expect(decideAreaAccess(areaForPath("/admin/setup")!, head, undefined)).toEqual({
-      kind: "forbidden",
-    });
+    for (const path of ["/admin", "/admin/browse/learners/x", "/admin/audit"])
+      expect(decideAreaAccess(areaForPath(path)!, head, undefined)).toMatchObject({
+        kind: "allow",
+      });
+    for (const path of ["/admin/setup", "/admin/setup/x", "/admin/people/learners"])
+      expect(decideAreaAccess(areaForPath(path)!, head, undefined)).toEqual({
+        kind: "forbidden",
+      });
+  });
+
+  it("keeps teachers out of the overview and browse pages", () => {
+    const teacher = { isPlatformAdmin: false, schools: [school("a", ["teacher"])] };
+    for (const path of ["/admin", "/admin/browse/learners/x"])
+      expect(decideAreaAccess(areaForPath(path)!, teacher, undefined)).toEqual({
+        kind: "forbidden",
+      });
   });
 
   it("ignores other pages and look-alike prefixes", () => {

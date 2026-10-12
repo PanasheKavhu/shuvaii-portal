@@ -2046,6 +2046,10 @@ export type Database = {
         Returns: number
       }
       approve_report: { Args: { p_report_id: string }; Returns: undefined }
+      archive_announcement: {
+        Args: { p_announcement_id: string }
+        Returns: undefined
+      }
       assessment_weight_problems: {
         Args: { p_term_id: string }
         Returns: {
@@ -2226,6 +2230,10 @@ export type Database = {
         Args: { p_event: string; p_membership_id: string }
         Returns: undefined
       }
+      mark_announcement_read: {
+        Args: { p_announcement_id: string }
+        Returns: boolean
+      }
       marks_lock: {
         Args: { p_class_subject_id: string; p_term_id: string }
         Returns: {
@@ -2288,6 +2296,33 @@ export type Database = {
           learner_number: string
         }[]
       }
+      my_news: {
+        Args: { p_school_id: string }
+        Returns: {
+          attachment_count: number
+          audience: Database["public"]["Enums"]["audience_type"]
+          author_name: string
+          body: string
+          class_id: string
+          class_name: string
+          expires_at: string
+          id: string
+          is_live: boolean
+          is_unread: boolean
+          pinned: boolean
+          published_at: string
+          status: Database["public"]["Enums"]["announcement_status"]
+          title: string
+        }[]
+      }
+      my_news_summary: {
+        Args: { p_school_id: string }
+        Returns: {
+          latest_id: string
+          latest_title: string
+          unread_count: number
+        }[]
+      }
       my_pending_invites: {
         Args: never
         Returns: {
@@ -2337,6 +2372,10 @@ export type Database = {
           version: number
           year_label: string
         }[]
+      }
+      publish_announcement: {
+        Args: { p_announcement_id: string }
+        Returns: undefined
       }
       publish_class_reports: {
         Args: { p_class_id: string; p_term_id: string }
@@ -2388,6 +2427,19 @@ export type Database = {
         Returns: undefined
       }
       revoke_report_share: { Args: { p_share_id: string }; Returns: undefined }
+      save_announcement: {
+        Args: {
+          p_announcement_id?: string
+          p_audience: Database["public"]["Enums"]["audience_type"]
+          p_body: string
+          p_class_id?: string
+          p_expires_at?: string
+          p_pinned: boolean
+          p_school_id: string
+          p_title: string
+        }
+        Returns: string
+      }
       save_assessment_set: {
         Args: {
           p_items: Json

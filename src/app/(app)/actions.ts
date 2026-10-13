@@ -16,7 +16,7 @@ export async function chooseSchool(formData: FormData) {
   if (!school) redirect("/select-school");
 
   await rememberSchool(school.schoolId);
-  redirect(homeFor(school.roles, viewer.isPlatformAdmin) ?? "/no-access");
+  redirect(homeFor(school.roles, viewer.isPlatformAdmin, school.features) ?? "/no-access");
 }
 
 export async function signOut() {

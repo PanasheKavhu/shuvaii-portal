@@ -1,4 +1,5 @@
 import type { SchoolBranding } from "@/lib/branding/theme";
+import type { Features } from "@/lib/platform/features";
 import type { AppRole } from "./roles";
 
 /** Name of the cookie holding the school a multi-school user chose (US-1.1). */
@@ -9,6 +10,8 @@ export type SchoolMembership = {
   schoolName: string;
   roles: AppRole[];
   branding: SchoolBranding;
+  /** The school's feature switches (US-10.3; D55). */
+  features: Features;
 };
 
 /**
@@ -32,6 +35,7 @@ export function groupMemberships(
     schoolName: string;
     role: AppRole;
     branding: SchoolBranding;
+    features: Features;
   }[],
 ): SchoolMembership[] {
   const bySchool = new Map<string, SchoolMembership>();
@@ -41,6 +45,7 @@ export function groupMemberships(
       schoolName: row.schoolName,
       roles: [],
       branding: row.branding,
+      features: row.features,
     };
     if (!school.roles.includes(row.role)) school.roles.push(row.role);
     bySchool.set(row.schoolId, school);

@@ -320,6 +320,34 @@ describe("describeAuditEntry: other tables", () => {
     ]);
   });
 
+  it("says which feature a platform admin switched on or off (D55)", () => {
+    const line = describeAuditEntry(
+      entry({
+        table: "schools",
+        action: "event",
+        event: "feature_changed",
+        actorName: "Platform Admin",
+        oldData: { newsletter: true },
+        newData: { newsletter: false },
+      }),
+    );
+    expect(line).toEqual({
+      summary: "Platform Admin switched the newsletter off",
+      changes: [],
+      reason: null,
+    });
+    expect(
+      describeAuditEntry(
+        entry({
+          table: "schools",
+          action: "event",
+          event: "feature_changed",
+          newData: { newsletter: true, attendance: true },
+        }),
+      ).summary,
+    ).toBe("Mr Moyo switched the newsletter on and attendance on");
+  });
+
   it("says something for a table it does not know, without its data", () => {
     const line = describeAuditEntry(
       entry({ table: "something_new", newData: { password: "x" }, oldData: null }),

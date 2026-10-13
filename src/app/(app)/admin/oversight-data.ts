@@ -30,11 +30,18 @@ export type Overseer = {
   isHead: boolean;
   /** School admin or head: the whole school. Otherwise a hod: their own (D23, D36). */
   isAdminOrHead: boolean;
+  /** Whether the school has the newsletter switched on (D55). */
+  newsletterOn: boolean;
 };
 
 function overseerFrom(
   viewer: { userId: string; fullName: string },
-  school: { schoolId: string; schoolName: string; roles: string[] },
+  school: {
+    schoolId: string;
+    schoolName: string;
+    roles: string[];
+    features: { newsletter: boolean };
+  },
 ): Overseer {
   const isAdmin = school.roles.includes("school_admin");
   const isHead = school.roles.includes("head");
@@ -46,6 +53,7 @@ function overseerFrom(
     isAdmin,
     isHead,
     isAdminOrHead: isAdmin || isHead,
+    newsletterOn: school.features.newsletter,
   };
 }
 

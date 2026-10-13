@@ -48,7 +48,7 @@ export function decideAreaAccess(
     return viewer.isPlatformAdmin ? { kind: "allow", school } : { kind: "forbidden" };
   }
   if (!school) return viewer.schools.length > 1 ? { kind: "choose-school" } : { kind: "forbidden" };
-  return canUseArea(area, school.roles, viewer.isPlatformAdmin)
+  return canUseArea(area, school.roles, viewer.isPlatformAdmin, school.features)
     ? { kind: "allow", school }
     : { kind: "forbidden" };
 }

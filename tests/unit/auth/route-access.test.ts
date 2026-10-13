@@ -2,12 +2,18 @@ import { describe, expect, it } from "vitest";
 import type { SchoolMembership } from "@/lib/auth/active-school";
 import { areaForPath, decideAreaAccess } from "@/lib/auth/route-access";
 import { NO_BRANDING } from "@/lib/branding/theme";
+import { DEFAULT_FEATURES } from "@/lib/platform/features";
 
-const school = (id: string, roles: SchoolMembership["roles"]): SchoolMembership => ({
+const school = (
+  id: string,
+  roles: SchoolMembership["roles"],
+  features = DEFAULT_FEATURES,
+): SchoolMembership => ({
   schoolId: id,
   schoolName: id,
   roles,
   branding: NO_BRANDING,
+  features,
 });
 
 describe("areaForPath", () => {
@@ -56,6 +62,34 @@ describe("areaForPath", () => {
       expect(decideAreaAccess(areaForPath(path)!, teacher, undefined)).toEqual({
         kind: "forbidden",
       });
+  });
+
+  it("closes the newsletter areas of a school that switched the newsletter off (D55)", () => {
+    const off = { ...DEFAULT_FEATURES, newsletter: false };
+    const admin = {
+      isPlatformAdmin: false,
+      schools: [school("a", ["school_admin"], off)],
+      assurance: "aal2" as const,
+    };
+    const parent = { isPlatformAdmin: false, schools: [school("a", ["parent"], off)] };
+    for (const path of ["/admin/newsletter", "/admin/newsletter/new", "/news", "/news/x"]) {
+      expect(decideAreaAccess(areaForPath(path)!, admin, undefined)).toEqual({ kind: "forbidden" });
+      expect(decideAreaAccess(areaForPath(path)!, parent, undefined)).toEqual({
+        kind: "forbidden",
+      });
+    }
+    expect(decideAreaAccess("admin", admin, undefined)).toMatchObject({ kind: "allow" });
+    expect(decideAreaAccess("children", parent, undefined)).toMatchObject({ kind: "allow" });
+  });
+
+  it("judges each school by its own switches", () => {
+    const off = { ...DEFAULT_FEATURES, newsletter: false };
+    const viewer = {
+      isPlatformAdmin: false,
+      schools: [school("a", ["teacher"], off), school("b", ["teacher"])],
+    };
+    expect(decideAreaAccess("news", viewer, "a")).toEqual({ kind: "forbidden" });
+    expect(decideAreaAccess("news", viewer, "b")).toMatchObject({ kind: "allow" });
   });
 
   it("ignores other pages and look-alike prefixes", () => {

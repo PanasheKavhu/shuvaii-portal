@@ -29,7 +29,11 @@ async function writerContext(): Promise<{ schoolId: string } | null> {
   const viewer = await getViewer();
   if (!viewer) return null;
   const school = await getActiveSchool(viewer);
-  return school && (school.roles.includes("school_admin") || school.roles.includes("head"))
+  // A school with the newsletter switched off writes nothing (D55); the
+  // database refuses it too.
+  return school &&
+    school.features.newsletter &&
+    (school.roles.includes("school_admin") || school.roles.includes("head"))
     ? { schoolId: school.schoolId }
     : null;
 }

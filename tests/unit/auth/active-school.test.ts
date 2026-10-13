@@ -1,15 +1,24 @@
 import { describe, expect, it } from "vitest";
 import { groupMemberships, pickActiveSchool } from "@/lib/auth/active-school";
 import { NO_BRANDING } from "@/lib/branding/theme";
+import { DEFAULT_FEATURES } from "@/lib/platform/features";
 
 const branding = NO_BRANDING;
+const features = DEFAULT_FEATURES;
 
-const msasa = { schoolId: "s-msasa", schoolName: "Msasa", roles: ["teacher" as const], branding };
+const msasa = {
+  schoolId: "s-msasa",
+  schoolName: "Msasa",
+  roles: ["teacher" as const],
+  branding,
+  features,
+};
 const kudzai = {
   schoolId: "s-kudzai",
   schoolName: "Kudzai",
   roles: ["teacher" as const],
   branding,
+  features,
 };
 
 describe("pickActiveSchool", () => {
@@ -39,14 +48,20 @@ describe("groupMemberships", () => {
   it("groups roles per school and sorts by name", () => {
     expect(
       groupMemberships([
-        { schoolId: "s-msasa", schoolName: "Msasa", role: "teacher", branding },
-        { schoolId: "s-kudzai", schoolName: "Kudzai", role: "teacher", branding },
-        { schoolId: "s-msasa", schoolName: "Msasa", role: "parent", branding },
-        { schoolId: "s-msasa", schoolName: "Msasa", role: "parent", branding },
+        { schoolId: "s-msasa", schoolName: "Msasa", role: "teacher", branding, features },
+        { schoolId: "s-kudzai", schoolName: "Kudzai", role: "teacher", branding, features },
+        { schoolId: "s-msasa", schoolName: "Msasa", role: "parent", branding, features },
+        { schoolId: "s-msasa", schoolName: "Msasa", role: "parent", branding, features },
       ]),
     ).toEqual([
-      { schoolId: "s-kudzai", schoolName: "Kudzai", roles: ["teacher"], branding },
-      { schoolId: "s-msasa", schoolName: "Msasa", roles: ["teacher", "parent"], branding },
+      { schoolId: "s-kudzai", schoolName: "Kudzai", roles: ["teacher"], branding, features },
+      {
+        schoolId: "s-msasa",
+        schoolName: "Msasa",
+        roles: ["teacher", "parent"],
+        branding,
+        features,
+      },
     ]);
   });
 });

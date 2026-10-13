@@ -197,11 +197,15 @@ export default async function OverviewPage({ searchParams }: PageProps<"/admin">
                 label: "People",
                 text: "Learners, guardians and staff, one at a time or from a file.",
               },
-              {
-                href: "/admin/newsletter",
-                label: "Newsletter",
-                text: "Announcements for the school, staff, families or a class.",
-              },
+              ...(o.newsletterOn
+                ? [
+                    {
+                      href: "/admin/newsletter",
+                      label: "Newsletter",
+                      text: "Announcements for the school, staff, families or a class.",
+                    },
+                  ]
+                : []),
               {
                 href: "/admin/exports",
                 label: "Exports",

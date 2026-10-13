@@ -76,6 +76,25 @@ export function parseAdminInvite(form: { fullName: unknown; email: unknown }): P
   return { ok: true, value: { fullName, email } };
 }
 
+export type PrivacyContact = { name: string; email: string };
+
+/** The school's privacy notice contact (Q20; D56): who answers data protection questions. */
+export function parsePrivacyContact(form: {
+  name: unknown;
+  email: unknown;
+}): Parse<PrivacyContact> {
+  const name = text(form.name);
+  const email = typeof form.email === "string" ? normalizeEmail(form.email) : "";
+  const errors: Errors<PrivacyContact> = {};
+
+  if (name.length < 2 || name.length > 120)
+    errors.name = "Enter the name of the person or office to contact.";
+  if (email.length > 254 || !EMAIL_RE.test(email)) errors.email = "Enter a valid email address.";
+
+  if (Object.keys(errors).length) return { ok: false, errors };
+  return { ok: true, value: { name, email } };
+}
+
 /** Logo uploads: what the `school-branding` bucket accepts (migration school_branding_bucket). */
 export const LOGO_MAX_BYTES = 1024 * 1024;
 export const LOGO_TYPES = {

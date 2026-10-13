@@ -72,7 +72,7 @@ export async function landingPathFor(viewer: Viewer): Promise<string> {
   if (count) return "/welcome";
 
   const school = await getActiveSchool(viewer);
-  if (school) return homeFor(school.roles, viewer.isPlatformAdmin) ?? "/no-access";
+  if (school) return homeFor(school.roles, viewer.isPlatformAdmin, school.features) ?? "/no-access";
   if (viewer.schools.length > 1) return "/select-school";
   return homeFor([], viewer.isPlatformAdmin) ?? "/no-access";
 }

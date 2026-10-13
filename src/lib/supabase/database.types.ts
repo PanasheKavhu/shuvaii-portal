@@ -1782,6 +1782,8 @@ export type Database = {
           name: string
           phone: string | null
           primary_color: string | null
+          privacy_contact_email: string | null
+          privacy_contact_name: string | null
           report_footer_text: string | null
           slug: string
           stage: Database["public"]["Enums"]["school_stage"]
@@ -1803,6 +1805,8 @@ export type Database = {
           name: string
           phone?: string | null
           primary_color?: string | null
+          privacy_contact_email?: string | null
+          privacy_contact_name?: string | null
           report_footer_text?: string | null
           slug: string
           stage: Database["public"]["Enums"]["school_stage"]
@@ -1824,6 +1828,8 @@ export type Database = {
           name?: string
           phone?: string | null
           primary_color?: string | null
+          privacy_contact_email?: string | null
+          privacy_contact_name?: string | null
           report_footer_text?: string | null
           slug?: string
           stage?: Database["public"]["Enums"]["school_stage"]
@@ -2582,6 +2588,14 @@ export type Database = {
           scale_name: string
         }[]
       }
+      school_onboarding: {
+        Args: { p_school_id: string }
+        Returns: {
+          done: boolean
+          item: string
+          missing: number
+        }[]
+      }
       school_staff: {
         Args: { p_school_id: string }
         Returns: {
@@ -2593,6 +2607,23 @@ export type Database = {
           role: Database["public"]["Enums"]["app_role"]
           status: Database["public"]["Enums"]["membership_status"]
           user_id: string
+        }[]
+      }
+      school_usage: {
+        Args: { p_school_id?: string }
+        Returns: {
+          active_learners: number
+          active_parents: number
+          active_staff: number
+          attachments_bytes: number
+          branding_bytes: number
+          imports_bytes: number
+          last_activity_at: string
+          last_marks_at: string
+          last_sign_in_at: string
+          published_reports: number
+          reports_bytes: number
+          school_id: string
         }[]
       }
       set_current_academic_year: {
@@ -2618,6 +2649,10 @@ export type Database = {
           p_not_available: boolean
           p_report_id: string
         }
+        Returns: undefined
+      }
+      set_school_feature: {
+        Args: { p_feature: string; p_on: boolean; p_school_id: string }
         Returns: undefined
       }
       sign_in_schools: {

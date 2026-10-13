@@ -28,7 +28,11 @@ describe("areaForPath", () => {
   });
 
   it("lets a head into the overview and audit log but not setup, people, exports or rollover", () => {
-    const head = { isPlatformAdmin: false, schools: [school("a", ["head"])] };
+    const head = {
+      isPlatformAdmin: false,
+      schools: [school("a", ["head"])],
+      assurance: "aal2" as const,
+    };
     for (const path of ["/admin", "/admin/browse/learners/x", "/admin/audit"])
       expect(decideAreaAccess(areaForPath(path)!, head, undefined)).toMatchObject({
         kind: "allow",
@@ -91,6 +95,7 @@ describe("decideAreaAccess", () => {
     const viewer = {
       isPlatformAdmin: false,
       schools: [school("a", ["teacher"]), school("b", ["school_admin"])],
+      assurance: "aal2" as const,
     };
     expect(decideAreaAccess("admin", viewer, undefined)).toEqual({ kind: "choose-school" });
     expect(decideAreaAccess("admin", viewer, "a")).toEqual({ kind: "forbidden" });
@@ -98,10 +103,61 @@ describe("decideAreaAccess", () => {
   });
 
   it("lets only platform admins into the platform console", () => {
-    const platformAdmin = { isPlatformAdmin: true, schools: [] };
+    const platformAdmin = { isPlatformAdmin: true, schools: [], assurance: "aal2" as const };
     expect(decideAreaAccess("platform", platformAdmin, undefined)).toMatchObject({
       kind: "allow",
     });
     expect(decideAreaAccess("admin", platformAdmin, undefined)).toEqual({ kind: "forbidden" });
+  });
+
+  describe("two-factor sign in (D54)", () => {
+    const admin = (assurance?: "aal1" | "aal2") => ({
+      isPlatformAdmin: false,
+      schools: [school("a", ["school_admin", "teacher"])],
+      assurance,
+    });
+
+    it("sends a school admin, head or super admin without the second step to it, for every area", () => {
+      for (const key of ["admin", "teaching", "news", "marks"] as const)
+        expect(decideAreaAccess(key, admin("aal1"), undefined), key).toEqual({
+          kind: "two-factor",
+        });
+      const head = {
+        isPlatformAdmin: false,
+        schools: [school("a", ["head"])],
+        assurance: "aal1" as const,
+      };
+      expect(decideAreaAccess("head", head, undefined)).toEqual({ kind: "two-factor" });
+      const platform = { isPlatformAdmin: true, schools: [], assurance: "aal1" as const };
+      expect(decideAreaAccess("platform", platform, undefined)).toEqual({ kind: "two-factor" });
+    });
+
+    it("treats an unknown assurance level as not passed", () => {
+      expect(decideAreaAccess("admin", admin(), undefined)).toEqual({ kind: "two-factor" });
+    });
+
+    it("lets them in at aal2", () => {
+      expect(decideAreaAccess("admin", admin("aal2"), undefined)).toMatchObject({ kind: "allow" });
+    });
+
+    it("never asks a teacher, parent or learner", () => {
+      for (const roles of [["teacher"], ["hod"], ["parent"], ["learner"]] as const) {
+        const viewer = {
+          isPlatformAdmin: false,
+          schools: [school("a", [...roles])],
+          assurance: "aal1" as const,
+        };
+        expect(decideAreaAccess("news", viewer, undefined)).toMatchObject({ kind: "allow" });
+      }
+    });
+
+    it("asks a teacher who is a head in another school", () => {
+      const viewer = {
+        isPlatformAdmin: false,
+        schools: [school("a", ["teacher"]), school("b", ["head"])],
+        assurance: "aal1" as const,
+      };
+      expect(decideAreaAccess("teaching", viewer, "a")).toEqual({ kind: "two-factor" });
+    });
   });
 });

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { SCHOOL_COOKIE } from "@/lib/auth/active-school";
 import { lockedUntil, minutesLeft } from "@/lib/auth/lockout";
 import { parseSignIn } from "@/lib/auth/sign-in-input";
+import { secondStepPending } from "@/lib/auth/two-factor";
 import {
   emailHash,
   lockedAfterFailure,
@@ -22,8 +23,8 @@ const UNAVAILABLE = "Sign in is unavailable right now. Please try again shortly.
 
 /**
  * Staff sign in (US-1.1). Checks the per-account lockout before asking
- * Supabase Auth, records the outcome, then sends the user to the school
- * picker or their role's home page.
+ * Supabase Auth, records the outcome, then sends the user to the second
+ * step (D54), the school picker or their role's home page.
  */
 export async function signIn(_prev: SignInState, formData: FormData): Promise<SignInState> {
   const rawEmail = formData.get("email");
@@ -49,10 +50,8 @@ export async function signIn(_prev: SignInState, formData: FormData): Promise<Si
   // rate limit do not.
   if (error && error.code !== "invalid_credentials") return { error: UNAVAILABLE, email };
 
-  const recorded = await recordAttempt(admin, hash, !error);
-  if (!recorded && error) return { error: UNAVAILABLE, email };
-
   if (error) {
+    if (!(await recordAttempt(admin, hash, false))) return { error: UNAVAILABLE, email };
     // Say so straight away when this failure is the one that locks the account.
     const failedAt = new Date();
     const nowBlocked = lockedAfterFailure(history, failedAt);
@@ -63,5 +62,9 @@ export async function signIn(_prev: SignInState, formData: FormData): Promise<Si
   // A multi-school user chooses their school afresh at every sign in (US-1.1).
   (await cookies()).delete(SCHOOL_COOKIE);
   const viewer = await loadViewer(supabase, data.user.id);
+  // Super admins, school admins and heads go on to the second step; their
+  // earlier wrong codes stay counted until it is passed (D54).
+  if (secondStepPending(viewer)) redirect("/two-factor");
+  await recordAttempt(admin, hash, true);
   redirect(viewer.schools.length > 1 ? "/select-school" : await landingPathFor(viewer));
 }

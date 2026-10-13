@@ -7,6 +7,7 @@ import { SCHOOL_COOKIE } from "@/lib/auth/active-school";
 import { parseNewPassword } from "@/lib/auth/new-password";
 import { endResetSession, hasResetSession } from "@/lib/auth/reset-session";
 import { emailHash, recordAttempt } from "@/lib/auth/sign-in-attempts";
+import { secondStepPending } from "@/lib/auth/two-factor";
 import { landingPathFor, loadViewer } from "@/lib/auth/viewer";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -15,7 +16,8 @@ export type ResetState = { error: string | null };
 
 /**
  * Step 3 of US-1.7: sets the new password in the session the reset link or
- * code opened, signs out every other session, clears the lockout and sends
+ * code opened, signs out every other session, clears the lockout (not for
+ * someone still owing the second step, D54) and sends
  * the person on as after a normal sign in.
  */
 export async function resetPassword(_prev: ResetState, formData: FormData): Promise<ResetState> {
@@ -47,13 +49,17 @@ export async function resetPassword(_prev: ResetState, formData: FormData): Prom
   await supabase.auth.signOut({ scope: "others" });
   await endResetSession();
   const admin = createAdminClient();
-  if (user.email) await recordAttempt(admin, emailHash(user.email), true);
+  (await cookies()).delete(SCHOOL_COOKIE);
+  const viewer = await loadViewer(supabase, user.id);
+  // A new password does not clear wrong two-factor codes: those clear only
+  // when the second step is passed (D54).
+  if (user.email && !secondStepPending(viewer)) {
+    await recordAttempt(admin, emailHash(user.email), true);
+  }
   // The reset link or code reached this inbox, so the address is proved (D27).
   if (user.app_metadata?.[EMAIL_UNVERIFIED] === true) {
     await admin.auth.admin.updateUserById(user.id, { app_metadata: { [EMAIL_UNVERIFIED]: null } });
   }
 
-  (await cookies()).delete(SCHOOL_COOKIE);
-  const viewer = await loadViewer(supabase, user.id);
   redirect(viewer.schools.length > 1 ? "/select-school" : await landingPathFor(viewer));
 }

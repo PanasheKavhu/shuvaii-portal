@@ -75,9 +75,9 @@ export default async function PlatformPage() {
           No schools yet. Create the first one.
         </p>
       ) : (
-        <ul aria-label="Schools overview" className="grid gap-3 sm:grid-cols-2">
+        <ul aria-label="Schools overview" className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {schools.map(({ school, usage: u }) => (
-            <li key={school.id}>
+            <li key={school.id} className="min-w-0">
               <Link
                 href={`/platform/schools/${school.id}`}
                 className="bg-card hover:bg-muted/60 focus-visible:ring-ring/50 flex min-h-20 items-center gap-4 rounded-2xl border p-4 transition-colors outline-none focus-visible:ring-3"

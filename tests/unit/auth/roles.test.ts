@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { canUseArea, AREAS, homeFor, navFor } from "@/lib/auth/roles";
+import { DEFAULT_FEATURES } from "@/lib/platform/features";
 
 const hrefs = (items: { href: string }[]) => items.map((i) => i.href);
 
@@ -107,5 +108,27 @@ describe("canUseArea", () => {
 
   it("denies a school admin the platform console", () => {
     expect(canUseArea(AREAS.platform, ["school_admin"], false)).toBe(false);
+  });
+});
+
+describe("feature switches (D55)", () => {
+  const off = { ...DEFAULT_FEATURES, newsletter: false };
+
+  it("drops News and Newsletter from the menus when the newsletter is off", () => {
+    expect(hrefs(navFor(["parent"], false, off))).toEqual(["/children"]);
+    expect(hrefs(navFor(["teacher"], false, off))).toEqual(["/teaching", "/marks/completion"]);
+    expect(hrefs(navFor(["school_admin"], false, off))).not.toContain("/admin/newsletter");
+    expect(hrefs(navFor(["school_admin"], false, DEFAULT_FEATURES))).toContain("/admin/newsletter");
+  });
+
+  it("refuses the areas themselves, not only the links", () => {
+    expect(canUseArea(AREAS.news, ["parent"], false, off)).toBe(false);
+    expect(canUseArea(AREAS.newsletter, ["head"], false, off)).toBe(false);
+    expect(canUseArea(AREAS.children, ["parent"], false, off)).toBe(true);
+  });
+
+  it("does not change where anyone lands", () => {
+    expect(homeFor(["learner"], false, off)).toBe("/my-reports");
+    expect(homeFor(["school_admin"], false, off)).toBe("/admin");
   });
 });

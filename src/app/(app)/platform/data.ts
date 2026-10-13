@@ -1,6 +1,8 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { readFeatures, type Features } from "@/lib/platform/features";
+import { onboardingItems, type OnboardingItem, type SchoolUsage } from "@/lib/platform/usage";
 import { createClient } from "@/lib/supabase/server";
 
 export type SchoolSummary = {
@@ -12,9 +14,13 @@ export type SchoolSummary = {
   logoPath: string | null;
   primaryColor: string | null;
   accentColor: string | null;
+  features: Features;
+  privacyContactName: string | null;
+  privacyContactEmail: string | null;
 };
 
-const SCHOOL_COLUMNS = "id, name, slug, stage, status, logo_path, primary_color, accent_color";
+const SCHOOL_COLUMNS =
+  "id, name, slug, stage, status, logo_path, primary_color, accent_color, feature_flags, privacy_contact_name, privacy_contact_email";
 
 function toSummary(row: {
   id: string;
@@ -25,6 +31,9 @@ function toSummary(row: {
   logo_path: string | null;
   primary_color: string | null;
   accent_color: string | null;
+  feature_flags: unknown;
+  privacy_contact_name: string | null;
+  privacy_contact_email: string | null;
 }): SchoolSummary {
   return {
     id: row.id,
@@ -35,6 +44,9 @@ function toSummary(row: {
     logoPath: row.logo_path,
     primaryColor: row.primary_color,
     accentColor: row.accent_color,
+    features: readFeatures(row.feature_flags),
+    privacyContactName: row.privacy_contact_name,
+    privacyContactEmail: row.privacy_contact_email,
   };
 }
 
@@ -182,4 +194,42 @@ export async function listPlatformAdminsTwoFactor(): Promise<TwoFactorPerson[]> 
   const { data, error } = await supabase.from("platform_admins").select("user_id");
   if (error) throw new Error("Could not load super admins");
   return twoFactorPeople(new Map(data.map((p) => [p.user_id, ["super_admin"]])));
+}
+
+/**
+ * Usage numbers per school (US-10.4), quietest first, or one school's.
+ * Counts, bytes and times only, through school_usage(), which answers
+ * platform admins only and returns no personal data (D5, D17, D56).
+ */
+export async function listSchoolUsage(schoolId?: string): Promise<SchoolUsage[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc(
+    "school_usage",
+    schoolId ? { p_school_id: schoolId } : {},
+  );
+  if (error) throw new Error("Could not load usage");
+  return data.map((u) => ({
+    schoolId: u.school_id,
+    activeLearners: u.active_learners,
+    activeStaff: u.active_staff,
+    activeParents: u.active_parents,
+    bytes: {
+      reports: Number(u.reports_bytes),
+      attachments: Number(u.attachments_bytes),
+      imports: Number(u.imports_bytes),
+      branding: Number(u.branding_bytes),
+    },
+    publishedReports: u.published_reports,
+    lastSignInAt: u.last_sign_in_at ?? null,
+    lastMarksAt: u.last_marks_at ?? null,
+    lastActivityAt: u.last_activity_at ?? null,
+  }));
+}
+
+/** The school's onboarding checklist (D56), read from what exists. */
+export async function getSchoolOnboarding(schoolId: string): Promise<OnboardingItem[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("school_onboarding", { p_school_id: schoolId });
+  if (error) throw new Error("Could not load the onboarding checklist");
+  return onboardingItems(data);
 }

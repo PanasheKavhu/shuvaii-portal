@@ -29,7 +29,7 @@ export default async function ChildrenPage({ searchParams }: PageProps<"/childre
     school ? loadPortalReports(school.schoolId) : Promise.resolve([]),
     school ? loadFamilyYears(school.schoolId) : Promise.resolve([]),
     searchParams,
-    school ? loadNewsSummary(supabase, school.schoolId) : null,
+    school?.features.newsletter ? loadNewsSummary(supabase, school.schoolId) : null,
   ]);
   if (error) throw new Error("Could not load your children");
   const chosen = pickChild(children, child);

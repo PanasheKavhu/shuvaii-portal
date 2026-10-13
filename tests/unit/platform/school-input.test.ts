@@ -5,6 +5,7 @@ import {
   logoObjectPath,
   parseAdminInvite,
   parseNewSchool,
+  parsePrivacyContact,
   slugify,
   sniffImageType,
 } from "@/lib/platform/school-input";
@@ -98,5 +99,22 @@ describe("sniffImageType", () => {
   it("rejects anything else, such as SVG or HTML renamed to .png", () => {
     expect(sniffImageType(new TextEncoder().encode("<svg xmlns="))).toBeNull();
     expect(sniffImageType(new TextEncoder().encode("<html><script>"))).toBeNull();
+  });
+});
+
+describe("parsePrivacyContact", () => {
+  it("accepts a name and an email, trimmed and lower-cased", () => {
+    expect(parsePrivacyContact({ name: "  The Bursar ", email: " Privacy@School.ac.zw " })).toEqual(
+      {
+        ok: true,
+        value: { name: "The Bursar", email: "privacy@school.ac.zw" },
+      },
+    );
+  });
+
+  it("asks for both", () => {
+    const parsed = parsePrivacyContact({ name: "", email: "nope" });
+    expect(parsed.ok).toBe(false);
+    if (!parsed.ok) expect(Object.keys(parsed.errors).sort()).toEqual(["email", "name"]);
   });
 });

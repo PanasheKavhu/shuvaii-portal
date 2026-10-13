@@ -15,7 +15,7 @@ import { loadNewsSummary } from "./news/data";
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const viewer = await requireViewer();
   const school = await getActiveSchool(viewer);
-  const areas = navFor(school?.roles ?? [], viewer.isPlatformAdmin);
+  const areas = navFor(school?.roles ?? [], viewer.isPlatformAdmin, school?.features);
   // The News entry carries the unread count (US-8.2, D50).
   const unread =
     school && areas.some((a) => a.href === AREAS.news.href)

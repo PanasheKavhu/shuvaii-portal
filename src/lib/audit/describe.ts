@@ -304,6 +304,8 @@ export function describeAuditEntry(e: AuditEntry): AuditLine {
     case "schools":
       if (e.event === "data_exported")
         return { summary: exportSummary(actor, e), changes: [], reason };
+      if (e.event === "feature_changed")
+        return { summary: featureSummary(actor, e), changes: [], reason };
       summary =
         e.event === "school_created"
           ? `${actor} created the school ${e.personName ?? ""}`.trim()
@@ -361,6 +363,21 @@ export function describeAuditEntry(e: AuditEntry): AuditLine {
   }
 
   return { summary, changes, reason };
+}
+
+const FEATURE_NAMES: Record<string, string> = {
+  newsletter: "the newsletter",
+  attendance: "attendance",
+};
+
+/** "Platform Admin switched the newsletter off" (US-10.3; D55). */
+function featureSummary(actor: string, e: AuditEntry): string {
+  const parts = Object.entries(e.newData ?? {})
+    .filter(([, on]) => typeof on === "boolean")
+    .map(([key, on]) => `${FEATURE_NAMES[key] ?? key} ${on ? "on" : "off"}`);
+  return parts.length > 0
+    ? `${actor} switched ${parts.join(" and ")}`
+    : `${actor} changed the school's features`;
 }
 
 /**

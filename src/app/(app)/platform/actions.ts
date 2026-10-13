@@ -17,8 +17,10 @@ import {
   logoObjectPath,
   parseAdminInvite,
   parseNewSchool,
+  parsePrivacyContact,
   sniffImageType,
 } from "@/lib/platform/school-input";
+import { FEATURES, isFeatureKey } from "@/lib/platform/features";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { notAllowed, type FormState } from "./form-state";
@@ -297,4 +299,57 @@ export async function resetTwoFactor(userId: string): Promise<FormState> {
     message: "Reset. They will set up their authenticator app again when they next sign in.",
     errors: {},
   };
+}
+
+/**
+ * Switches one feature on or off for a school (US-10.3; D55). The
+ * database checks the caller again, records a `feature_changed` console
+ * event, and refuses a switched-off feature's reads and writes.
+ */
+export async function setFeature(
+  schoolId: string,
+  feature: string,
+  on: boolean,
+): Promise<FormState> {
+  if (!(await isPlatformAdmin()) || !UUID_RE.test(schoolId) || !isFeatureKey(feature)) {
+    return NOT_ALLOWED;
+  }
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_school_feature", {
+    p_school_id: schoolId,
+    p_feature: feature,
+    p_on: on,
+  });
+  if (error?.code === "42501") return NOT_ALLOWED;
+  if (error)
+    return FAILED(`switch the ${FEATURES[feature].label.toLowerCase()} ${on ? "on" : "off"}`);
+  // Menus and pages of everyone in the school change with it.
+  revalidatePath("/", "layout");
+  return {
+    status: "saved",
+    message: `${FEATURES[feature].label} switched ${on ? "on" : "off"}.`,
+    errors: {},
+  };
+}
+
+/** Saves the school's privacy notice contact (Q20; D56). */
+export async function savePrivacyContact(
+  schoolId: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  if (!(await isPlatformAdmin()) || !UUID_RE.test(schoolId)) return NOT_ALLOWED;
+  const parsed = parsePrivacyContact({ name: formData.get("name"), email: formData.get("email") });
+  if (!parsed.ok) return { status: "error", message: null, errors: parsed.errors };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("schools")
+    .update({ privacy_contact_name: parsed.value.name, privacy_contact_email: parsed.value.email })
+    .eq("id", schoolId)
+    .select("id");
+  if (error || data.length !== 1) return FAILED("save the privacy contact");
+
+  revalidatePath(`/platform/schools/${schoolId}`);
+  return { status: "saved", message: "Privacy contact saved.", errors: {} };
 }

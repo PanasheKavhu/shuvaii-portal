@@ -8,14 +8,32 @@ import { isHexColor, readableOn } from "@/lib/branding/contrast";
 import { logoUrl } from "@/lib/branding/theme";
 import { STAGE_LABELS } from "@/lib/platform/school-input";
 import { supabaseUrl } from "@/lib/supabase/env";
-import { inviteSchoolAdmin, resendInvite, saveColors, uploadLogo } from "../../actions";
-import { getSchool, getSchoolGrading, listSchoolAdmins, listSchoolTwoFactor } from "../../data";
+import {
+  inviteSchoolAdmin,
+  resendInvite,
+  saveColors,
+  savePrivacyContact,
+  setFeature,
+  uploadLogo,
+} from "../../actions";
+import {
+  getSchool,
+  getSchoolGrading,
+  getSchoolOnboarding,
+  listSchoolAdmins,
+  listSchoolTwoFactor,
+  listSchoolUsage,
+} from "../../data";
 import { twoFactorRows } from "../../two-factor-rows";
 import { ColorsForm } from "./colors-form";
 import { InviteForm } from "./invite-form";
 import { LogoForm } from "./logo-form";
 import { ResendInviteForm } from "@/components/resend-invite-form";
 import { TwoFactorPeople } from "@/components/platform/two-factor-people";
+import { UsageStats } from "@/components/platform/usage-stats";
+import { FEATURE_KEYS, FEATURES } from "@/lib/platform/features";
+import { FeatureSwitch } from "./feature-switch";
+import { PrivacyContactForm } from "./privacy-contact-form";
 
 export const metadata: Metadata = { title: "School" };
 
@@ -25,17 +43,25 @@ const STATUS_LABELS: Record<string, string> = {
   disabled: "Disabled",
 };
 
-/** One school in the console: branding (US-1.5) and the first admin invite (US-10.1). */
+/**
+ * One school in the console: onboarding checklist and usage (US-10.4,
+ * D56), feature switches (US-10.3, D55), branding (US-1.5), the first admin
+ * invite (US-10.1), two-factor resets (D54) and the grading key (D42).
+ */
 export default async function SchoolPage({ params }: PageProps<"/platform/schools/[id]">) {
   const { viewer } = await requireArea("platform");
   const { id } = await params;
   const school = await getSchool(id);
   if (!school) notFound();
-  const [admins, grading, twoFactor] = await Promise.all([
+  const [admins, grading, twoFactor, onboarding, [usage]] = await Promise.all([
     listSchoolAdmins(school.id),
     getSchoolGrading(school.id),
     listSchoolTwoFactor(school.id),
+    getSchoolOnboarding(school.id),
+    listSchoolUsage(school.id),
   ]);
+  const done = onboarding.filter((i) => i.done).length;
+  const now = new Date();
   const incomplete = grading.filter((l) => !l.complete);
   const logo = logoUrl(school.logoPath, supabaseUrl());
   const badge = isHexColor(school.primaryColor)
@@ -62,6 +88,91 @@ export default async function SchoolPage({ params }: PageProps<"/platform/school
           </p>
         </div>
       </div>
+
+      <Panel
+        title="Onboarding"
+        description="Read from what the school has set up so far. Each item turns green on its own."
+      >
+        <p
+          role="status"
+          aria-label="Onboarding status"
+          className={
+            done === onboarding.length
+              ? "rounded-lg bg-emerald-500/10 px-3 py-2 text-sm font-medium text-emerald-800 dark:text-emerald-300"
+              : "rounded-lg bg-amber-500/15 px-3 py-2 text-sm font-medium text-amber-900 dark:text-amber-200"
+          }
+        >
+          {done === onboarding.length
+            ? "Onboarding complete: the school is ready."
+            : `${done} of ${onboarding.length} done.`}
+        </p>
+        <ul aria-label="Onboarding checklist" className="flex flex-col gap-2">
+          {onboarding.map((item) => (
+            <li
+              key={item.key}
+              data-done={item.done}
+              className={
+                item.done
+                  ? "flex gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-3 py-2"
+                  : "bg-muted/40 flex gap-3 rounded-xl border px-3 py-2"
+              }
+            >
+              <span
+                aria-hidden
+                className={
+                  item.done
+                    ? "mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold text-white"
+                    : "mt-0.5 size-6 shrink-0 rounded-full border-2 border-dashed"
+                }
+              >
+                {item.done ? "✓" : ""}
+              </span>
+              <span className="flex min-w-0 flex-col">
+                <span className="font-medium">
+                  {item.label}
+                  <span className="sr-only">{item.done ? ": done" : ": to do"}</span>
+                </span>
+                {!item.done && (
+                  <span className="text-muted-foreground text-sm">
+                    {item.missing ? `${item.missing} ` : ""}
+                    {item.where}
+                  </span>
+                )}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </Panel>
+
+      {usage && (
+        <Panel
+          title="Usage"
+          description="Active people, files stored and last activity. Numbers only: no names, marks or other personal data."
+        >
+          <UsageStats usage={usage} now={now} detailed />
+        </Panel>
+      )}
+
+      <Panel
+        title="Features"
+        description="Switched-off features disappear for everyone in this school, and the database refuses them too. Nothing is deleted; switching back on brings everything back."
+      >
+        <ul aria-label="Features" className="flex flex-col gap-2">
+          {FEATURE_KEYS.map((key) => (
+            <li key={key}>
+              <FeatureSwitch
+                label={FEATURES[key].label}
+                description={FEATURES[key].description}
+                on={school.features[key]}
+                action={setFeature.bind(null, school.id, key, !school.features[key])}
+              />
+            </li>
+          ))}
+        </ul>
+        <p className="text-muted-foreground text-sm">
+          Payments get a switch here when payments are built.
+        </p>
+      </Panel>
 
       <Panel
         title="Colours"
@@ -107,6 +218,17 @@ export default async function SchoolPage({ params }: PageProps<"/platform/school
         ) : (
           <InviteForm action={inviteSchoolAdmin.bind(null, school.id)} />
         )}
+      </Panel>
+
+      <Panel
+        title="Privacy notice contact"
+        description="Who at the school answers questions about learners' data. Named in the privacy notice."
+      >
+        <PrivacyContactForm
+          action={savePrivacyContact.bind(null, school.id)}
+          name={school.privacyContactName ?? ""}
+          email={school.privacyContactEmail ?? ""}
+        />
       </Panel>
 
       <Panel

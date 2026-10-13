@@ -9,7 +9,15 @@ import { logoUrl } from "@/lib/branding/theme";
 import { STAGE_LABELS } from "@/lib/platform/school-input";
 import { supabaseUrl } from "@/lib/supabase/env";
 import { TwoFactorPeople } from "@/components/platform/two-factor-people";
-import { listPlatformAdminsTwoFactor, listSchools } from "./data";
+import {
+  ago,
+  byLastActivity,
+  formatBytes,
+  isQuiet,
+  QUIET_AFTER_DAYS,
+  totalBytes,
+} from "@/lib/platform/usage";
+import { listPlatformAdminsTwoFactor, listSchools, listSchoolUsage } from "./data";
 import { twoFactorRows } from "./two-factor-rows";
 
 /** Shows the initials badge in the school's own colour. */
@@ -20,10 +28,25 @@ function badgeStyle(color: string | null): CSSProperties | undefined {
 
 export const metadata: Metadata = { title: "Platform" };
 
-/** Super-admin console home (SPEC E10): every school, and a way to add one. */
+/**
+ * Super-admin console home (SPEC E10): every school with its headline usage
+ * numbers (US-10.4), quietest first so a school that has gone quiet is easy
+ * to spot, and a way to add one.
+ */
 export default async function PlatformPage() {
   const { viewer } = await requireArea("platform");
-  const [schools, superAdmins] = await Promise.all([listSchools(), listPlatformAdminsTwoFactor()]);
+  const [allSchools, usage, superAdmins] = await Promise.all([
+    listSchools(),
+    listSchoolUsage(),
+    listPlatformAdminsTwoFactor(),
+  ]);
+  const now = new Date();
+  const usageOf = new Map(usage.map((u) => [u.schoolId, u]));
+  const schools = allSchools
+    .map((school) => ({ school, usage: usageOf.get(school.id) }))
+    .sort((a, b) =>
+      a.usage && b.usage ? byLastActivity(a.usage, b.usage) : a.usage ? 1 : b.usage ? -1 : 0,
+    );
 
   return (
     <section className="flex flex-col gap-6">
@@ -40,13 +63,20 @@ export default async function PlatformPage() {
         </Link>
       </div>
 
+      {schools.length > 0 && (
+        <p className="text-muted-foreground text-sm">
+          Quietest first: a school with no sign in or marks entry for {QUIET_AFTER_DAYS} days is
+          marked Quiet.
+        </p>
+      )}
+
       {schools.length === 0 ? (
         <p className="text-muted-foreground bg-muted/40 rounded-xl border border-dashed p-6">
           No schools yet. Create the first one.
         </p>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2">
-          {schools.map((school) => (
+        <ul aria-label="Schools overview" className="grid gap-3 sm:grid-cols-2">
+          {schools.map(({ school, usage: u }) => (
             <li key={school.id}>
               <Link
                 href={`/platform/schools/${school.id}`}
@@ -61,6 +91,22 @@ export default async function PlatformPage() {
                     {school.slug} · {STAGE_LABELS[school.stage].split(" ")[0]}
                     {school.status !== "active" && ` · ${school.status}`}
                   </span>
+                  {u && (
+                    <>
+                      <span className="mt-1 flex flex-wrap items-center gap-2 text-sm">
+                        <span>Last activity: {ago(u.lastActivityAt, now)}</span>
+                        {isQuiet(u.lastActivityAt, now) && (
+                          <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-900 dark:text-amber-200">
+                            Quiet
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-muted-foreground text-sm tabular-nums">
+                        {u.activeLearners} learners · {u.activeStaff} staff · {u.activeParents}{" "}
+                        parents · {u.publishedReports} reports · {formatBytes(totalBytes(u))}
+                      </span>
+                    </>
+                  )}
                 </span>
                 <span aria-hidden className="flex gap-1">
                   {[school.primaryColor, school.accentColor].map((c, i) =>

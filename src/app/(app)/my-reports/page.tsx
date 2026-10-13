@@ -20,7 +20,7 @@ export default async function MyReportsPage() {
     ? await Promise.all([
         loadPortalReports(school.schoolId),
         loadFamilyYears(school.schoolId),
-        loadNewsSummary(await createClient(), school.schoolId),
+        school.features.newsletter ? loadNewsSummary(await createClient(), school.schoolId) : null,
       ])
     : [[], [], null];
 

@@ -5,7 +5,12 @@
  * Each area is one top-level route. A person sees a menu entry for every
  * area one of their roles may use, and lands on the first one in AREAS
  * order, so a teacher who is also a parent lands on their classes.
+ *
+ * An area tied to a feature (US-10.3; D55) is closed, menu and route, when
+ * the school has that feature switched off.
  */
+import { DEFAULT_FEATURES, type FeatureKey, type Features } from "@/lib/platform/features";
+
 export const APP_ROLES = ["school_admin", "head", "hod", "teacher", "parent", "learner"] as const;
 
 export type AppRole = (typeof APP_ROLES)[number];
@@ -18,6 +23,8 @@ export type Area = {
   /** Roles that get a menu entry, when not every role in `roles` should. */
   menuRoles?: readonly AppRole[];
   platformOnly?: boolean;
+  /** A school feature the area needs switched on. */
+  feature?: FeatureKey;
 };
 
 export const AREAS = {
@@ -66,7 +73,12 @@ export const AREAS = {
   // The school's audit log (D35). Inside /admin, but heads may open it too.
   audit: { href: "/admin/audit", label: "Audit log", roles: ["school_admin", "head"] },
   // Writing announcements (US-8.1, D50). Inside /admin, but heads write too.
-  newsletter: { href: "/admin/newsletter", label: "Newsletter", roles: ["school_admin", "head"] },
+  newsletter: {
+    href: "/admin/newsletter",
+    label: "Newsletter",
+    roles: ["school_admin", "head"],
+    feature: "newsletter",
+  },
   children: { href: "/children", label: "My children", roles: ["parent"] },
   myReports: { href: "/my-reports", label: "My reports", roles: ["learner"] },
   // Reading announcements (US-8.2, D50). Anyone may open it; school admin
@@ -76,6 +88,7 @@ export const AREAS = {
     label: "News",
     roles: ["school_admin", "head", "hod", "teacher", "parent", "learner"],
     menuRoles: ["hod", "teacher", "parent", "learner"],
+    feature: "newsletter",
   },
   platform: { href: "/platform", label: "Platform", roles: [], platformOnly: true },
 } as const satisfies Record<string, Area>;
@@ -90,21 +103,31 @@ export function canUseArea(
   area: Area,
   roles: readonly AppRole[],
   isPlatformAdmin: boolean,
+  features: Features = DEFAULT_FEATURES,
 ): boolean {
   if (area.platformOnly) return isPlatformAdmin;
+  if (area.feature && !features[area.feature]) return false;
   return area.roles.some((r) => roles.includes(r));
 }
 
 /** Menu entries for this viewer, in display order. */
-export function navFor(roles: readonly AppRole[], isPlatformAdmin: boolean): Area[] {
+export function navFor(
+  roles: readonly AppRole[],
+  isPlatformAdmin: boolean,
+  features: Features = DEFAULT_FEATURES,
+): Area[] {
   return Object.values(AREAS as Record<AreaKey, Area>).filter((area) =>
-    canUseArea({ ...area, roles: area.menuRoles ?? area.roles }, roles, isPlatformAdmin),
+    canUseArea({ ...area, roles: area.menuRoles ?? area.roles }, roles, isPlatformAdmin, features),
   );
 }
 
 /** Where to send the viewer after sign in, or null if they have nowhere to go. */
-export function homeFor(roles: readonly AppRole[], isPlatformAdmin: boolean): string | null {
-  return navFor(roles, isPlatformAdmin)[0]?.href ?? null;
+export function homeFor(
+  roles: readonly AppRole[],
+  isPlatformAdmin: boolean,
+  features: Features = DEFAULT_FEATURES,
+): string | null {
+  return navFor(roles, isPlatformAdmin, features)[0]?.href ?? null;
 }
 
 const ROLE_LABELS: Record<AppRole, string> = {

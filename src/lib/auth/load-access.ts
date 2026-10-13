@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
+import { readFeatures } from "@/lib/platform/features";
 import { groupMemberships, type SchoolMembership } from "./active-school";
 import { isAppRole } from "./roles";
 
@@ -23,7 +24,7 @@ export async function loadAccess(
     supabase
       .from("memberships")
       .select(
-        "role, school_id, schools!inner(name, status, logo_path, primary_color, accent_color)",
+        "role, school_id, schools!inner(name, status, logo_path, primary_color, accent_color, feature_flags)",
       )
       .eq("user_id", userId)
       .eq("status", "active"),
@@ -44,6 +45,7 @@ export async function loadAccess(
         primaryColor: m.schools.primary_color,
         accentColor: m.schools.accent_color,
       },
+      features: readFeatures(m.schools.feature_flags),
     }));
 
   return {

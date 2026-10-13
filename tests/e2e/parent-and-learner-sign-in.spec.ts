@@ -226,7 +226,7 @@ test("a parent sets up an account with a one-time code and sees both children", 
   await expect(parent.getByText("Use at least 8 characters.")).toBeVisible();
   // The privacy notice must be accepted, and its link names the school (D57).
   await expect(parent.getByText("Tick the box to accept the privacy notice.")).toBeVisible();
-  await expect(parent.getByRole("link", { name: "privacy notice" })).toHaveAttribute(
+  await expect(parent.getByRole("link", { name: "privacy notice", exact: true })).toHaveAttribute(
     "href",
     "/privacy?school=msasa-demo",
   );

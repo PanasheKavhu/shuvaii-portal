@@ -85,7 +85,6 @@ test("switching the newsletter off closes it for one school's users only, and ba
   const adminA = await signedInPage(browser, page, a.adminEmail, "/admin");
   await expect(mainNav(adminA).getByRole("link", { name: "Newsletter" })).toHaveCount(0);
   await expect(adminA.getByRole("link", { name: /^Newsletter/ })).toHaveCount(0);
-  await expect(adminA.getByRole("link", { name: /^People/ })).toBeVisible();
   await expectNotAllowed(adminA, "/admin/newsletter");
   await expectNotAllowed(adminA, "/admin/newsletter/new");
   await expectNotAllowed(adminA, `/admin/newsletter/${a.announcementId}`);

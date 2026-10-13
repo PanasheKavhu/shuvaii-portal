@@ -1,13 +1,16 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { Field, FormMessage, describedBy, inputClass } from "@/components/platform/form-bits";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { FormState } from "../../form-state";
 import { idle } from "../../form-state";
 
-/** The school's privacy notice contact (Q20; D56). */
+/**
+ * The school's privacy notice contact (Q20; D56). Controlled inputs, so a
+ * refused save keeps what was typed (React resets a form after its action).
+ */
 export function PrivacyContactForm({
   action,
   name,
@@ -18,6 +21,8 @@ export function PrivacyContactForm({
   email: string;
 }) {
   const [state, formAction, pending] = useActionState(action, idle);
+  const [nameValue, setNameValue] = useState(name);
+  const [emailValue, setEmailValue] = useState(email);
   return (
     <form action={formAction} className="flex flex-col gap-5" noValidate>
       <Field
@@ -29,7 +34,8 @@ export function PrivacyContactForm({
         <Input
           id="privacyName"
           name="name"
-          defaultValue={name}
+          value={nameValue}
+          onChange={(e) => setNameValue(e.target.value)}
           autoComplete="off"
           required
           className={inputClass}
@@ -42,7 +48,8 @@ export function PrivacyContactForm({
           name="email"
           type="email"
           inputMode="email"
-          defaultValue={email}
+          value={emailValue}
+          onChange={(e) => setEmailValue(e.target.value)}
           autoComplete="off"
           required
           className={inputClass}

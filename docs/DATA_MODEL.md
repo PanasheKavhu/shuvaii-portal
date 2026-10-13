@@ -67,8 +67,11 @@ id, slug unique, name, motto, stage school_stage, address, phone, email,
 logo_path, stamp_path, head_signature_path,           -- Supabase Storage paths
 primary_color, accent_color,                           -- hex, contrast-checked
 report_footer_text, timezone default 'Africa/Harare',
-feature_flags jsonb default '{}', status ('active'|'suspended')
+feature_flags jsonb default '{}', status ('active'|'suspended'),
+privacy_contact_name, privacy_contact_email          -- privacy notice contact (Q20, D56)
 ```
+
+`feature_flags` holds only known features as true or false (`newsletter` default on, `attendance` default off; a missing key means the default). Only a platform admin switches them (D3), through `set_school_feature()`, and a switched-off newsletter is refused by the database (D55).
 
 **profiles**: one row per person, global (`id` = `auth.users.id`).
 

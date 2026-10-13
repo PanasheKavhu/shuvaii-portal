@@ -67,8 +67,9 @@ test("super admin creates a school, brands it and invites its admin, who sees th
   );
 
   // First school-admin invite.
-  await page.getByLabel("Full name").fill("Tariro Moyo");
-  await page.getByLabel("Email").fill(adminEmail);
+  const invite = page.getByRole("region", { name: "School admin" });
+  await invite.getByLabel("Full name").fill("Tariro Moyo");
+  await invite.getByLabel("Email").fill(adminEmail);
   await page.getByRole("button", { name: "Send invite" }).click();
   await expect(page.getByRole("list", { name: "School admins" })).toContainText(
     "Invite sent, not accepted yet",
@@ -200,8 +201,9 @@ test("super admin resends a pending invite, and only the new link works", async 
   await expect(page).toHaveURL(/\/platform\/schools\/[0-9a-f-]{36}$/);
   const schoolId = page.url().split("/").pop()!;
 
-  await page.getByLabel("Full name").fill("Rufaro Ncube");
-  await page.getByLabel("Email").fill(adminEmail);
+  const invite = page.getByRole("region", { name: "School admin" });
+  await invite.getByLabel("Full name").fill("Rufaro Ncube");
+  await invite.getByLabel("Email").fill(adminEmail);
   await page.getByRole("button", { name: "Send invite" }).click();
   const admins = page.getByRole("list", { name: "School admins" });
   await expect(admins).toContainText("Invite sent, not accepted yet");

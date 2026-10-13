@@ -323,6 +323,7 @@ export async function createEmptySchool(
   options: { head?: boolean } = {},
 ): Promise<{
   schoolId: string;
+  schoolName: string;
   adminEmail: string;
   adminName: string;
   teacherEmail: string;
@@ -340,9 +341,10 @@ export async function createEmptySchool(
   }
 
   const platform = await apiSignIn(PLATFORM_ADMIN);
+  const schoolName = `Setup School ${stamp}`;
   const { data: school, error } = await platform
     .from("schools")
-    .insert({ name: `Setup School ${stamp}`, slug: `setup-${stamp}`, stage: "secondary" })
+    .insert({ name: schoolName, slug: `setup-${stamp}`, stage: "secondary" })
     .select("id")
     .single();
   if (error) throw new Error("Could not create a test school");
@@ -373,6 +375,7 @@ export async function createEmptySchool(
   if (memberError) throw new Error("Could not add the test school's staff");
   return {
     schoolId: school.id,
+    schoolName,
     adminEmail: admin.email,
     adminName,
     teacherEmail: teacher.email,

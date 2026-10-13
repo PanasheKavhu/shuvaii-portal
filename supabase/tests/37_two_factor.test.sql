@@ -231,22 +231,28 @@ select is(
   false,
   'a wrong code is refused'
 );
+-- service_role cannot read auth.mfa_factors; check as the owner.
+reset role;
 select is(
   (select count(*) from auth.mfa_factors where user_id = '11111111-1111-1111-1111-111111111111'),
   1::bigint,
   'a wrong code leaves the app in place'
 );
+set local role service_role;
 select is(
   public.use_recovery_code('11111111-1111-1111-1111-111111111111',
     '004f29251a299c0d9945581dbdcf2c66bf54baecdec7bac005a9e25ac2fac0c4'),
   true,
   'a right code is accepted'
 );
+-- service_role cannot read auth.mfa_factors; check as the owner.
+reset role;
 select is(
   (select count(*) from auth.mfa_factors where user_id = '11111111-1111-1111-1111-111111111111'),
   0::bigint,
   'using a code removes the app, so the person enrols again'
 );
+set local role service_role;
 select is(
   (select count(*) from public.mfa_recovery_codes where user_id = '11111111-1111-1111-1111-111111111111' and used_at is null),
   0::bigint,

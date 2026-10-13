@@ -133,7 +133,7 @@ select lives_ok(
 -- Paul, a parent the school disabled ---------------------------------------------------------
 select set_config('request.jwt.claim.sub', 'f5000000-0000-0000-0000-000000000004', true);
 select throws_ok(
-  $$ select public.redeem_parent_invite(repeat('5', 64)) $$,
+  $$ select public.redeem_parent_invite(repeat('5', 64), 'test-notice') $$,
   'P0001', 'membership_disabled',
   'A disabled parent cannot use a code to get back in'
 );

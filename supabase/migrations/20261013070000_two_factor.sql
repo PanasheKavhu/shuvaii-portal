@@ -276,7 +276,7 @@ begin
   insert into public.two_factor_resets (user_id, reset_by) values (p_user_id, auth.uid());
 
   insert into public.audit_log (school_id, actor_id, table_name, row_id, action, event)
-  select distinct m.school_id, auth.uid(), 'profiles', p_user_id, 'event', 'two_factor_reset'
+  select distinct m.school_id, auth.uid(), 'profiles', p_user_id, 'event'::public.audit_action, 'two_factor_reset'
   from public.memberships m
   where m.user_id = p_user_id
     and m.role in ('school_admin', 'head')

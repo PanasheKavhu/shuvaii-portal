@@ -30,19 +30,22 @@ export const KUDZAI = {
  * form with its message.
  */
 export async function signIn(page: Page, email: string, password = PASSWORD) {
-  await page.goto("/sign-in");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await Promise.race([
-    page.waitForURL((url) => url.pathname !== "/sign-in").catch(() => {}),
-    page
-      .locator("form")
-      .getByRole("alert")
-      .waitFor()
-      .catch(() => {}),
-  ]);
-  await passSecondStep(page, email);
+  for (let attempt = 1; ; attempt++) {
+    await page.goto("/sign-in");
+    await page.getByLabel("Email").fill(email);
+    await page.getByLabel("Password").fill(password);
+    await page.getByRole("button", { name: "Sign in" }).click();
+    const refused = page.locator("form").getByRole("alert");
+    await Promise.race([
+      page.waitForURL((url) => url.pathname !== "/sign-in").catch(() => {}),
+      refused.waitFor().catch(() => {}),
+    ]);
+    if (await refused.isVisible()) return;
+    await passSecondStep(page, email);
+    // Signing out ends all of a person's sessions, so another test signing
+    // out as the same person can end this one mid-step; sign in again.
+    if (new URL(page.url()).pathname !== "/sign-in" || attempt === 3) return;
+  }
 }
 
 /**
@@ -109,10 +112,18 @@ export async function apiSignIn(email: string, password = PASSWORD) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { auth: { persistSession: false } },
   );
-  const signedIn = await supabase.auth.signInWithPassword({ email, password });
-  if (signedIn.error) throw new Error(`Could not sign in a test client as ${email}`);
-  await stepUp(supabase, email, signedIn.data.user.id);
-  return supabase;
+  for (let attempt = 1; ; attempt++) {
+    const signedIn = await supabase.auth.signInWithPassword({ email, password });
+    if (signedIn.error) throw new Error(`Could not sign in a test client as ${email}`);
+    try {
+      await stepUp(supabase, email, signedIn.data.user.id);
+      return supabase;
+    } catch (e) {
+      // Another test signing out as the same person ends this session too
+      // (sign out is global); sign in again.
+      if (attempt === 3 || !String(e).includes("Auth session missing")) throw e;
+    }
+  }
 }
 
 async function stepUp(

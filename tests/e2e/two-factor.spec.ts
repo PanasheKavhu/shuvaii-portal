@@ -32,6 +32,15 @@ async function enterCode(page: Page, code: string) {
   await page.getByRole("button", { name: "Continue" }).click();
 }
 
+/**
+ * Submits a code that is refused. The form clears once the answer is in,
+ * so the next code is not typed while this one is still being checked.
+ */
+async function refusedCode(page: Page, code: string) {
+  await enterCode(page, code);
+  await expect(page.getByLabel("6-digit code")).toHaveValue("");
+}
+
 async function signOut(page: Page) {
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL("/sign-in");
@@ -65,6 +74,7 @@ test("a school admin must set up two-factor first, then signs in again with a co
   await expect(formError(page)).toHaveText(
     "That code is not right. Try the newest code in your app.",
   );
+  await expect(page.getByLabel("6-digit code")).toHaveValue("");
   await page.getByLabel("6-digit code").fill(totpCode(secret));
   await page.getByRole("button", { name: "Confirm" }).click();
 
@@ -110,7 +120,7 @@ test("wrong codes are refused and share the password lockout", async ({ page }) 
 
   // Two wrong codes are refused; the third is the fifth failure.
   for (let i = 0; i < 2; i++) {
-    await enterCode(page, wrongTotpCode(secret));
+    await refusedCode(page, wrongTotpCode(secret));
     await expect(formError(page)).toHaveText(
       "That code is not right. Try the newest code in your app.",
     );
@@ -166,6 +176,7 @@ test("a recovery code works once and makes the person set up their app again", a
   for (const old of [codes[0]!, codes[1]!]) {
     await page.getByLabel("Recovery code").fill(old);
     await page.getByRole("button", { name: "Sign in with this code" }).click();
+    await expect(page.getByLabel("Recovery code")).toHaveValue("");
     await expect(formError(page)).toHaveText(
       "That recovery code is not right or was already used.",
     );

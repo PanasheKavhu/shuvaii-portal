@@ -52,14 +52,27 @@ export async function signIn(page: Page, email: string, password = PASSWORD) {
  * set one up. Does nothing anywhere else.
  */
 export async function passSecondStep(page: Page, email: string): Promise<string[] | null> {
-  const at = new URL(page.url()).pathname;
-  if (at === "/two-factor/setup") return setUpTwoFactor(page, email);
-  if (at !== "/two-factor") return null;
+  if (!new URL(page.url()).pathname.startsWith("/two-factor")) return null;
+  // /two-factor sends someone with no app on to /two-factor/setup; wait for
+  // the page to settle before reading where we are.
+  const setup = page.getByRole("button", { name: "Set up authenticator app" });
+  await Promise.race([setup.waitFor(), page.getByLabel("6-digit code").waitFor()]);
+  if (await setup.isVisible()) return setUpTwoFactor(page, email);
   const secret = totpSecretFor(email);
   if (!secret) throw new Error(`No known two-factor setup key for ${email}`);
+  const passed = (url: URL) => !url.pathname.startsWith("/two-factor");
   await page.getByLabel("6-digit code").fill(totpCode(secret));
   await page.getByRole("button", { name: "Continue" }).click();
-  await page.waitForURL((url) => !url.pathname.startsWith("/two-factor"));
+  const refused = page.locator("form").getByRole("alert");
+  await Promise.race([page.waitForURL(passed), refused.waitFor()]);
+  if (await refused.isVisible()) {
+    // Another worker signed in as this person with the same code; Auth
+    // takes each code once, so use the next one.
+    await page.waitForTimeout(30_500 - (Date.now() % 30_000));
+    await page.getByLabel("6-digit code").fill(totpCode(secret));
+    await page.getByRole("button", { name: "Continue" }).click();
+    await page.waitForURL(passed);
+  }
   return null;
 }
 
@@ -108,16 +121,25 @@ async function stepUp(
   userId: string,
 ) {
   const factors = await supabase.auth.mfa.listFactors();
-  if (factors.error) throw new Error("Could not list two-factor factors");
+  if (factors.error) throw new Error(`Could not list two-factor factors: ${factors.error.message}`);
   const verified = factors.data.totp.find((f) => f.status === "verified");
   if (verified) {
     const secret = totpSecretFor(email);
     if (!secret) throw new Error(`No known two-factor setup key for ${email}`);
-    const { error } = await supabase.auth.mfa.challengeAndVerify({
+    let { error } = await supabase.auth.mfa.challengeAndVerify({
       factorId: verified.id,
       code: totpCode(secret),
     });
-    if (error) throw new Error(`Could not pass the second step as ${email}`);
+    if (error) {
+      // Parallel workers signing in as the same person can submit the same
+      // code; Auth takes each code once, so try again with the next one.
+      await new Promise((r) => setTimeout(r, 30_500 - (Date.now() % 30_000)));
+      ({ error } = await supabase.auth.mfa.challengeAndVerify({
+        factorId: verified.id,
+        code: totpCode(secret),
+      }));
+    }
+    if (error) throw new Error(`Could not pass the second step as ${email}: ${error.message}`);
     return;
   }
 

@@ -24,7 +24,9 @@ test("a head lands on the overview and sees only their menu", async ({ page }) =
     "Audit log",
     "Newsletter",
   ]);
-  await expect(page.getByRole("contentinfo")).toHaveText("Implemented by Panashe and Shuvai 2026");
+  await expect(page.getByRole("contentinfo")).toContainText(
+    "Implemented by Panashe and Shuvai 2026",
+  );
 });
 
 test("a school admin lands on the admin area", async ({ page }) => {

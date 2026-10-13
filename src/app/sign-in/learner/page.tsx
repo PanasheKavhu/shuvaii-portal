@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { LegalLinks } from "@/components/legal/legal-links";
 import { PIN_LENGTH } from "@/lib/auth/learner-pin";
 import { getViewer } from "@/lib/auth/viewer";
 import { createClient } from "@/lib/supabase/server";
@@ -47,6 +48,7 @@ export default async function LearnerSignInPage({ searchParams }: PageProps<"/si
           >
             Staff or parent? Sign in with email
           </Link>
+          <LegalLinks schoolSlug={typeof school === "string" ? school : null} />
         </CardContent>
       </Card>
     </main>

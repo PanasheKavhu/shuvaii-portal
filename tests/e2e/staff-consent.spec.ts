@@ -42,6 +42,7 @@ test("an address a parent claimed without proof cannot be added as staff until i
   await other.getByLabel("Email").fill(teacherEmail);
   await other.getByLabel("Password", { exact: true }).fill(PASSWORD);
   await other.getByLabel("Confirm password").fill(PASSWORD);
+  await other.getByLabel("I have read and accept the privacy notice").check();
   await other.getByRole("button", { name: "Create account" }).click();
   await expect(other).toHaveURL("/children");
 

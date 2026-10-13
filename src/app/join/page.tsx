@@ -41,6 +41,7 @@ export default async function JoinPage() {
     guardianName: string;
     guardianEmail: string;
     children: number;
+    schoolSlug: string | null;
   } | null = null;
 
   if (code) {
@@ -56,6 +57,7 @@ export default async function JoinPage() {
         guardianName: row.guardian_name ?? "",
         guardianEmail: row.guardian_email ?? "",
         children: row.children ?? 0,
+        schoolSlug: row.school_slug,
       };
     } else {
       problem = PROBLEMS[row.status] ?? PROBLEMS.unknown;
@@ -118,7 +120,11 @@ export default async function JoinPage() {
                 You are signed in as <span className="font-medium">{viewer.fullName || "you"}</span>
                 . Add {childrenText} at {invite.schoolName} to this account?
               </p>
-              <ExistingAccountForm code={code} label="Add to my account" />
+              <ExistingAccountForm
+                code={code}
+                label="Add to my account"
+                schoolSlug={invite.schoolSlug}
+              />
             </>
           )}
 
@@ -137,6 +143,7 @@ export default async function JoinPage() {
                 fullName={invite.guardianName}
                 email={invite.guardianEmail}
                 minPasswordLength={MIN_PASSWORD_LENGTH}
+                schoolSlug={invite.schoolSlug}
               />
             </>
           )}

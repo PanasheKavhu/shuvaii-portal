@@ -97,7 +97,7 @@ test("super admin creates a school, brands it and invites its admin, who sees th
   await expect(invitee.getByTestId("school-name")).toHaveText(name);
   expect(await cssVar(invitee, "--primary")).toBe("#7a1fa2");
   await expect(invitee.getByRole("img", { name: `${name} logo` })).toBeVisible();
-  await expect(invitee.getByRole("contentinfo")).toHaveText(
+  await expect(invitee.getByRole("contentinfo")).toContainText(
     "Implemented by Panashe and Shuvai 2026",
   );
 

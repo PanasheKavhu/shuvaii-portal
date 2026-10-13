@@ -41,3 +41,42 @@ jobs:
       - run: npm run test:db
       - if: always()
         run: npx supabase stop --no-backup
+
+  e2e:
+    # Playwright on both screen sizes against a local Supabase stack, the
+    # seed and the dev server (D54: every admin, head and super admin sign in
+    # now has a second step, so the whole suite runs here). The timing
+    # checks (the perf project) stay local: shared runners are too noisy.
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Start Supabase
+        run: >-
+          npx supabase start
+          -x realtime,imgproxy,studio,edge-runtime,logflare,vector,supavisor,postgres-meta
+      - name: Write .env.local from the local stack
+        run: |
+          eval "$(npx supabase status -o env)"
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
+            echo "LEARNER_PIN_SECRET=ci-only-learner-pin-secret-0123456789abcdef"
+          } > .env.local
+      - run: npm run db:seed
+      - run: npx playwright test --project=mobile --project=desktop
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: test-results/
+          retention-days: 7
+      - if: always()
+        run: npx supabase stop --no-backup

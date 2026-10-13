@@ -457,3 +457,23 @@ describe("describeAuditEntry: year rollover", () => {
     });
   });
 });
+
+describe("describeAuditEntry: two-factor resets (D54)", () => {
+  it("says which super admin reset whose two-factor sign in", () => {
+    const line = describeAuditEntry(
+      entry({
+        table: "profiles",
+        action: "event",
+        event: "two_factor_reset",
+        actorName: "Panashe Kavhu",
+        personName: "Grace Tembo",
+        learnerName: null,
+        className: null,
+        subjectName: null,
+        assessmentName: null,
+      }),
+    );
+    expect(line.summary).toBe("Panashe Kavhu reset Grace Tembo's two-factor sign in");
+    expect(line.changes).toEqual([]);
+  });
+});

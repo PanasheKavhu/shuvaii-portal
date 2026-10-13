@@ -1,5 +1,6 @@
 import { pickActiveSchool, type SchoolMembership } from "./active-school";
 import { AREAS, canUseArea, type Area, type AreaKey } from "./roles";
+import { secondStepPending, type Assurance } from "./two-factor";
 
 /**
  * The role area a path belongs to, or null for pages outside every area.
@@ -18,18 +19,28 @@ export type AccessDecision =
   | { kind: "allow"; school: SchoolMembership | null }
   | { kind: "sign-in" }
   | { kind: "choose-school" }
+  | { kind: "two-factor" }
   | { kind: "forbidden" };
 
 /**
  * Who may open a role area (US-1.8). Used by the proxy, before the page
  * renders, and again by each page through requireArea(). Pure.
+ *
+ * A super admin, school admin or head whose session has not passed the
+ * second step (aal1) opens no area at all until they do, or set it up
+ * (D54); the database refuses their roles too.
  */
 export function decideAreaAccess(
   key: AreaKey,
-  viewer: { isPlatformAdmin: boolean; schools: readonly SchoolMembership[] } | null,
+  viewer: {
+    isPlatformAdmin: boolean;
+    schools: readonly SchoolMembership[];
+    assurance?: Assurance | null;
+  } | null,
   schoolCookie: string | undefined,
 ): AccessDecision {
   if (!viewer) return { kind: "sign-in" };
+  if (secondStepPending(viewer)) return { kind: "two-factor" };
   const area: Area = AREAS[key];
   const school = pickActiveSchool(viewer.schools, schoolCookie);
 

@@ -9,11 +9,13 @@ import { logoUrl } from "@/lib/branding/theme";
 import { STAGE_LABELS } from "@/lib/platform/school-input";
 import { supabaseUrl } from "@/lib/supabase/env";
 import { inviteSchoolAdmin, resendInvite, saveColors, uploadLogo } from "../../actions";
-import { getSchool, getSchoolGrading, listSchoolAdmins } from "../../data";
+import { getSchool, getSchoolGrading, listSchoolAdmins, listSchoolTwoFactor } from "../../data";
+import { twoFactorRows } from "../../two-factor-rows";
 import { ColorsForm } from "./colors-form";
 import { InviteForm } from "./invite-form";
 import { LogoForm } from "./logo-form";
 import { ResendInviteForm } from "@/components/resend-invite-form";
+import { TwoFactorPeople } from "@/components/platform/two-factor-people";
 
 export const metadata: Metadata = { title: "School" };
 
@@ -25,13 +27,14 @@ const STATUS_LABELS: Record<string, string> = {
 
 /** One school in the console: branding (US-1.5) and the first admin invite (US-10.1). */
 export default async function SchoolPage({ params }: PageProps<"/platform/schools/[id]">) {
-  await requireArea("platform");
+  const { viewer } = await requireArea("platform");
   const { id } = await params;
   const school = await getSchool(id);
   if (!school) notFound();
-  const [admins, grading] = await Promise.all([
+  const [admins, grading, twoFactor] = await Promise.all([
     listSchoolAdmins(school.id),
     getSchoolGrading(school.id),
+    listSchoolTwoFactor(school.id),
   ]);
   const incomplete = grading.filter((l) => !l.complete);
   const logo = logoUrl(school.logoPath, supabaseUrl());
@@ -104,6 +107,16 @@ export default async function SchoolPage({ params }: PageProps<"/platform/school
         ) : (
           <InviteForm action={inviteSchoolAdmin.bind(null, school.id)} />
         )}
+      </Panel>
+
+      <Panel
+        title="Two-factor sign in"
+        description="School admins and heads sign in with a code from an authenticator app. If one loses their phone and their recovery codes, reset it here; they set it up again at their next sign in."
+      >
+        <TwoFactorPeople
+          rows={twoFactorRows(twoFactor, viewer.userId)}
+          label="Two-factor status of admins and heads"
+        />
       </Panel>
 
       <Panel

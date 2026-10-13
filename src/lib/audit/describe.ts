@@ -289,6 +289,13 @@ export function describeAuditEntry(e: AuditEntry): AuditLine {
       break;
     }
     case "profiles":
+      if (e.event === "two_factor_reset") {
+        return {
+          summary: `${actor} reset ${possessive(e.personName ?? "a staff member")} two-factor sign in`,
+          changes: [],
+          reason,
+        };
+      }
       summary = `${actor} changed ${possessive(e.personName ?? "a staff member")} staff details`;
       break;
     case "grading_scales":

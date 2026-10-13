@@ -5,6 +5,7 @@ import { JOIN_CODE_COOKIE, JOIN_CODE_MAX_AGE_S } from "@/lib/auth/invite-code";
 import { mustChangePin } from "@/lib/auth/learner-pin";
 import { loadAccess } from "@/lib/auth/load-access";
 import { areaForPath, decideAreaAccess } from "@/lib/auth/route-access";
+import { isAssurance } from "@/lib/auth/two-factor";
 import type { Database } from "@/lib/supabase/database.types";
 import { supabaseAnonKey, supabaseUrl } from "@/lib/supabase/env";
 
@@ -14,9 +15,10 @@ import { supabaseAnonKey, supabaseUrl } from "@/lib/supabase/env";
  *    cannot write cookies) see a valid session.
  * 2. Blocks role areas (US-1.8): signed-out visitors go to sign in, a
  *    multi-school user who has not chosen goes to the picker, and anyone
- *    whose role may not use the area gets the 403 "Not allowed" page.
- *    Pages repeat the check through requireArea(); RLS is the final guard
- *    on the data itself.
+ *    whose role may not use the area gets the 403 "Not allowed" page. A
+ *    super admin, school admin or head whose session has not passed the
+ *    second step (aal1) goes to /two-factor (D54). Pages repeat the check
+ *    through requireArea(); RLS is the final guard on the data itself.
  * 3. Moves a parent code in `/join?code=` into a short-lived httpOnly
  *    cookie and redirects to a clean /join (D28).
  */
@@ -67,7 +69,12 @@ export async function proxy(request: NextRequest) {
   }
 
   const access = userId ? await loadAccess(supabase, userId) : null;
-  const decision = decideAreaAccess(area, access, request.cookies.get(SCHOOL_COOKIE)?.value);
+  const assurance = isAssurance(data?.claims.aal) ? data.claims.aal : null;
+  const decision = decideAreaAccess(
+    area,
+    access && { ...access, assurance },
+    request.cookies.get(SCHOOL_COOKIE)?.value,
+  );
 
   switch (decision.kind) {
     case "allow":
@@ -76,6 +83,8 @@ export async function proxy(request: NextRequest) {
       return withCookies(NextResponse.redirect(new URL("/sign-in", request.url)), response);
     case "choose-school":
       return withCookies(NextResponse.redirect(new URL("/select-school", request.url)), response);
+    case "two-factor":
+      return withCookies(NextResponse.redirect(new URL("/two-factor", request.url)), response);
     case "forbidden":
       return withCookies(
         NextResponse.rewrite(new URL("/not-allowed", request.url), { status: 403 }),

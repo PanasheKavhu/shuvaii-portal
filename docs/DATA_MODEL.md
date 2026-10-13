@@ -5,7 +5,7 @@ Status: DRAFT v0.1. Postgres on Supabase. Companion to `SPEC.md`. Column names m
 ## 1. Conventions
 
 - Primary keys are `uuid` (`gen_random_uuid()`). Timestamps are `timestamptz` in UTC; display in `Africa/Harare`.
-- **Every tenant table has `school_id uuid not null references schools(id)`**, indexed, and row-level security enabled. Exceptions: `schools` (its own `id` is the tenant), `profiles` and `platform_admins` (global, described below), and `sign_in_attempts` (global, service role only; see below).
+- **Every tenant table has `school_id uuid not null references schools(id)`**, indexed, and row-level security enabled. Exceptions: `schools` (its own `id` is the tenant), `profiles` and `platform_admins` (global, described below), `sign_in_attempts` (global, service role only; see below), and `mfa_recovery_codes` and `two_factor_resets` (global, a person's account rather than a school's; see below, D54).
 - Child tables repeat `school_id` (even when it could be derived) so policies never need joins. A trigger or composite check ensures a child's `school_id` equals its parent's.
 - Nothing personal is hard-deleted: learners, marks and reports use `status` fields. Deletion of a school is a super-admin operation done offline.
 - `created_at` and `updated_at` on every table (`updated_at` set by trigger). Omitted below for brevity.
@@ -81,6 +81,10 @@ Readable only by the person themselves and by users who share a school with them
 **platform_admins**: `user_id pk fk auth.users`. Super admins. No policy grants them tenant data by default (support access is a deliberate later feature).
 
 **sign_in_attempts**: `id bigint identity pk`, `email_hash` (SHA-256 hex of the trimmed, lower-cased email), `succeeded bool`, `created_at`. Per-account sign-in lockout (US-1.1); wrong password-reset codes count too (US-1.7, D19). Learner PIN tries are counted here too, under a hash of the school and learner number (D26), and wrong PINs also under a hash of the school and network address (D28). Public report verification lookups are counted under a hash of the network address (D45). No `school_id`, because the school is unknown before sign in. RLS on with no policies and privileges revoked from `anon` and `authenticated`: only the service role reads or writes it.
+
+**mfa_recovery_codes**: `id uuid pk`, `user_id uuid -> auth.users` (cascade), `code_hash` (SHA-256 hex of the user id and the normalised code), `used_at`, `created_at`, unique `(user_id, code_hash)`. Ten single-use two-factor recovery codes per super admin, school admin or head (D54). Only the service role reads or writes it, through `replace_recovery_codes()` and `use_recovery_code()`. Using a code deletes the person's Auth factors and their other codes.
+
+**two_factor_resets**: `id bigint identity pk`, `user_id uuid -> auth.users`, `reset_by uuid -> auth.users`, `created_at`. Each two-factor reset made from the console by a super admin, written only by `reset_two_factor()` (which also writes a `two_factor_reset` event to the audit log of each school where the person is a school admin or head); append-only; platform admins read (D54).
 
 **memberships**: a person's role in a school.
 

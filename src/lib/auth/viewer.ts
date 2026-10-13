@@ -9,11 +9,14 @@ import { mustChangePin } from "./learner-pin";
 import { loadAccess, type Access } from "./load-access";
 import { homeFor, type AreaKey } from "./roles";
 import { decideAreaAccess } from "./route-access";
+import { assuranceOf, secondStepPending, type Assurance } from "./two-factor";
 
 export type Viewer = Access & {
   userId: string;
   /** A learner whose PIN an admin set must choose their own first (US-1.2). */
   mustChangePin?: boolean;
+  /** The session's assurance level; aal2 once the second step is passed (D54). */
+  assurance: Assurance | null;
 };
 
 /**
@@ -32,12 +35,20 @@ export const getViewer = cache(async (): Promise<Viewer | null> => {
   };
 });
 
-/** Loads a viewer with a client already signed in as `userId` (used right after sign in). */
+/**
+ * Loads a viewer with a client already signed in as `userId` (used right
+ * after sign in). The assurance level is read from the session's token,
+ * which getUser() (or the sign in itself) has just checked with Auth.
+ */
 export async function loadViewer(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
 ): Promise<Viewer> {
-  return { userId, ...(await loadAccess(supabase, userId)) };
+  const [access, session] = await Promise.all([
+    loadAccess(supabase, userId),
+    supabase.auth.getSession(),
+  ]);
+  return { userId, ...access, assurance: assuranceOf(session.data.session?.access_token) };
 }
 
 /** The viewer's current school (from the school cookie), or null if they must choose. */
@@ -48,6 +59,9 @@ export async function getActiveSchool(viewer: Viewer): Promise<SchoolMembership 
 
 /** Where a signed-in viewer should go from "/" or after choosing a school. */
 export async function landingPathFor(viewer: Viewer): Promise<string> {
+  // Super admins, school admins and heads pass the second step first (D54).
+  if (secondStepPending(viewer)) return "/two-factor";
+
   // A staff role waiting for their answer comes first (D27).
   const supabase = await createClient();
   const { count } = await supabase
@@ -71,7 +85,7 @@ export async function schoolAdminContext(): Promise<{ schoolId: string; userId: 
   const viewer = await getViewer();
   if (!viewer) return null;
   const school = await getActiveSchool(viewer);
-  return school?.roles.includes("school_admin")
+  return school?.roles.includes("school_admin") && !secondStepPending(viewer)
     ? { schoolId: school.schoolId, userId: viewer.userId }
     : null;
 }
@@ -102,6 +116,8 @@ export async function requireArea(
       redirect("/sign-in");
     case "choose-school":
       redirect("/select-school");
+    case "two-factor":
+      redirect("/two-factor");
     case "forbidden":
       forbidden();
   }

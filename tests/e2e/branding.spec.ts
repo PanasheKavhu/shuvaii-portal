@@ -1,13 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-
-const PASSWORD = process.env.SEED_DEMO_PASSWORD ?? "sp-portal-demo-2026";
-
-async function signIn(page: Page, email: string) {
-  await page.goto("/sign-in");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(PASSWORD);
-  await page.getByRole("button", { name: "Sign in" }).click();
-}
+import { signIn } from "./helpers";
 
 const cssVar = (page: Page, name: string) =>
   page.evaluate((n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim(), name);

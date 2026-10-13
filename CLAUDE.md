@@ -72,8 +72,8 @@ Requires Node 24, and Docker for the local Supabase stack.
 | End-to-end           | `npm run test:e2e` (first time: `npx playwright install`)                                    |
 | Local Supabase       | `npm run db:start` / `npm run db:stop` / `npm run db:reset` (re-applies migrations and seed) |
 
-Before declaring a story done run: `typecheck`, `lint`, `test`, `test:db`, `test:e2e`. CI runs `typecheck`, `lint`, `test` and `test:db`; `test:e2e` is run locally until CI gets a Playwright job.
+Before declaring a story done run: `typecheck`, `lint`, `test`, `test:db`, `test:e2e`. CI runs all five (`test:e2e` on a production build in two shards, D61); the perf specs stay local.
 
 ## Environment
 
-Copy `.env.example` to `.env.local`. Local Supabase prints the URL and keys on `npm run db:start`.
+Copy `.env.example` to `.env.local`. Local Supabase prints the URL and keys on `npm run db:start`. Hosting, environment variables and the go-live steps: `docs/DEPLOY.md`; retention and backups: `docs/RETENTION.md`, `docs/BACKUPS.md`.

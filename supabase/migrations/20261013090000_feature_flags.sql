@@ -30,6 +30,9 @@ as $$
 $$;
 
 -- An object whose keys are known features and whose values are booleans.
+-- The keys are listed here rather than read from feature_default(): a check
+-- constraint runs as whoever writes the row, and the service role (the seed)
+-- has no usage of the private schema.
 create function private.feature_flags_are_valid(p_flags jsonb)
 returns boolean
 language sql
@@ -40,7 +43,7 @@ as $$
     and not exists (
       select 1
       from jsonb_each(p_flags) as f (key, value)
-      where private.feature_default(f.key) is null
+      where f.key not in ('newsletter', 'attendance')
          or jsonb_typeof(f.value) <> 'boolean'
     );
 $$;

@@ -17,7 +17,7 @@
 -- workflow are needed.
 begin;
 
-select plan(59);
+select plan(60);
 
 insert into auth.users (
   id, instance_id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -94,6 +94,12 @@ select throws_ok(
 select throws_ok(
   $$ update public.schools set feature_flags = '{"games":true}' where id = 'a3800000-0000-0000-0000-00000000000a' $$,
   '23514', null, 'an unknown feature cannot be stored');
+
+set local role service_role;
+select lives_ok(
+  $$ update public.schools set feature_flags = '{"newsletter":true,"attendance":false}' where id = 'a3800000-0000-0000-0000-00000000000b' $$,
+  'the service role (the seed) can write valid flags; the check needs no private schema usage');
+reset role;
 
 -- Who may switch ------------------------------------------------------------------------
 

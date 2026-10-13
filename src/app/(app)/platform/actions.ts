@@ -45,7 +45,9 @@ const FAILED = (what: string): FormState => ({
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function isPlatformAdmin(): Promise<boolean> {
-  return (await getViewer())?.isPlatformAdmin === true;
+  const viewer = await getViewer();
+  // Past the second step too (D54); the database checks the same.
+  return viewer?.isPlatformAdmin === true && viewer.assurance === "aal2";
 }
 
 export async function createSchool(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -274,4 +276,25 @@ async function logInviteEvent(
     };
   }
   return { status: "saved", message, errors: {} };
+}
+
+/**
+ * Resets another person's two-factor sign in (D54): their authenticator
+ * app, recovery codes and sessions go, so they sign in again and set up a
+ * new app. The platform admin check comes first, here and again in
+ * reset_two_factor(), which also refuses one's own and writes the record
+ * and the audit rows in the same transaction.
+ */
+export async function resetTwoFactor(userId: string): Promise<FormState> {
+  if (!(await isPlatformAdmin()) || !UUID_RE.test(userId)) return NOT_ALLOWED;
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("reset_two_factor", { p_user_id: userId });
+  if (error?.code === "42501") return NOT_ALLOWED;
+  if (error) return FAILED("reset two-factor sign in");
+  revalidatePath("/platform", "layout");
+  return {
+    status: "saved",
+    message: "Reset. They will set up their authenticator app again when they next sign in.",
+    errors: {},
+  };
 }

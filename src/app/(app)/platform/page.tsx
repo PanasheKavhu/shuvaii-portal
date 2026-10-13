@@ -8,7 +8,9 @@ import { isHexColor, readableOn } from "@/lib/branding/contrast";
 import { logoUrl } from "@/lib/branding/theme";
 import { STAGE_LABELS } from "@/lib/platform/school-input";
 import { supabaseUrl } from "@/lib/supabase/env";
-import { listSchools } from "./data";
+import { TwoFactorPeople } from "@/components/platform/two-factor-people";
+import { listPlatformAdminsTwoFactor, listSchools } from "./data";
+import { twoFactorRows } from "./two-factor-rows";
 
 /** Shows the initials badge in the school's own colour. */
 function badgeStyle(color: string | null): CSSProperties | undefined {
@@ -20,8 +22,8 @@ export const metadata: Metadata = { title: "Platform" };
 
 /** Super-admin console home (SPEC E10): every school, and a way to add one. */
 export default async function PlatformPage() {
-  await requireArea("platform");
-  const schools = await listSchools();
+  const { viewer } = await requireArea("platform");
+  const [schools, superAdmins] = await Promise.all([listSchools(), listPlatformAdminsTwoFactor()]);
 
   return (
     <section className="flex flex-col gap-6">
@@ -76,6 +78,22 @@ export default async function PlatformPage() {
           ))}
         </ul>
       )}
+
+      <section aria-labelledby="super-admins" className="flex flex-col gap-3">
+        <div>
+          <h2 id="super-admins" className="text-lg font-semibold">
+            Super admins
+          </h2>
+          <p className="text-muted-foreground text-sm">
+            Each super admin signs in with a code from an authenticator app. Another super admin can
+            reset a lost one.
+          </p>
+        </div>
+        <TwoFactorPeople
+          rows={twoFactorRows(superAdmins, viewer.userId)}
+          label="Two-factor status of super admins"
+        />
+      </section>
     </section>
   );
 }

@@ -119,3 +119,67 @@ export async function getSchoolGrading(schoolId: string): Promise<LevelGrading[]
     complete: l.complete,
   }));
 }
+
+export type TwoFactorPerson = {
+  userId: string;
+  fullName: string | null;
+  email: string | null;
+  roles: string[];
+  enrolled: boolean;
+  lastResetAt: string | null;
+};
+
+/**
+ * People who must use two-factor sign in, with whether they have set up
+ * their app and when it was last reset (D54). Names and emails need the
+ * service role, as for listSchoolAdmins(); the status comes from
+ * two_factor_status(), which answers platform admins only.
+ */
+async function twoFactorPeople(roles: Map<string, string[]>): Promise<TwoFactorPerson[]> {
+  const ids = [...roles.keys()];
+  if (ids.length === 0) return [];
+  const supabase = await createClient();
+  const [profiles, status] = await Promise.all([
+    createAdminClient().from("profiles").select("id, full_name, email").in("id", ids),
+    supabase.rpc("two_factor_status", { p_user_ids: ids }),
+  ]);
+  if (profiles.error || status.error) throw new Error("Could not load two-factor status");
+
+  return ids
+    .map((id) => {
+      const profile = profiles.data.find((p) => p.id === id);
+      const row = status.data.find((r) => r.user_id === id);
+      return {
+        userId: id,
+        fullName: profile?.full_name ?? null,
+        email: profile?.email ?? null,
+        roles: roles.get(id) ?? [],
+        enrolled: row?.enrolled ?? false,
+        lastResetAt: row?.last_reset_at ?? null,
+      };
+    })
+    .sort((a, b) => (a.fullName ?? a.email ?? "").localeCompare(b.fullName ?? b.email ?? ""));
+}
+
+/** The school's active school admins and heads, for the console's two-factor panel. */
+export async function listSchoolTwoFactor(schoolId: string): Promise<TwoFactorPerson[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("memberships")
+    .select("user_id, role")
+    .eq("school_id", schoolId)
+    .in("role", ["school_admin", "head"])
+    .eq("status", "active");
+  if (error) throw new Error("Could not load the school's admins and heads");
+  const roles = new Map<string, string[]>();
+  for (const m of data) roles.set(m.user_id, [...(roles.get(m.user_id) ?? []), m.role]);
+  return twoFactorPeople(roles);
+}
+
+/** Every super admin, for the console home. */
+export async function listPlatformAdminsTwoFactor(): Promise<TwoFactorPerson[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("platform_admins").select("user_id");
+  if (error) throw new Error("Could not load super admins");
+  return twoFactorPeople(new Map(data.map((p) => [p.user_id, ["super_admin"]])));
+}

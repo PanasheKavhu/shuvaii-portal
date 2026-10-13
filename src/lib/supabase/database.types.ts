@@ -1394,6 +1394,30 @@ export type Database = {
           },
         ]
       }
+      mfa_recovery_codes: {
+        Row: {
+          code_hash: string
+          created_at: string
+          id: string
+          used_at: string | null
+          user_id: string
+        }
+        Insert: {
+          code_hash: string
+          created_at?: string
+          id?: string
+          used_at?: string | null
+          user_id: string
+        }
+        Update: {
+          code_hash?: string
+          created_at?: string
+          id?: string
+          used_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       platform_admins: {
         Row: {
           created_at: string
@@ -2010,6 +2034,27 @@ export type Database = {
           },
         ]
       }
+      two_factor_resets: {
+        Row: {
+          created_at: string
+          id: number
+          reset_by: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: never
+          reset_by?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: never
+          reset_by?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -2454,6 +2499,10 @@ export type Database = {
         Args: { p_class_subject_id: string; p_term_id: string }
         Returns: undefined
       }
+      replace_recovery_codes: {
+        Args: { p_hashes: string[]; p_user_id: string }
+        Returns: undefined
+      }
       report_changes_since_draft: {
         Args: { p_class_id: string; p_term_id: string }
         Returns: {
@@ -2486,6 +2535,7 @@ export type Database = {
           subject_name: string
         }[]
       }
+      reset_two_factor: { Args: { p_user_id: string }; Returns: undefined }
       return_class_reports: {
         Args: { p_class_id: string; p_note: string; p_term_id: string }
         Returns: number
@@ -2600,6 +2650,14 @@ export type Database = {
         Returns: number
       }
       teaches: { Args: { p_class_subject_id: string }; Returns: boolean }
+      two_factor_status: {
+        Args: { p_user_ids: string[] }
+        Returns: {
+          enrolled: boolean
+          last_reset_at: string
+          user_id: string
+        }[]
+      }
       unlock_class_subject: {
         Args: {
           p_class_subject_id: string
@@ -2616,6 +2674,10 @@ export type Database = {
           p_user_id: string
         }
         Returns: undefined
+      }
+      use_recovery_code: {
+        Args: { p_hash: string; p_user_id: string }
+        Returns: boolean
       }
       withdraw_report: {
         Args: { p_reason: string; p_report_id: string }

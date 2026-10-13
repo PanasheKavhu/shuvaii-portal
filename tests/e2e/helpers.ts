@@ -1,6 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "../../src/lib/supabase/database.types";
+import { rememberTotpSecret, totpCode, totpSecretFor } from "./totp";
 
 // Seed data (seed/*.csv); the password is the published local demo password
 // from scripts/seed.mjs.
@@ -22,11 +23,131 @@ export const KUDZAI = {
   primary: "#1b7f5c",
 };
 
+/**
+ * Signs in through the form. A super admin, school admin or head then
+ * passes the second step (D54): with the code from their known setup key,
+ * or by setting up their app the first time. A refused sign in stays on the
+ * form with its message.
+ */
 export async function signIn(page: Page, email: string, password = PASSWORD) {
   await page.goto("/sign-in");
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
+  await Promise.race([
+    page.waitForURL((url) => url.pathname !== "/sign-in").catch(() => {}),
+    page
+      .locator("form")
+      .getByRole("alert")
+      .waitFor()
+      .catch(() => {}),
+  ]);
+  await passSecondStep(page, email);
+}
+
+/**
+ * If the page is at the second step, passes it: enters the code for a known
+ * setup key at /two-factor, or sets up a new app at /two-factor/setup
+ * (keeping the key for later sign ins). Returns the recovery codes when it
+ * set one up. Does nothing anywhere else.
+ */
+export async function passSecondStep(page: Page, email: string): Promise<string[] | null> {
+  const at = new URL(page.url()).pathname;
+  if (at === "/two-factor/setup") return setUpTwoFactor(page, email);
+  if (at !== "/two-factor") return null;
+  const secret = totpSecretFor(email);
+  if (!secret) throw new Error(`No known two-factor setup key for ${email}`);
+  await page.getByLabel("6-digit code").fill(totpCode(secret));
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.waitForURL((url) => !url.pathname.startsWith("/two-factor"));
+  return null;
+}
+
+/** Sets up two-factor sign in on /two-factor/setup; returns the ten recovery codes. */
+export async function setUpTwoFactor(page: Page, email: string): Promise<string[]> {
+  await page.getByRole("button", { name: "Set up authenticator app" }).click();
+  const secret = (await page.getByTestId("setup-key").innerText()).replace(/\s/g, "");
+  rememberTotpSecret(email, secret);
+  await page.getByLabel("6-digit code").fill(totpCode(secret));
+  await page.getByRole("button", { name: "Confirm" }).click();
+  const list = page.getByRole("list", { name: "Recovery codes" });
+  await expect(list.getByRole("listitem")).toHaveCount(10);
+  const codes = await list.getByRole("listitem").allInnerTexts();
+  await page.getByLabel("I have saved my recovery codes").check();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.waitForURL((url) => !url.pathname.startsWith("/two-factor"));
+  return codes;
+}
+
+/**
+ * A client signed in as `email` through the public API, as the app's
+ * server is. A super admin, school admin or head is taken past the second
+ * step too (D54), setting up their app the first time, since the database
+ * refuses their roles in an aal1 session.
+ */
+export async function apiSignIn(email: string, password = PASSWORD) {
+  try {
+    process.loadEnvFile(".env.local");
+  } catch {
+    // Already in the environment (CI).
+  }
+  const supabase = createClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { persistSession: false } },
+  );
+  const signedIn = await supabase.auth.signInWithPassword({ email, password });
+  if (signedIn.error) throw new Error(`Could not sign in a test client as ${email}`);
+  await stepUp(supabase, email, signedIn.data.user.id);
+  return supabase;
+}
+
+async function stepUp(
+  supabase: ReturnType<typeof createClient<Database>>,
+  email: string,
+  userId: string,
+) {
+  const factors = await supabase.auth.mfa.listFactors();
+  if (factors.error) throw new Error("Could not list two-factor factors");
+  const verified = factors.data.totp.find((f) => f.status === "verified");
+  if (verified) {
+    const secret = totpSecretFor(email);
+    if (!secret) throw new Error(`No known two-factor setup key for ${email}`);
+    const { error } = await supabase.auth.mfa.challengeAndVerify({
+      factorId: verified.id,
+      code: totpCode(secret),
+    });
+    if (error) throw new Error(`Could not pass the second step as ${email}`);
+    return;
+  }
+
+  const [roles, platform] = await Promise.all([
+    supabase
+      .from("memberships")
+      .select("role")
+      .eq("user_id", userId)
+      .eq("status", "active")
+      .in("role", ["school_admin", "head"]),
+    supabase.from("platform_admins").select("user_id").eq("user_id", userId),
+  ]);
+  if (!roles.data?.length && !platform.data?.length) return;
+
+  for (const f of factors.data.all) {
+    if (f.status !== "verified") await supabase.auth.mfa.unenroll({ factorId: f.id });
+  }
+  const enrolled = await supabase.auth.mfa.enroll({
+    factorType: "totp",
+    friendlyName: "Authenticator app",
+  });
+  if (enrolled.error || enrolled.data.type !== "totp") {
+    throw new Error(`Could not set up two-factor for ${email}`);
+  }
+  rememberTotpSecret(email, enrolled.data.totp.secret);
+  const { error } = await supabase.auth.mfa.challengeAndVerify({
+    factorId: enrolled.data.id,
+    code: totpCode(enrolled.data.totp.secret),
+  });
+  if (error) throw new Error(`Could not confirm two-factor for ${email}`);
 }
 
 /** A CSS custom property's computed value on <html>. */
@@ -89,13 +210,7 @@ export async function auditEventsAs(
   } catch {
     // Already in the environment (CI).
   }
-  const supabase = createClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { auth: { persistSession: false } },
-  );
-  const signedIn = await supabase.auth.signInWithPassword({ email, password });
-  if (signedIn.error) throw new Error("Could not sign in to read the audit log");
+  const supabase = await apiSignIn(email, password);
   const { data, error } = await supabase
     .from("audit_log")
     .select("event")
@@ -184,17 +299,6 @@ export async function createEmptySchool(
   headEmail: string | null;
   headName: string | null;
 }> {
-  try {
-    process.loadEnvFile(".env.local");
-  } catch {
-    // Already in the environment (CI).
-  }
-  const client = () =>
-    createClient<Database>(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      { auth: { persistSession: false } },
-    );
   const stamp = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 
   async function newUser(role: string, fullName: string) {
@@ -202,12 +306,7 @@ export async function createEmptySchool(
     return { id: await createTestAccount(email, fullName), email };
   }
 
-  const platform = client();
-  const signedIn = await platform.auth.signInWithPassword({
-    email: PLATFORM_ADMIN,
-    password: PASSWORD,
-  });
-  if (signedIn.error) throw new Error("Could not sign in as the platform admin");
+  const platform = await apiSignIn(PLATFORM_ADMIN);
   const { data: school, error } = await platform
     .from("schools")
     .insert({ name: `Setup School ${stamp}`, slug: `setup-${stamp}`, stage: "secondary" })
@@ -259,14 +358,7 @@ export async function signedInClient(email: string) {
   } catch {
     // Already in the environment (CI).
   }
-  const supabase = createClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { auth: { persistSession: false } },
-  );
-  const signedIn = await supabase.auth.signInWithPassword({ email, password: PASSWORD });
-  if (signedIn.error) throw new Error("Could not sign in a test client");
-  return supabase;
+  return apiSignIn(email);
 }
 
 /**
@@ -594,16 +686,7 @@ export async function createFamily(prefix: string): Promise<{
   } catch {
     // Already in the environment (CI).
   }
-  const supabase = createClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { auth: { persistSession: false } },
-  );
-  const signedIn = await supabase.auth.signInWithPassword({
-    email: MSASA_ADMIN,
-    password: PASSWORD,
-  });
-  if (signedIn.error) throw new Error("Could not sign in as Msasa's admin");
+  const supabase = await apiSignIn(MSASA_ADMIN);
 
   const stamp = `${Date.now().toString().slice(-7)}${Math.floor(Math.random() * 90 + 10)}`;
   const lastName = `Family${stamp}`;
@@ -654,16 +737,7 @@ async function msasaAdminClient() {
   } catch {
     // Already in the environment (CI).
   }
-  const supabase = createClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { auth: { persistSession: false } },
-  );
-  const signedIn = await supabase.auth.signInWithPassword({
-    email: MSASA_ADMIN,
-    password: PASSWORD,
-  });
-  if (signedIn.error) throw new Error("Could not sign in as Msasa's admin");
+  const supabase = await apiSignIn(MSASA_ADMIN);
   return supabase;
 }
 

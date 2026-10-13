@@ -12,6 +12,7 @@ import {
   inviteTokenFor,
   inviteTokensFor,
   mainNav,
+  setUpTwoFactor,
   signIn,
 } from "./helpers";
 
@@ -85,6 +86,10 @@ test("super admin creates a school, brands it and invites its admin, who sees th
   await invitee.getByLabel("New password").fill("harare-e2e-2026");
   await invitee.getByLabel("Confirm password").fill("harare-e2e-2026");
   await invitee.getByRole("button", { name: "Set password and continue" }).click();
+
+  // A school admin sets up two-factor sign in before anything else (D54).
+  await expect(invitee).toHaveURL("/two-factor/setup");
+  await setUpTwoFactor(invitee, adminEmail);
 
   // The school's pages use the new theme and logo, with no code change.
   await expect(invitee).toHaveURL("/admin");
@@ -222,6 +227,8 @@ test("super admin resends a pending invite, and only the new link works", async 
   await invitee.getByLabel("New password").fill(password);
   await invitee.getByLabel("Confirm password").fill(password);
   await invitee.getByRole("button", { name: "Set password and continue" }).click();
+  await expect(invitee).toHaveURL("/two-factor/setup");
+  await setUpTwoFactor(invitee, adminEmail);
   await expect(invitee).toHaveURL("/admin");
   await inviteeContext.close();
 

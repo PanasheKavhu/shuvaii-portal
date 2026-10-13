@@ -1,20 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
+import { signIn } from "./helpers";
 
-// Seed users (seed/profiles.csv); the password is the published local demo
-// password from scripts/seed.mjs.
-const PASSWORD = process.env.SEED_DEMO_PASSWORD ?? "sp-portal-demo-2026";
+// Seed users (seed/profiles.csv).
 const HEAD = "pzimu@msasa.demo.spportal.test";
 const TEACHER = "rchik@msasa.demo.spportal.test";
 const ADMIN = "gtembo@msasa.demo.spportal.test";
 const RELIEF_TEACHER = "relief1@demo.spportal.test";
 const PLATFORM_ADMIN = "platform@demo.spportal.test";
-
-async function signIn(page: Page, email: string, password = PASSWORD) {
-  await page.goto("/sign-in");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Sign in" }).click();
-}
 
 const formError = (page: Page) => page.locator("form").getByRole("alert");
 const mainNav = (page: Page) => page.getByRole("navigation", { name: "Main" });

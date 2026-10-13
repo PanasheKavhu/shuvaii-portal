@@ -7,8 +7,11 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  // In CI also as GitHub annotations, so a failure is readable on the check run.
-  reporter: process.env.CI ? [["list"], ["github"]] : "list",
+  // In CI also as GitHub annotations, so a failure is readable on the check
+  // run, and an HTML report that CI uploads when a run fails.
+  reporter: process.env.CI
+    ? [["list"], ["github"], ["html", { open: "never", outputFolder: "playwright-report" }]]
+    : "list",
   // The dev server compiles each route on first visit, which can exceed the 5s default.
   expect: { timeout: 15_000 },
   use: { baseURL: "http://localhost:3000", trace: "on-first-retry" },
@@ -25,8 +28,10 @@ export default defineConfig({
       dependencies: ["mobile", "desktop"],
     },
   ],
+  // E2E_SERVER=production runs against `npm run build` output (CI does),
+  // which is faster and closer to what schools use than the dev server.
   webServer: {
-    command: "npm run dev",
+    command: process.env.E2E_SERVER === "production" ? "npm run start" : "npm run dev",
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
   },

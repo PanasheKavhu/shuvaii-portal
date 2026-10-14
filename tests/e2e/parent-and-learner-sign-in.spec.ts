@@ -224,9 +224,16 @@ test("a parent sets up an account with a one-time code and sees both children", 
   await parent.getByLabel("Confirm password").fill("short");
   await parent.getByRole("button", { name: "Create account" }).click();
   await expect(parent.getByText("Use at least 8 characters.")).toBeVisible();
+  // The privacy notice must be accepted, and its link names the school (D57).
+  await expect(parent.getByText("Tick the box to accept the privacy notice.")).toBeVisible();
+  await expect(parent.getByRole("link", { name: "privacy notice", exact: true })).toHaveAttribute(
+    "href",
+    "/privacy?school=msasa-demo",
+  );
 
   await parent.getByLabel("Password", { exact: true }).fill(PASSWORD);
   await parent.getByLabel("Confirm password").fill(PASSWORD);
+  await parent.getByLabel("I have read and accept the privacy notice").check();
   await parent.getByRole("button", { name: "Create account" }).click();
   await expect(parent).toHaveURL("/children");
   const children = parent.getByRole("list", { name: "Your children" });
@@ -310,6 +317,9 @@ test("someone already signed in adds the children to their own account", async (
   await expect(person).toHaveURL("/no-access");
   await person.goto(`/join?code=${code}`);
   await expect(person.getByText("You are signed in as")).toBeVisible();
+  await person.getByRole("button", { name: "Add to my account" }).click();
+  await expect(person.getByText("Tick the box to accept the privacy notice.")).toBeVisible();
+  await person.getByLabel("I have read and accept the privacy notice").check();
   await person.getByRole("button", { name: "Add to my account" }).click();
   await expect(person).toHaveURL("/children");
   await expect(person.getByRole("list", { name: "Your children" })).toContainText(

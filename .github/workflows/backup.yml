@@ -1,0 +1,56 @@
+name: Weekly backup
+
+# The weekly external backup (docs/BACKUPS.md, D60): database and the
+# reports bucket, encrypted with BACKUP_PASSPHRASE, kept as a workflow
+# artifact for 90 days. Supabase's own daily backups stay in Supabase; this
+# copy lives outside it. Skips (and says so) until the secrets are set.
+
+on:
+  schedule:
+    - cron: "0 2 * * 0" # Sundays 02:00 UTC (04:00 in Harare)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      SUPABASE_DB_URL: ${{ secrets.BACKUP_DB_URL }}
+      SUPABASE_URL: ${{ secrets.BACKUP_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.BACKUP_SERVICE_ROLE_KEY }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+    steps:
+      - name: Check the secrets are set
+        id: ready
+        run: |
+          if [[ -z "$SUPABASE_DB_URL" || -z "$SUPABASE_URL" || -z "$SUPABASE_SERVICE_ROLE_KEY" || -z "$BACKUP_PASSPHRASE" ]]; then
+            echo "::warning::Backup secrets are not set (docs/BACKUPS.md); nothing was backed up."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.ready.outputs.ok == 'true'
+        uses: actions/checkout@v4
+      - if: steps.ready.outputs.ok == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - if: steps.ready.outputs.ok == 'true'
+        run: npm ci
+      - if: steps.ready.outputs.ok == 'true'
+        run: scripts/backup/backup.sh backups
+      - if: steps.ready.outputs.ok == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sp-portal-backup-${{ github.run_id }}
+          path: backups/*.tar.gz.gpg
+          if-no-files-found: error
+          retention-days: 90

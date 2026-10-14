@@ -166,7 +166,7 @@ select is(
   'An unknown code reveals nothing'
 );
 select throws_ok(
-  $$ select public.redeem_parent_invite(repeat('2', 64)) $$,
+  $$ select public.redeem_parent_invite(repeat('2', 64), 'test-notice') $$,
   '42501', null,
   'Signed-out visitors cannot redeem a code'
 );
@@ -183,7 +183,7 @@ set local role authenticated;
 select set_config('request.jwt.claim.sub', 'f2000000-0000-0000-0000-000000000004', true);
 
 select is(
-  public.redeem_parent_invite(repeat('2', 64)),
+  public.redeem_parent_invite(repeat('2', 64), 'test-notice'),
   'a2000000-0000-0000-0000-00000000000a'::uuid,
   'Pat redeems the code for school A'
 );
@@ -203,17 +203,17 @@ select is(
   'A redeemed code shows as used'
 );
 select throws_ok(
-  $$ select public.redeem_parent_invite(repeat('2', 64)) $$,
+  $$ select public.redeem_parent_invite(repeat('2', 64), 'test-notice') $$,
   'P0001', 'invite_used',
   'A code works once, even for the same person'
 );
 select throws_ok(
-  $$ select public.redeem_parent_invite(repeat('1', 64)) $$,
+  $$ select public.redeem_parent_invite(repeat('1', 64), 'test-notice') $$,
   'P0001', 'invite_expired',
   'An expired code is rejected'
 );
 select throws_ok(
-  $$ select public.redeem_parent_invite(repeat('7', 64)) $$,
+  $$ select public.redeem_parent_invite(repeat('7', 64), 'test-notice') $$,
   'P0001', 'invite_unknown',
   'An unknown code is rejected'
 );
@@ -265,7 +265,7 @@ where id = 'a2200000-0000-0000-0000-000000000002';
 set local role authenticated;
 select set_config('request.jwt.claim.sub', 'f2000000-0000-0000-0000-000000000004', true);
 select throws_ok(
-  $$ select public.redeem_parent_invite(repeat('4', 64)) $$,
+  $$ select public.redeem_parent_invite(repeat('4', 64), 'test-notice') $$,
   'P0001', 'guardian_taken',
   'A guardian linked to someone else stays theirs'
 );

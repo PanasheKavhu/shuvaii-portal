@@ -1075,6 +1075,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           error_report: Json | null
+          file_deleted_at: string | null
           file_path: string | null
           id: string
           kind: Database["public"]["Enums"]["import_kind"]
@@ -1088,6 +1089,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           error_report?: Json | null
+          file_deleted_at?: string | null
           file_path?: string | null
           id?: string
           kind: Database["public"]["Enums"]["import_kind"]
@@ -1101,6 +1103,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           error_report?: Json | null
+          file_deleted_at?: string | null
           file_path?: string | null
           id?: string
           kind?: Database["public"]["Enums"]["import_kind"]
@@ -1153,6 +1156,8 @@ export type Database = {
           id: string
           learner_id: string | null
           phone: string | null
+          privacy_accepted_at: string | null
+          privacy_notice_version: string | null
           role: Database["public"]["Enums"]["app_role"]
           school_id: string
         }
@@ -1168,6 +1173,8 @@ export type Database = {
           id?: string
           learner_id?: string | null
           phone?: string | null
+          privacy_accepted_at?: string | null
+          privacy_notice_version?: string | null
           role: Database["public"]["Enums"]["app_role"]
           school_id: string
         }
@@ -1183,6 +1190,8 @@ export type Database = {
           id?: string
           learner_id?: string | null
           phone?: string | null
+          privacy_accepted_at?: string | null
+          privacy_notice_version?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           school_id?: string
         }
@@ -2231,6 +2240,12 @@ export type Database = {
       }
       current_school_ids: { Args: never; Returns: string[] }
       decline_my_invites: { Args: never; Returns: number }
+      expired_import_files: {
+        Args: { p_limit?: number }
+        Returns: {
+          name: string
+        }[]
+      }
       export_class_comments: {
         Args: { p_class_id: string; p_term_id: string }
         Returns: Json
@@ -2248,6 +2263,7 @@ export type Database = {
           year_label: string
         }[]
       }
+      forget_import_files: { Args: { p_names: string[] }; Returns: number }
       generate_report_drafts: {
         Args: {
           p_class_id: string
@@ -2280,6 +2296,7 @@ export type Database = {
           to_mark: number
         }[]
       }
+      health_check: { Args: never; Returns: boolean }
       has_role: {
         Args: {
           p_role: Database["public"]["Enums"]["app_role"]
@@ -2473,6 +2490,7 @@ export type Database = {
           guardian_email: string
           guardian_name: string
           school_name: string
+          school_slug: string
           status: string
         }[]
       }
@@ -2500,7 +2518,20 @@ export type Database = {
         Args: { p_class_id: string; p_term_id: string }
         Returns: number
       }
-      redeem_parent_invite: { Args: { p_code_hash: string }; Returns: string }
+      privacy_notice_school: {
+        Args: { p_slug: string }
+        Returns: {
+          name: string
+          privacy_contact_email: string
+          privacy_contact_name: string
+          slug: string
+        }[]
+      }
+      prune_sign_in_attempts: { Args: never; Returns: number }
+      redeem_parent_invite: {
+        Args: { p_code_hash: string; p_privacy_version: string }
+        Returns: string
+      }
       relock_class_subject: {
         Args: { p_class_subject_id: string; p_term_id: string }
         Returns: undefined

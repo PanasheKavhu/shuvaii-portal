@@ -31,6 +31,15 @@ export default async function SetupPage() {
             Report settings
           </Link>
           <Link
+            href="/admin/setup/privacy"
+            className={buttonVariants({
+              variant: "outline",
+              className: "h-11 rounded-full px-5 text-base",
+            })}
+          >
+            Privacy contact
+          </Link>
+          <Link
             href="/admin/rollover"
             className={buttonVariants({
               variant: "outline",

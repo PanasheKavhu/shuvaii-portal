@@ -6,6 +6,7 @@ import { EMAIL_UNVERIFIED, matchesEmailOnFile } from "@/lib/auth/account-trust";
 import { JOIN_CODE_COOKIE, hashInviteCode, normalizeInviteCode } from "@/lib/auth/invite-code";
 import { parseParentSignUp } from "@/lib/auth/parent-sign-up";
 import { rememberSchool } from "@/lib/auth/school-cookie";
+import { PRIVACY_NOTICE_VERSION } from "@/lib/privacy/notice";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { FormState } from "../(app)/platform/form-state";
@@ -14,10 +15,17 @@ import type { FormState } from "../(app)/platform/form-state";
  * US-1.3: a parent claims the one-time code the school gave them, either
  * with a new account (name, email, password) or with the account they are
  * signed in with. redeem_parent_invite() links the account to their
- * guardian record, and so to all their children, in one step (D25).
+ * guardian record, and so to all their children, in one step (D25), and
+ * records the privacy notice version they accepted and when (D57).
  */
 
 const TRY_AGAIN = "Something went wrong. Please try again.";
+const PRIVACY_REQUIRED = "Tick the box to accept the privacy notice.";
+
+/** The privacy notice must be accepted before anything is made or claimed (D57). */
+function acceptedPrivacy(formData: FormData): boolean {
+  return formData.get("privacy") === "accepted";
+}
 
 /** What to tell the parent when the database refuses a code. */
 function redeemError(message: string | undefined): string {
@@ -28,6 +36,8 @@ function redeemError(message: string | undefined): string {
       return "This code has expired. Ask the school office for a new one.";
     case "invite_unknown":
       return "We could not find that code. Check it and try again.";
+    case "privacy_not_accepted":
+      return PRIVACY_REQUIRED;
     case "guardian_taken":
       return "This parent record already has an account. Ask the school office for help.";
     default:
@@ -37,7 +47,10 @@ function redeemError(message: string | undefined): string {
 
 async function redeem(codeHash: string): Promise<{ schoolId: string } | { error: string }> {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("redeem_parent_invite", { p_code_hash: codeHash });
+  const { data, error } = await supabase.rpc("redeem_parent_invite", {
+    p_code_hash: codeHash,
+    p_privacy_version: PRIVACY_NOTICE_VERSION,
+  });
   if (error || !data) return { error: redeemError(error?.message) };
   return { schoolId: data };
 }
@@ -71,7 +84,9 @@ export async function claimWithNewAccount(
     password: formData.get("password"),
     confirm: formData.get("confirm"),
   });
-  if (!parsed.ok) return fail(null, parsed.errors);
+  const privacy = acceptedPrivacy(formData) ? {} : { privacy: PRIVACY_REQUIRED };
+  if (!parsed.ok) return fail(null, { ...parsed.errors, ...privacy });
+  if (privacy.privacy) return fail(null, privacy);
   const { fullName, email, password } = parsed.value;
 
   const supabase = await createClient();
@@ -117,7 +132,14 @@ export async function claimWithNewAccount(
 }
 
 /** Signed-in person (a teacher who is also a parent, or a parent at another school). */
-export async function claimWithThisAccount(rawCode: string): Promise<FormState> {
+export async function claimWithThisAccount(
+  rawCode: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  if (!acceptedPrivacy(formData)) {
+    return { status: "error", message: null, errors: { privacy: PRIVACY_REQUIRED } };
+  }
   const code = normalizeInviteCode(rawCode);
   if (!code) return { status: "error", message: redeemError("invite_unknown"), errors: {} };
   const supabase = await createClient();

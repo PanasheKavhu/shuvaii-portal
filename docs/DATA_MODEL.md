@@ -83,7 +83,7 @@ Readable only by the person themselves and by users who share a school with them
 
 **platform_admins**: `user_id pk fk auth.users`. Super admins. No policy grants them tenant data by default (support access is a deliberate later feature).
 
-**sign_in_attempts**: `id bigint identity pk`, `email_hash` (SHA-256 hex of the trimmed, lower-cased email), `succeeded bool`, `created_at`. Per-account sign-in lockout (US-1.1); wrong password-reset codes count too (US-1.7, D19). Learner PIN tries are counted here too, under a hash of the school and learner number (D26), and wrong PINs also under a hash of the school and network address (D28). Public report verification lookups are counted under a hash of the network address (D45). No `school_id`, because the school is unknown before sign in. RLS on with no policies and privileges revoked from `anon` and `authenticated`: only the service role reads or writes it.
+**sign_in_attempts**: `id bigint identity pk`, `email_hash` (SHA-256 hex of the trimmed, lower-cased email), `succeeded bool`, `created_at`. Per-account sign-in lockout (US-1.1); wrong password-reset codes count too (US-1.7, D19). Learner PIN tries are counted here too, under a hash of the school and learner number (D26), and wrong PINs also under a hash of the school and network address (D28). Public report verification lookups are counted under a hash of the network address (D45). No `school_id`, because the school is unknown before sign in. RLS on with no policies and privileges revoked from `anon` and `authenticated`: only the service role reads or writes it. Rows older than 30 days are deleted daily (`prune_sign_in_attempts()`, D58).
 
 **mfa_recovery_codes**: `id uuid pk`, `user_id uuid -> auth.users` (cascade), `code_hash` (SHA-256 hex of the user id and the normalised code), `used_at`, `created_at`, unique `(user_id, code_hash)`. Ten single-use two-factor recovery codes per super admin, school admin or head (D54). Only the service role reads or writes it, through `replace_recovery_codes()` and `use_recovery_code()`. Using a code deletes the person's Auth factors and their other codes.
 
@@ -102,21 +102,23 @@ A person can have several rows (a teacher who is also a parent; a teacher in two
 
 ```
 id, school_id, role app_role, email, phone, guardian_id null, learner_id null,
-code_hash (SHA-256 hex, unique), expires_at, accepted_at null, accepted_by null, created_by, created_at
+code_hash (SHA-256 hex, unique), expires_at, accepted_at null, accepted_by null, created_by, created_at,
+privacy_notice_version null, privacy_accepted_at null   -- both or neither (D57)
 check: role = parent and guardian_id not null (staff use Auth invites, D14; learners get PINs, D26)
 ```
 
-Written only by `create_parent_invite()` (school admin; 14 days; stops older waiting codes for the guardian) and `redeem_parent_invite()` (links the caller to the guardian and gives them an active parent membership). `parent_invite_preview()` tells anyone holding a code whether it is valid, used, expired or unknown. Read by school admin and head.
+Written only by `create_parent_invite()` (school admin; 14 days; stops older waiting codes for the guardian) and `redeem_parent_invite(code_hash, privacy_version)` (links the caller to the guardian and gives them an active parent membership; refuses without a privacy notice version and records it with the time, D57). `parent_invite_preview()` tells anyone holding a code whether it is valid, used, expired or unknown. Read by school admin and head.
 
 **import_jobs**
 
 ```
 id, school_id, kind import_kind, status import_status,
 file_path, error_report jsonb, created_by,
-class_subject_id, term_id   -- marks uploads only (D33)
+class_subject_id, term_id,  -- marks uploads only (D33)
+file_deleted_at null        -- set by the 30-day clean-up (D58)
 ```
 
-`file_path` is the stored upload in the `imports` bucket. `error_report` holds `{fileName, errors: [{row, message}], summary, committed, notInvited}` (D24). A job is `validated` (clean, waiting), `committed` (by `commit_learner_import()`, `commit_staff_import()` or `commit_marks_import()`, all or nothing) or `failed` (errors, nothing imported). A `marks` job names its class subject and term (both required for marks, null otherwise); its kind, class subject, term and author never change (D33).
+`file_path` is the stored upload in the `imports` bucket; the daily clean-up deletes the file after 30 days and clears `file_path` (the row stays, D58). `error_report` holds `{fileName, errors: [{row, message}], summary, committed, notInvited}` (D24). A job is `validated` (clean, waiting), `committed` (by `commit_learner_import()`, `commit_staff_import()` or `commit_marks_import()`, all or nothing) or `failed` (errors, nothing imported). A `marks` job names its class subject and term (both required for marks, null otherwise); its kind, class subject, term and author never change (D33).
 
 ### 4.2 Academic structure
 
@@ -407,7 +409,7 @@ Oversight (D51): `oversight_counts(school)`, `oversight_reports(term)` and `over
 | `report-assets`   | stamp, head's signature | private; upload by the school admin, no read through the API (report rendering only, D43)                                                                                                          |
 | `reports`         | published PDFs          | private; written by the server only; read through short signed URLs by whoever can read the report (D43), or by the server for a live share link (D47)                                             |
 | `attachments`     | newsletter files        | private; `{school_id}/{announcement_id}/{filename}`, at most 3 per announcement, 5 MB, PDF and images; upload by admin and head; 60-second signed URLs for whoever can read the announcement (D49) |
-| `imports`         | uploaded CSV/Excel      | private; school admin and head (D24); a class subject's teacher for `{school}/marks/{class_subject}/` (D33); deleted after 30 days (not yet automated)                                             |
+| `imports`         | uploaded CSV/Excel      | private; school admin and head (D24); a class subject's teacher for `{school}/marks/{class_subject}/` (D33); deleted after 30 days by the daily clean-up (D58)                                     |
 
 Object paths start with the school id (`{school_id}/...`) so storage policies can check it.
 

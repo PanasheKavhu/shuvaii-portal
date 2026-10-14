@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import { Field, FormMessage, describedBy, inputClass } from "@/components/platform/form-bits";
 import { Button } from "@/components/ui/button";
@@ -17,11 +18,13 @@ export function NewParentForm({
   fullName,
   email,
   minPasswordLength,
+  schoolSlug,
 }: {
   code: string;
   fullName: string;
   email: string;
   minPasswordLength: number;
+  schoolSlug: string | null;
 }) {
   const [state, formAction, pending] = useActionState<NewParentState, FormData>(
     claimWithNewAccount.bind(null, code),
@@ -85,6 +88,7 @@ export function NewParentForm({
           className={inputClass}
         />
       </Field>
+      <PrivacyAccept id="privacyNew" schoolSlug={schoolSlug} error={e.privacy} />
       <FormMessage status={state.status} message={state.message} />
       <Button type="submit" disabled={pending} className="h-12 text-base">
         {pending ? "Setting up…" : "Create account"}
@@ -94,14 +98,66 @@ export function NewParentForm({
 }
 
 /** Someone already signed in adds the children to the account they are using. */
-export function ExistingAccountForm({ code, label }: { code: string; label: string }) {
+export function ExistingAccountForm({
+  code,
+  label,
+  schoolSlug,
+}: {
+  code: string;
+  label: string;
+  schoolSlug: string | null;
+}) {
   const [state, formAction, pending] = useActionState(claimWithThisAccount.bind(null, code), idle);
   return (
-    <form action={formAction} className="flex flex-col gap-4">
+    <form action={formAction} className="flex flex-col gap-4" noValidate>
+      <PrivacyAccept id="privacyExisting" schoolSlug={schoolSlug} error={state.errors.privacy} />
       <FormMessage status={state.status} message={state.message} />
       <Button type="submit" disabled={pending} className="h-12 text-base">
         {pending ? "Adding…" : label}
       </Button>
     </form>
+  );
+}
+
+/**
+ * The parent accepts the privacy notice before claiming a code (D57); the
+ * invite records the notice version and the time. The link opens in a new
+ * tab so the form keeps what was typed.
+ */
+function PrivacyAccept({
+  id,
+  schoolSlug,
+  error,
+}: {
+  id: string;
+  schoolSlug: string | null;
+  error?: string;
+}) {
+  const href = schoolSlug ? `/privacy?school=${encodeURIComponent(schoolSlug)}` : "/privacy";
+  return (
+    <div className="flex flex-col gap-1">
+      <label htmlFor={id} className="flex min-h-12 items-center gap-3 text-base">
+        <input
+          id={id}
+          name="privacy"
+          type="checkbox"
+          value="accepted"
+          required
+          className="accent-primary size-5 shrink-0"
+          {...describedBy(id, error)}
+        />
+        <span>
+          I have read and accept the{" "}
+          <Link href={href} target="_blank" rel="noopener" className="underline underline-offset-4">
+            privacy notice
+          </Link>
+        </span>
+      </label>
+      {error && (
+        <p id={`${id}-error`} className="text-destructive text-sm">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }

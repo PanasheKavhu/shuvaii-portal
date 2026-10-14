@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { LegalLinks } from "@/components/legal/legal-links";
 import { getViewer } from "@/lib/auth/viewer";
 import { SignInForm } from "./sign-in-form";
 
@@ -43,6 +44,7 @@ export default async function SignInPage({ searchParams }: PageProps<"/sign-in">
               Parent with a code from the school? Set up your account
             </Link>
           </div>
+          <LegalLinks />
         </CardContent>
       </Card>
     </main>

@@ -42,13 +42,21 @@ jobs:
       - if: always()
         run: npx supabase stop --no-backup
 
-  e2e:
+  e2e-run:
     # Playwright on both screen sizes against a local Supabase stack, the
-    # seed and the dev server (D54: every admin, head and super admin sign in
-    # now has a second step, so the whole suite runs here). The timing
-    # checks (the perf project) stay local: shared runners are too noisy.
+    # seed and a production build (`next build` then `next start`), split in
+    # two shards that run side by side (D61). The timing checks (the perf
+    # project) stay local: shared runners are too noisy. On failure the HTML
+    # report and traces are uploaded per shard.
+    name: e2e (shard ${{ matrix.shard }}/2)
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    env:
+      E2E_SERVER: production
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -69,14 +77,30 @@ jobs:
             echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY"
             echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
             echo "LEARNER_PIN_SECRET=ci-only-learner-pin-secret-0123456789abcdef"
+            echo "SITE_URL=http://localhost:3000"
           } > .env.local
       - run: npm run db:seed
-      - run: npx playwright test --project=mobile --project=desktop
+      - run: npm run build
+      - run: npx playwright test --project=mobile --project=desktop --shard=${{ matrix.shard }}/2
       - if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-results
-          path: test-results/
+          name: playwright-report-shard-${{ matrix.shard }}
+          path: |
+            playwright-report/
+            test-results/
           retention-days: 7
       - if: always()
         run: npx supabase stop --no-backup
+
+  e2e:
+    # One check for branch protection: passes only when both shards pass.
+    if: always()
+    needs: e2e-run
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          if [[ "${{ needs.e2e-run.result }}" != "success" ]]; then
+            echo "The e2e shards did not all pass (${{ needs.e2e-run.result }})."
+            exit 1
+          fi

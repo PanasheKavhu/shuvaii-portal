@@ -22,6 +22,7 @@ import {
 import { cn } from "@/lib/utils";
 import { resolveTerm } from "../marks/data";
 import { loadDashboard, requireOverseer, type Overseer } from "./oversight-data";
+import { greetingName } from "@/lib/people/greeting";
 
 export const metadata: Metadata = { title: "Overview" };
 
@@ -38,7 +39,7 @@ export default async function OverviewPage({ searchParams }: PageProps<"/admin">
   const { term: wanted } = await searchParams;
   const { terms, term } = await resolveTerm(o.schoolId, wanted);
   const data = await loadDashboard(o, term?.id ?? null);
-  const firstName = o.fullName.split(" ")[0];
+  const firstName = greetingName(o.fullName);
   const totals = overallTotals(data.classSubjects, data.classes);
   const completionHref = term ? `/marks/completion?term=${term.id}` : "/marks/completion";
 

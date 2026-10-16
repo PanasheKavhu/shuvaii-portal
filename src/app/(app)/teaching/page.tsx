@@ -5,6 +5,7 @@ import { ClassSubjectList, TermTabs } from "@/components/marks/class-subject-lis
 import { requireArea } from "@/lib/auth/viewer";
 import { listClassesForTerm } from "../marks/comment-data";
 import { listProgress, requireMarksActor, resolveTerm } from "../marks/data";
+import { greetingName } from "@/lib/people/greeting";
 
 export const metadata: Metadata = { title: "My classes" };
 
@@ -23,7 +24,7 @@ export default async function TeachingPage({ searchParams }: PageProps<"/teachin
     ? await Promise.all([listProgress(term.id), listClassesForTerm(actor, term.id, true)])
     : [[], []];
   const mine = progress.filter((cs) => cs.teacherId === actor.userId);
-  const firstName = viewer.fullName.split(" ")[0];
+  const firstName = greetingName(viewer.fullName);
 
   return (
     <section className="flex flex-col gap-5">

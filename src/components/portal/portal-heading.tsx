@@ -1,3 +1,5 @@
+import { greetingName } from "@/lib/people/greeting";
+
 /** The portal homes' heading: school, page title and a welcome by first name (D47). */
 export function PortalHeading({
   schoolName,
@@ -8,7 +10,7 @@ export function PortalHeading({
   title: string;
   fullName: string;
 }) {
-  const firstName = fullName.split(" ")[0];
+  const firstName = greetingName(fullName);
   return (
     <div>
       <p className="text-muted-foreground text-sm">{schoolName}</p>

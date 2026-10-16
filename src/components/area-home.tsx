@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { greetingName as toGreetingName } from "@/lib/people/greeting";
 
 /**
  * Landing page for a role area. Features arrive in later stories; until then
@@ -15,7 +16,7 @@ export function AreaHome({
   schoolName?: string;
   children: ReactNode;
 }) {
-  const firstName = greetingName.split(" ")[0];
+  const firstName = toGreetingName(greetingName);
   return (
     <section className="flex flex-col gap-4">
       <div>

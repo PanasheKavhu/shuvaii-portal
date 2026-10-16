@@ -5,6 +5,7 @@ import {
   PASSWORD,
   createFamily,
   createLoneUser,
+  parentCodeEmailFor,
   resetEmailFor,
   setLearnerStatus,
   signIn,
@@ -185,6 +186,33 @@ test("wrong PINs lock a learner out like staff", async ({ browser, page }) => {
   await submitLearnerSignIn(learnerPage, pin);
   await expect(formError(learnerPage)).toHaveText("Learner number or PIN is incorrect.");
   await learnerContext.close();
+});
+
+test("an admin emails a parent code to a guardian whose email is on file", async ({
+  browser,
+  page,
+}) => {
+  const family = await createFamily("pem", { guardianEmail: true });
+  const to = family.guardianEmail!;
+  await signIn(page, MSASA_ADMIN);
+  await expect(page).toHaveURL("/admin");
+  await page.goto(`/admin/people/learners/${family.learners[0].id}`);
+  const form = page.getByRole("form", { name: `Email a parent code to ${family.guardianName}` });
+  await form.getByRole("button", { name: `Email a parent code to ${to}` }).click();
+  await expect(form.getByRole("status")).toContainText(
+    `Parent code emailed to ${to}. It works once, until`,
+  );
+
+  const email = await parentCodeEmailFor(to);
+  expect(email.subject).toBe(`Your parent code for ${MSASA.name}`);
+  const parentContext = await browser.newContext();
+  const parent = await parentContext.newPage();
+  await parent.goto(new URL(email.link).pathname + new URL(email.link).search);
+  await expect(parent.getByRole("heading", { name: `Join ${MSASA.name}` })).toBeVisible();
+  await expect(
+    parent.getByText(`This code is for ${family.guardianName}. It links your 2 children`),
+  ).toBeVisible();
+  await parentContext.close();
 });
 
 test("a parent sets up an account with a one-time code and sees both children", async ({

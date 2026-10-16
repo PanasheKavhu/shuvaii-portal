@@ -229,6 +229,32 @@ export async function inviteTokensFor(to: string, count: number): Promise<string
 }
 
 /**
+ * Waits for the parent code email to `to` (D62) and returns its subject and
+ * the /join link it carries.
+ */
+export async function parentCodeEmailFor(to: string): Promise<{ subject: string; link: string }> {
+  let id = "";
+  await expect
+    .poll(
+      async () => {
+        const search = await fetch(
+          `${MAILPIT}/api/v1/search?query=${encodeURIComponent(`to:"${to}"`)}`,
+        );
+        const { messages } = (await search.json()) as { messages: { ID: string }[] };
+        id = messages[0]?.ID ?? "";
+        return id !== "";
+      },
+      { message: `parent code email to ${to}`, timeout: 20_000 },
+    )
+    .toBe(true);
+  const message = await fetch(`${MAILPIT}/api/v1/message/${id}`);
+  const { Subject, Text } = (await message.json()) as { Subject: string; Text: string };
+  const match = /https?:\/\/\S+\/join\?code=[2-9A-Z-]+/.exec(Text);
+  if (!match) throw new Error("Parent code email has no join link");
+  return { subject: Subject, link: match[0] };
+}
+
+/**
  * Console events in a school's audit log, read as that school's admin
  * through RLS (D18), oldest first. Uses the public URL and anon key from
  * .env.local, as the app does.
@@ -712,9 +738,14 @@ export async function createMarksClass(
  * as Msasa's school admin (RLS allows admin writes, D23). Fresh numbers,
  * names and phone each run, since learners are never deleted.
  */
-export async function createFamily(prefix: string): Promise<{
+export async function createFamily(
+  prefix: string,
+  { guardianEmail = false } = {},
+): Promise<{
   learners: { id: string; number: string; firstName: string }[];
   guardianName: string;
+  /** Set when asked for: a unique address Mailpit catches locally and in CI. */
+  guardianEmail: string | null;
   lastName: string;
 }> {
   try {
@@ -740,9 +771,10 @@ export async function createFamily(prefix: string): Promise<{
   if (error) throw new Error("Could not add test learners");
 
   const guardianName = `Chipo ${lastName}`;
+  const email = guardianEmail ? `chipo-${lastName.toLowerCase()}@demo.spportal.test` : null;
   const { data: guardian, error: guardianError } = await supabase
     .from("guardians")
-    .insert({ school_id: MSASA.id, full_name: guardianName, phone: `078${stamp}` })
+    .insert({ school_id: MSASA.id, full_name: guardianName, phone: `078${stamp}`, email })
     .select("id")
     .single();
   if (guardianError) throw new Error("Could not add a test guardian");
@@ -762,6 +794,7 @@ export async function createFamily(prefix: string): Promise<{
       .map((l) => ({ id: l.id, number: l.learner_number, firstName: l.first_name }))
       .sort((a, b) => a.number.localeCompare(b.number)),
     guardianName,
+    guardianEmail: email,
     lastName,
   };
 }

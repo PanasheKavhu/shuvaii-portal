@@ -11,6 +11,7 @@ import {
   inviteLink,
 } from "@/lib/auth/invite-code";
 import { issueLearnerPin } from "@/lib/auth/learner-accounts";
+import { emailConfigured, sendEmail } from "@/lib/email/send";
 import {
   findOrCreateAccounts,
   resendProblem,
@@ -19,6 +20,7 @@ import {
 } from "@/lib/auth/staff-accounts";
 import { schoolAdminContext } from "@/lib/auth/viewer";
 import { STAFF_ROLE_LABELS, isStaffRole } from "@/lib/people/fields";
+import { parentCodeEmail } from "@/lib/people/parent-code-email";
 import {
   GuardianMatcher,
   planLearnerImport,
@@ -836,52 +838,120 @@ const secretFailed = (message: string): SecretState => ({
   secret: null,
 });
 
+type IssuedParentCode = {
+  schoolId: string;
+  code: string;
+  link: string;
+  expiresOn: string;
+  guardianName: string;
+  guardianEmail: string | null;
+};
+
 /**
- * US-1.3: a one-time code (and link) for a guardian of this learner to set
- * up their parent account. Only the code's hash is stored; any older code
- * for the guardian stops working (D25).
+ * Makes a new one-time parent code for a guardian of this learner. Only the
+ * code's hash is stored; any older code for the guardian stops working
+ * (D25). Returns the code, or the message to show instead.
  */
-export async function createParentCode(
+async function issueParentCode(
   learnerId: string,
   guardianId: string,
-): Promise<SecretState> {
+  { needsEmail = false } = {},
+): Promise<IssuedParentCode | { problem: string }> {
   const ctx = await schoolAdminContext();
-  if (!ctx || !isUuid(learnerId) || !isUuid(guardianId)) {
-    return secretFailed(NOT_ALLOWED.message!);
-  }
+  if (!ctx || !isUuid(learnerId) || !isUuid(guardianId)) return { problem: NOT_ALLOWED.message! };
   const supabase = await createClient();
   const link = await supabase
     .from("guardian_links")
-    .select("guardians!inner(full_name)")
+    .select("guardians!inner(full_name, email)")
     .eq("learner_id", learnerId)
     .eq("guardian_id", guardianId)
     .eq("school_id", ctx.schoolId)
     .maybeSingle();
-  if (link.error || !link.data) return secretFailed("This guardian is no longer linked.");
+  if (link.error || !link.data) return { problem: "This guardian is no longer linked." };
+  const guardianEmail = link.data.guardians.email?.trim() || null;
+  if (needsEmail && !guardianEmail) return { problem: "Add the guardian's email address first." };
 
   const code = generateInviteCode(randomInt);
   const { data, error } = await supabase.rpc("create_parent_invite", {
     p_guardian_id: guardianId,
     p_code_hash: hashInviteCode(code),
   });
-  if (error?.message === "this guardian already has an account") {
-    revalidatePath(learnerPath(learnerId));
-    return secretFailed("This guardian already has a parent account.");
-  }
-  if (error || !data[0]) return secretFailed("Could not make a code. Please try again.");
-
   revalidatePath(learnerPath(learnerId));
+  if (error?.message === "this guardian already has an account") {
+    return { problem: "This guardian already has a parent account." };
+  }
+  if (error || !data[0]) return { problem: "Could not make a code. Please try again." };
+  return {
+    schoolId: ctx.schoolId,
+    code: formatInviteCode(code),
+    link: inviteLink(await portalOrigin(), code),
+    expiresOn: formatDay(data[0].expires_at),
+    guardianName: link.data.guardians.full_name,
+    guardianEmail,
+  };
+}
+
+function parentCodeSecret(issued: IssuedParentCode, message: string | null = null): SecretState {
   return {
     status: "saved",
-    message: null,
+    message,
     secret: {
-      label: `Parent code for ${link.data.guardians.full_name}`,
-      value: formatInviteCode(code),
+      label: `Parent code for ${issued.guardianName}`,
+      value: issued.code,
       details: [
-        `Or open ${inviteLink(await portalOrigin(), code)}`,
-        `Works once, until ${formatDay(data[0].expires_at)}. Making a new code stops this one.`,
+        `Or open ${issued.link}`,
+        `Works once, until ${issued.expiresOn}. Making a new code stops this one.`,
       ],
     },
+  };
+}
+
+/**
+ * US-1.3: a one-time code (and link) for a guardian of this learner to set
+ * up their parent account, shown once for the admin to hand over (D25).
+ */
+export async function createParentCode(
+  learnerId: string,
+  guardianId: string,
+): Promise<SecretState> {
+  const issued = await issueParentCode(learnerId, guardianId);
+  return "problem" in issued ? secretFailed(issued.problem) : parentCodeSecret(issued);
+}
+
+/**
+ * US-1.3 by email (D62): makes a new parent code and emails it, with the
+ * link, to the guardian's address on file. If the email cannot be sent the
+ * code is shown instead, so the admin can still hand it over.
+ */
+export async function emailParentCode(learnerId: string, guardianId: string): Promise<SecretState> {
+  if (!emailConfigured()) return secretFailed("Email is not set up for this portal.");
+  const issued = await issueParentCode(learnerId, guardianId, { needsEmail: true });
+  if ("problem" in issued) return secretFailed(issued.problem);
+  const supabase = await createClient();
+  const school = await supabase.from("schools").select("name").eq("id", issued.schoolId).single();
+  const sent =
+    !school.error &&
+    issued.guardianEmail !== null &&
+    (await sendEmail({
+      to: issued.guardianEmail,
+      ...parentCodeEmail({
+        schoolName: school.data.name,
+        guardianName: issued.guardianName,
+        code: issued.code,
+        link: issued.link,
+        expiresOn: issued.expiresOn,
+      }),
+    }));
+  if (!sent) {
+    return parentCodeSecret(
+      issued,
+      "Could not send the email. Give them this code yourself, or try again later.",
+    );
+  }
+  return {
+    status: "saved",
+    message: `Parent code emailed to ${issued.guardianEmail}. It works once, until ${issued.expiresOn}.`,
+    secret: null,
   };
 }
 

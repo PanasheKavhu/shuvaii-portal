@@ -171,7 +171,7 @@ Format: **D#. Title** (date). Decision. Why. Alternatives.
 - `redeem_parent_invite()` (security definer, signed in) sets `guardians.user_id`, adds or re-activates an `active` parent membership (a transaction-local flag lets `guard_membership_insert()` allow this one self-grant) and marks the code accepted, all at once; the guardian's links make every sibling appear under one login. A guardian already linked to someone else stays theirs. `parent_invite_accepted` is recorded.
 - Until the parent portal (Phase 4), `/children` lists the linked children's names and learner numbers through `my_children()`; parents still get no table access (D23).
 - Password reset (US-1.7) for parents is the email flow of D19, unchanged.
-- Not now: rate limiting `/join` (a code is not guessable, but repeated tries are not counted), sending codes by email or SMS (the admin hands over a slip or a message), and an admin list of waiting codes beyond the note on each guardian.
+- Not now: rate limiting `/join` (a code is not guessable, but repeated tries are not counted), sending codes by email or SMS (the admin hands over a slip or a message; email since D62), and an admin list of waiting codes beyond the note on each guardian.
 
 ## D26. Learner sign in with learner number and PIN (2026-10-08)
 
@@ -529,3 +529,10 @@ PDFs left unmade after publishing (the head closed the class page, or a PDF fail
 - Decision: the `e2e-run` job builds the app (`next build`) and runs Playwright against `next start` (`E2E_SERVER=production`), on the mobile and desktop projects, split in two shards that run side by side, each with its own local Supabase stack and seed. A small `e2e` job passes only when both shards pass, so branch protection needs one name for it. Failing shards upload the HTML report and traces (`playwright-report-shard-N`, 7 days). `SITE_URL` is set, since a production server refuses to make PDFs without it.
 - Why: the dev-server run took about 16 minutes and compiles each route on first visit; a production build is faster, steadier and what schools use. Two shards keep the wall time down without dropping tests; a smoke-only job would have let failures through to `main`. The perf project stays local (shared runners are too noisy).
 - Gate: `check`, `db` and `e2e` must be required status checks on `main` (GitHub, Settings, Branches), which only the repository owner can set (go-live checklist).
+
+## D62. Parent codes by email when the guardian's email is on file (2026-10-16; amends D25)
+
+- Decision: on a learner's page, a guardian with no parent account and an email address on file gets a second button, "Email a parent code to <address>", beside "Make a parent code". It makes a new code exactly as D25 does (`create_parent_invite()`, hashed, 14 days, once, older code stopped, `parent_invite_created` recorded) and emails the code and the `/join?code=` link to that address, naming the school. The admin sees "Parent code emailed to <address>" and never sees the code. If the server refuses the email the code is shown on screen as before, so the admin can still hand it over. Handing over a slip stays for guardians without an email.
+- Sending: the app sends this mail itself over SMTP with `nodemailer` (`src/lib/email/send.ts`, server only), because Supabase Auth only sends its own messages (invites, resets). Settings `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` and `EMAIL_FROM` are the same server as Auth's SMTP settings; without `SMTP_HOST` and `EMAIL_FROM` the button is hidden. Nothing about the message is logged except that a send failed and the error code (rule 5).
+- Local and CI: Mailpit's SMTP port (54325) is opened in `supabase/config.toml` and CI's `.env.local` points there, so the e2e test reads the email and follows its link.
+- Not now: SMS or WhatsApp, emailing codes in bulk for a class, and a record of which address a code went to (the audit row says a code was made, as before).

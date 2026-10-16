@@ -10,10 +10,12 @@ import { OneTimeSecretForm } from "@/components/people/one-time-secret-form";
 import { StatusPill } from "@/components/people/status-pill";
 import { ActionForm } from "@/components/setup/action-form";
 import { CheckboxField, SelectField } from "@/components/setup/fields";
+import { emailConfigured } from "@/lib/email/send";
 import { LEARNER_STATUS_LABELS } from "@/lib/people/person-input";
 import {
   addGuardian,
   createParentCode,
+  emailParentCode,
   removeGuardianLink,
   resetLearnerPin,
   saveGuardian,
@@ -49,6 +51,7 @@ export default async function LearnerPage({
   ]);
   const name = `${learner.firstName} ${learner.lastName}`;
   const enrolment = learner.enrolment;
+  const canEmail = emailConfigured();
 
   return (
     <div className="flex flex-col gap-6">
@@ -224,6 +227,14 @@ export default async function LearnerPage({
                       ? `A parent code is waiting to be used. Making a new one stops the old one.`
                       : `${g.fullName} has no parent account yet. Give them a one-time code to set one up.`}
                 </p>
+                {!g.hasAccount && canEmail && g.email && (
+                  <OneTimeSecretForm
+                    action={emailParentCode.bind(null, learner.id, g.guardianId)}
+                    submitLabel={`Email a parent code to ${g.email}`}
+                    pendingLabel="Sending…"
+                    label={`Email a parent code to ${g.fullName}`}
+                  />
+                )}
                 {!g.hasAccount && (
                   <OneTimeSecretForm
                     action={createParentCode.bind(null, learner.id, g.guardianId)}

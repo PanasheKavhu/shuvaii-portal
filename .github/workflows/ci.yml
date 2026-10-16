@@ -78,6 +78,9 @@ jobs:
             echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
             echo "LEARNER_PIN_SECRET=ci-only-learner-pin-secret-0123456789abcdef"
             echo "SITE_URL=http://localhost:3000"
+            echo "SMTP_HOST=127.0.0.1"
+            echo "SMTP_PORT=54325"
+            echo "EMAIL_FROM=SP Portal <portal@ci.test>"
           } > .env.local
       - run: npm run db:seed
       - run: npm run build

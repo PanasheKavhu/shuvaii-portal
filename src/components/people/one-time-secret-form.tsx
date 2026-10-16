@@ -7,7 +7,9 @@ import { noSecret, type SecretState } from "@/app/(app)/admin/people/secret-stat
 
 /**
  * A button that makes a parent code or learner PIN and shows it once, large
- * enough to read out or copy onto a slip (US-1.2, US-1.3).
+ * enough to read out or copy onto a slip (US-1.2, US-1.3). An action that
+ * delivers the secret itself (an emailed parent code, D62) returns only a
+ * message instead.
  */
 export function OneTimeSecretForm({
   action,
@@ -29,6 +31,7 @@ export function OneTimeSecretForm({
       {children}
       {state.secret ? (
         <div role="status" className="bg-muted/50 flex flex-col gap-1 rounded-xl border p-4">
+          {state.message && <span className="text-sm font-medium">{state.message}</span>}
           <span className="text-muted-foreground text-sm">{state.secret.label}</span>
           <span className="font-mono text-2xl font-semibold tracking-wider break-all">
             {state.secret.value}

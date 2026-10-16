@@ -28,8 +28,13 @@ Set in Vercel (Settings, Environment Variables), separately for Production and f
 | `SENTRY_DSN`                     | Server only | The Sentry project's DSN; empty sends nothing (D59)                                                                                                                           |
 | `NEXT_PUBLIC_SENTRY_DSN`         | Public      | The same DSN, for browser errors                                                                                                                                              |
 | `NEXT_PUBLIC_SENTRY_ENVIRONMENT` | Public      | `production` or `staging`                                                                                                                                                     |
+| `SMTP_HOST`                      | Server only | The SMTP server Supabase Auth uses too, e.g. `smtp.gmail.com`. Empty hides "Email a parent code" (D62)                                                                        |
+| `SMTP_PORT`                      | Server only | `465` (TLS) or `587` (STARTTLS)                                                                                                                                               |
+| `SMTP_USER`                      | Server only | The sending account, e.g. the Gmail address                                                                                                                                   |
+| `SMTP_PASSWORD`                  | Server only | Its password; for Gmail an app password, the same one Supabase Auth uses                                                                                                      |
+| `EMAIL_FROM`                     | Server only | The sender shown to parents, e.g. `SP Portal <portal.sender@gmail.com>`; Gmail needs the account's own address                                                                |
 
-Keep `LEARNER_PIN_SECRET`, `CRON_SECRET` and the backup passphrase in the password manager as well. Staging and production use different values for every secret.
+Keep `LEARNER_PIN_SECRET`, `CRON_SECRET`, `SMTP_PASSWORD` and the backup passphrase in the password manager as well. Staging and production use different values for every secret.
 
 The weekly backup reads its own GitHub Actions secrets (`BACKUP_DB_URL`, `BACKUP_SUPABASE_URL`, `BACKUP_SERVICE_ROLE_KEY`, `BACKUP_PASSPHRASE`; `docs/BACKUPS.md`).
 

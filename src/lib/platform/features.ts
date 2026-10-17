@@ -17,6 +17,12 @@ export const FEATURES = {
       "Not built yet: waiting for the school's answer on attendance (Q25). The switch is kept for when it is.",
     default: false,
   },
+  auto_learner_numbers: {
+    label: "Automatic learner numbers",
+    description:
+      "For schools without their own numbers: a learner added without one, by import or by hand, gets the next number, like TH260001 (initials, year, running number). Off: the school gives every number.",
+    default: false,
+  },
 } as const;
 
 export type FeatureKey = keyof typeof FEATURES;
@@ -28,6 +34,7 @@ export const FEATURE_KEYS = Object.keys(FEATURES) as FeatureKey[];
 export const DEFAULT_FEATURES: Features = {
   newsletter: FEATURES.newsletter.default,
   attendance: FEATURES.attendance.default,
+  auto_learner_numbers: FEATURES.auto_learner_numbers.default,
 };
 
 export function isFeatureKey(value: unknown): value is FeatureKey {

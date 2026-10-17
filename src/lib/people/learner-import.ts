@@ -16,7 +16,9 @@ import { readSheet, type ColumnSpec, type RowError, type SheetRecord } from "./s
  * to create. Pure: the caller passes this year's classes and the school's
  * existing learner numbers and guardians.
  *
- * - Learner numbers must be unique in the school and in the file.
+ * - Learner numbers must be unique in the school and in the file. A school
+ *   with automatic learner numbers on (D64) may leave them blank: the
+ *   database gives each such learner the next number when it is added.
  * - The class must be one of this year's classes (matched by name,
  *   ignoring case and extra spaces); unknown classes are reported.
  * - A guardian is matched by phone or email, against the school's existing
@@ -71,6 +73,8 @@ export type LearnerImportContext = {
   /** Learner numbers already used in the school. */
   existingLearnerNumbers: Iterable<string>;
   existingGuardians: readonly ExistingGuardian[];
+  /** The school's automatic learner numbers switch (D64): blank numbers allowed. */
+  autoNumbers?: boolean;
 };
 
 export type GuardianPlan = {
@@ -85,6 +89,7 @@ export type GuardianPlan = {
 
 export type LearnerPlan = {
   row: number;
+  /** Empty when the database is to make it (D64). */
   learnerNumber: string;
   firstName: string;
   lastName: string;
@@ -249,8 +254,9 @@ export function validateLearnerRecords(
     const admissionDate = parseDate(v.admission_date);
     const sex = parseSex(v.sex);
 
-    if (!learnerNumber) rowErrors.push("Learner number is missing.");
-    else if (!validLearnerNumber(learnerNumber))
+    if (!learnerNumber) {
+      if (!context.autoNumbers) rowErrors.push("Learner number is missing.");
+    } else if (!validLearnerNumber(learnerNumber))
       rowErrors.push("Learner number must be 30 characters or fewer.");
     else {
       const key = learnerNumberKey(learnerNumber);
@@ -324,19 +330,28 @@ export function validateLearnerRecords(
   return { errors, learners, guardians: matcher.guardians.filter((g) => used.has(g.ref)) };
 }
 
+/** The columns for a school: learner_number is optional with automatic numbers on (D64). */
+export function learnerColumns(autoNumbers: boolean) {
+  return LEARNER_COLUMNS.map((c) =>
+    c.key === "learner_number" && autoNumbers ? { ...c, required: false } : c,
+  );
+}
+
 /** Reads and validates a whole learners sheet. */
 export function planLearnerImport(
   rows: readonly (readonly (string | number | boolean | null)[])[],
   context: LearnerImportContext,
   today: string,
 ): LearnerImportPlan {
-  const sheet = readSheet(rows, LEARNER_COLUMNS);
+  const sheet = readSheet(rows, learnerColumns(context.autoNumbers ?? false));
   if (!sheet.ok) return { errors: sheet.errors, learners: [], guardians: [] };
   return validateLearnerRecords(sheet.records, context, today);
 }
 
 export type LearnerImportSummary = {
   learners: number;
+  /** Learners who will get a number made by the portal (D64). */
+  autoNumbered: number;
   newGuardians: number;
   existingGuardians: number;
   /** Guardians linked to more than one learner in this file. */
@@ -353,6 +368,7 @@ export function summariseLearnerPlan(plan: LearnerImportPlan): LearnerImportSumm
   }
   return {
     learners: plan.learners.length,
+    autoNumbered: plan.learners.filter((l) => !l.learnerNumber).length,
     newGuardians: plan.guardians.filter((g) => !g.id).length,
     existingGuardians: plan.guardians.filter((g) => g.id).length,
     sharedGuardians: [...perGuardian.values()].filter((n) => n > 1).length,

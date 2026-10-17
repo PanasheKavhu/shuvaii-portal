@@ -35,6 +35,7 @@ export function LearnerFields({
   prefix,
   learner,
   showStatus,
+  numberHint,
 }: {
   prefix: string;
   learner?: {
@@ -47,6 +48,8 @@ export function LearnerFields({
     status: LearnerStatus;
   };
   showStatus: boolean;
+  /** Under the learner number, e.g. that a blank one is made (D64). */
+  numberHint?: string;
 }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
@@ -56,6 +59,7 @@ export function LearnerFields({
         label={LEARNER_LABELS.learnerNumber}
         defaultValue={learner?.learnerNumber}
         maxLength={30}
+        hint={numberHint}
       />
       <TextField
         id={`${prefix}-first`}

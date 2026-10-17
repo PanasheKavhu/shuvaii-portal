@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { IMPORT_KIND_LABEL, ImportStatus } from "@/components/people/import-status";
 import { ActionForm } from "@/components/setup/action-form";
-import { LEARNER_COLUMNS } from "@/lib/people/learner-import";
+import { learnerColumns } from "@/lib/people/learner-import";
 import { STAFF_COLUMNS } from "@/lib/people/staff-import";
 import { uploadImport } from "../actions";
-import { currentYear, listImportJobs, requireSchoolAdmin } from "../data";
+import { autoLearnerNumbers, currentYear, listImportJobs, requireSchoolAdmin } from "../data";
 
 export const metadata: Metadata = { title: "Import" };
 
@@ -35,7 +35,11 @@ function Columns({ columns }: { columns: readonly { label: string; required: boo
  */
 export default async function ImportPage() {
   const { schoolId } = await requireSchoolAdmin();
-  const [jobs, year] = await Promise.all([listImportJobs(schoolId), currentYear(schoolId)]);
+  const [jobs, year, autoNumbers] = await Promise.all([
+    listImportJobs(schoolId),
+    currentYear(schoolId),
+    autoLearnerNumbers(schoolId),
+  ]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -57,7 +61,13 @@ export default async function ImportPage() {
           already at the school is linked rather than added twice. Primary learners take all their
           class subjects.
         </p>
-        <Columns columns={LEARNER_COLUMNS} />
+        {autoNumbers && (
+          <p className="text-sm">
+            Learner numbers are optional for this school: leave the cell blank and the portal gives
+            the learner the next number. Numbers you fill in are kept.
+          </p>
+        )}
+        <Columns columns={learnerColumns(autoNumbers)} />
         <a
           href="/templates/learners-import-template.csv"
           download

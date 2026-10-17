@@ -141,6 +141,7 @@ describe("planLearnerImport", () => {
     ]);
     expect(summariseLearnerPlan(result)).toEqual({
       learners: 5,
+      autoNumbered: 0,
       newGuardians: 1,
       existingGuardians: 2,
       sharedGuardians: 1,
@@ -301,5 +302,45 @@ describe("planLearnerImport", () => {
     const result = plan(lines);
     expect(result.errors).toHaveLength(10);
     expect(result.errors[0]).toEqual({ row: 992, message: "Learner number D0 is also on row 2." });
+  });
+
+  describe("with automatic learner numbers (D64)", () => {
+    const auto = { ...context, autoNumbers: true };
+
+    it("refuses a blank number when the school gives its own", () => {
+      const result = plan([row({ first_name: "Rudo", last_name: "Moyo", class: "3 Blue" })]);
+      expect(result.errors).toEqual([{ row: 2, message: "Learner number is missing." }]);
+    });
+
+    it("lets blank numbers through to be made, keeps given ones and still checks them", () => {
+      const result = plan(
+        [
+          row({ first_name: "Rudo", last_name: "Moyo", class: "3 Blue" }),
+          row({ learner_number: "OWN1", first_name: "Tino", last_name: "Moyo", class: "3 Blue" }),
+          row({ first_name: "Chipo", last_name: "Banda", class: "4 Green" }),
+          row({ learner_number: "msh260001", first_name: "Dup", last_name: "X", class: "3 Blue" }),
+        ],
+        auto,
+      );
+      expect(result.errors).toEqual([
+        { row: 5, message: "Learner number msh260001 already exists in the school." },
+      ]);
+      expect(result.learners.map((l) => l.learnerNumber)).toEqual(["", "OWN1", ""]);
+      expect(summariseLearnerPlan(result).autoNumbered).toBe(2);
+    });
+
+    it("accepts a file without the learner_number column at all", () => {
+      const header = HEADER.filter((h) => h !== "learner_number");
+      const result = planLearnerImport(
+        [header, ["Rudo", "Moyo", "", "", "3 Blue", "", "", "", "", ""]],
+        auto,
+        TODAY,
+      );
+      expect(result.errors).toEqual([]);
+      expect(result.learners).toHaveLength(1);
+      expect(planLearnerImport([header], context, TODAY).errors[0]?.message).toBe(
+        'Missing column "learner_number". Use the template\'s header row.',
+      );
+    });
   });
 });

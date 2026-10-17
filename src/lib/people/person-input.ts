@@ -67,6 +67,8 @@ export function parseLearnerForm(
     classId: unknown;
   },
   today: string,
+  /** A new learner in a school with automatic learner numbers (D64) may have none. */
+  { allowBlankNumber = false } = {},
 ): Parse<LearnerDraft> {
   const learnerNumber = text(form.learnerNumber);
   const firstName = text(form.firstName);
@@ -80,7 +82,7 @@ export function parseLearnerForm(
   const classId = text(form.classId);
   const errors: Errors<LearnerDraft> = {};
 
-  if (!validLearnerNumber(learnerNumber))
+  if (!(allowBlankNumber && !learnerNumber) && !validLearnerNumber(learnerNumber))
     errors.learnerNumber = "Enter the learner number (up to 30 characters).";
   if (!validPersonName(firstName)) errors.firstName = "Enter the first name.";
   if (!validPersonName(lastName)) errors.lastName = "Enter the last name.";

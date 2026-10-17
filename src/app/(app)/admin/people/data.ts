@@ -2,6 +2,7 @@ import "server-only";
 
 import { notFound } from "next/navigation";
 import type { StaffRole } from "@/lib/people/fields";
+import { readFeatures } from "@/lib/platform/features";
 import type { ExistingGuardian, ImportClass } from "@/lib/people/learner-import";
 import type { LearnerStatus, MembershipStatus } from "@/lib/people/person-input";
 import { searchWords } from "@/lib/people/person-input";
@@ -24,6 +25,17 @@ function rows<T>(result: { data: T[] | null; error: { code?: string } | null }):
 }
 
 export type YearRef = { id: string; label: string };
+
+/** Whether the portal makes a learner number left blank in this school (D64). */
+export async function autoLearnerNumbers(schoolId: string): Promise<boolean> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("schools")
+    .select("feature_flags")
+    .eq("id", schoolId)
+    .maybeSingle();
+  return readFeatures(data?.feature_flags).auto_learner_numbers;
+}
 
 /** The school's current year, or its latest if none is marked current. */
 export async function currentYear(schoolId: string): Promise<YearRef | null> {

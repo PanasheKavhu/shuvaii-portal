@@ -332,6 +332,42 @@ export async function setFeature(
   };
 }
 
+/**
+ * Suspends a school or reactivates it (D63). Suspended, it is missing from
+ * every public list and nobody in it can use it; nothing is deleted. The
+ * database checks the caller again and records the console event.
+ */
+export async function setSchoolStatus(
+  schoolId: string,
+  suspend: boolean,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  if (!(await isPlatformAdmin()) || !UUID_RE.test(schoolId)) return NOT_ALLOWED;
+  if (suspend && formData.get("confirm") !== "yes") {
+    return {
+      status: "error",
+      message: null,
+      errors: { confirm: "Tick the box to confirm." },
+    };
+  }
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_school_status", {
+    p_school_id: schoolId,
+    p_status: suspend ? "suspended" : "active",
+  });
+  if (error?.code === "42501") return NOT_ALLOWED;
+  if (error) return FAILED(suspend ? "suspend the school" : "reactivate the school");
+  revalidatePath("/", "layout");
+  return {
+    status: "saved",
+    message: suspend
+      ? "School suspended. It is hidden and nobody in it can sign in to it."
+      : "School reactivated. Everything is back as it was.",
+    errors: {},
+  };
+}
+
 /** Saves the school's privacy notice contact (Q20; D56). */
 export async function savePrivacyContact(
   schoolId: string,

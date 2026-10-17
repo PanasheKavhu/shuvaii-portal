@@ -7,7 +7,7 @@ Status: DRAFT v0.1. Postgres on Supabase. Companion to `SPEC.md`. Column names m
 - Primary keys are `uuid` (`gen_random_uuid()`). Timestamps are `timestamptz` in UTC; display in `Africa/Harare`.
 - **Every tenant table has `school_id uuid not null references schools(id)`**, indexed, and row-level security enabled. Exceptions: `schools` (its own `id` is the tenant), `profiles` and `platform_admins` (global, described below), `sign_in_attempts` (global, service role only; see below), and `mfa_recovery_codes` and `two_factor_resets` (global, a person's account rather than a school's; see below, D54).
 - Child tables repeat `school_id` (even when it could be derived) so policies never need joins. A trigger or composite check ensures a child's `school_id` equals its parent's.
-- Nothing personal is hard-deleted: learners, marks and reports use `status` fields. Deletion of a school is a super-admin operation done offline.
+- Nothing personal is hard-deleted: learners, marks and reports use `status` fields. Deletion of a school is a super-admin operation done offline (`scripts/delete-school.sql`, test schools only, D63); a school that stops using the portal is suspended instead.
 - `created_at` and `updated_at` on every table (`updated_at` set by trigger). Omitted below for brevity.
 - Names are `snake_case`, plural tables, enums as Postgres enum types.
 

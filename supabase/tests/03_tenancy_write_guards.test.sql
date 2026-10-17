@@ -32,7 +32,7 @@ values
 insert into public.platform_admins (user_id) values ('88888888-8888-8888-8888-888888888888');
 
 insert into public.schools (id, slug, name, stage, status, primary_color)
-values ('dddddddd-dddd-dddd-dddd-dddddddddddd', 'school-d-test', 'School D', 'primary', 'suspended', '#0B5FA5');
+values ('dddddddd-dddd-dddd-dddd-dddddddddddd', 'school-d-test', 'School D', 'primary', 'active', '#0B5FA5');
 
 insert into public.memberships (id, school_id, user_id, role, status)
 values
@@ -61,9 +61,9 @@ select lives_ok(
 );
 
 select throws_like(
-  $$ update public.schools set status = 'active' where id = 'dddddddd-dddd-dddd-dddd-dddddddddddd' $$,
+  $$ update public.schools set status = 'suspended' where id = 'dddddddd-dddd-dddd-dddd-dddddddddddd' $$,
   '%only a platform admin%',
-  'School admin cannot reactivate a suspended school'
+  'School admin cannot change their school''s status'
 );
 
 select throws_like(
@@ -114,7 +114,7 @@ select throws_ok(
 select set_config('request.jwt.claim.sub', '88888888-8888-8888-8888-888888888888', true);
 
 select lives_ok(
-  $$ update public.schools set status = 'active', primary_color = '#1B7F5C'
+  $$ update public.schools set status = 'suspended', primary_color = '#1B7F5C'
      where id = 'dddddddd-dddd-dddd-dddd-dddddddddddd' $$,
   'Platform admin can change status and branding'
 );

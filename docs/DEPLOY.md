@@ -128,3 +128,15 @@ A school that insists on its own address (`reports.school.ac.zw`) can have it la
 4. `curl https://<portal>/healthz` answers `{"status":"ok"}`; `/privacy` names the region.
 5. Create the super admin (seed a platform admin by hand: their Auth user, then a `platform_admins` row in the SQL editor), sign in, set up two-factor, save the recovery codes.
 6. Onboard the pilot school from the console (D56) and work through the rest of the go-live checklist.
+
+## 9. Suspending or deleting a school
+
+**Suspend** (D63): console, the school's page, "Suspend school" (tick the box). The school disappears from the learner sign-in and privacy notice lists, its staff, parents and learners land on "No school access" and the database gives them nothing, and its parent codes stop working. Nothing is deleted; "Reactivate school" brings everything back. Use this for a school that stops using the portal, and before deleting a test school.
+
+**Delete a test school** (D63). For test and demo schools only; a real school's data follows `docs/RETENTION.md`, never this.
+
+1. Suspend it (above) and note its id (in the page address, `/platform/schools/<id>`).
+2. Supabase, Storage: in each bucket (`school-branding`, `report-assets`, `reports`, `attachments`, `imports`) open the folder named after that id, if there is one, select everything and delete it.
+3. Supabase, SQL Editor: paste the whole of `scripts/delete-school.sql`, change the slug on the line marked `CHANGE ME`, and press Run.
+
+The script refuses (and deletes nothing) unless the school exists, is suspended and has no files left; the message says which. Otherwise it deletes, in one go, every row of that school, the school, and the sign-in accounts of people who were in that school only (never a super admin or anyone in another school), and lists how many rows it removed from each table. It cannot be undone except from a backup (section 7).

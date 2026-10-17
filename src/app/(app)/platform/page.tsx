@@ -89,7 +89,7 @@ export default async function PlatformPage() {
                   <span className="truncate font-semibold">{school.name}</span>
                   <span className="text-muted-foreground truncate text-sm">
                     {school.slug} · {STAGE_LABELS[school.stage].split(" ")[0]}
-                    {school.status !== "active" && ` · ${school.status}`}
+                    {school.status === "suspended" && " · Suspended"}
                   </span>
                   {u && (
                     <>

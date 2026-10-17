@@ -14,6 +14,7 @@ import {
   saveColors,
   savePrivacyContact,
   setFeature,
+  setSchoolStatus,
   uploadLogo,
 } from "../../actions";
 import {
@@ -34,6 +35,7 @@ import { UsageStats } from "@/components/platform/usage-stats";
 import { FEATURE_KEYS, FEATURES } from "@/lib/platform/features";
 import { FeatureSwitch } from "./feature-switch";
 import { PrivacyContactForm } from "./privacy-contact-form";
+import { SchoolStatusForm } from "./school-status-form";
 
 export const metadata: Metadata = { title: "School" };
 
@@ -84,7 +86,7 @@ export default async function SchoolPage({ params }: PageProps<"/platform/school
           <h1 className="text-2xl font-semibold tracking-tight">{school.name}</h1>
           <p className="text-muted-foreground text-sm">
             {school.slug} · {STAGE_LABELS[school.stage]}
-            {school.status !== "active" && ` · ${school.status}`}
+            {school.status === "suspended" && " · Suspended"}
           </p>
         </div>
       </div>
@@ -281,6 +283,17 @@ export default async function SchoolPage({ params }: PageProps<"/platform/school
             ))}
           </ul>
         )}
+      </Panel>
+
+      <Panel
+        title="Suspend school"
+        description="A suspended school disappears from the sign-in and privacy notice lists, its staff, parents and learners cannot use it, and its parent codes stop working. Nothing is deleted: reactivating brings everything back. To remove a test school for good, suspend it first, then run the delete script in docs/DEPLOY.md."
+      >
+        <SchoolStatusForm
+          schoolName={school.name}
+          suspended={school.status === "suspended"}
+          action={setSchoolStatus.bind(null, school.id, school.status !== "suspended")}
+        />
       </Panel>
     </section>
   );

@@ -2296,7 +2296,6 @@ export type Database = {
           to_mark: number
         }[]
       }
-      health_check: { Args: never; Returns: boolean }
       has_role: {
         Args: {
           p_role: Database["public"]["Enums"]["app_role"]
@@ -2304,6 +2303,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      health_check: { Args: never; Returns: boolean }
       import_learners: {
         Args: { p_guardians: Json; p_learners: Json; p_school_id: string }
         Returns: Json
@@ -2510,14 +2510,6 @@ export type Database = {
           year_label: string
         }[]
       }
-      publish_announcement: {
-        Args: { p_announcement_id: string }
-        Returns: undefined
-      }
-      publish_class_reports: {
-        Args: { p_class_id: string; p_term_id: string }
-        Returns: number
-      }
       privacy_notice_school: {
         Args: { p_slug: string }
         Returns: {
@@ -2528,6 +2520,14 @@ export type Database = {
         }[]
       }
       prune_sign_in_attempts: { Args: never; Returns: number }
+      publish_announcement: {
+        Args: { p_announcement_id: string }
+        Returns: undefined
+      }
+      publish_class_reports: {
+        Args: { p_class_id: string; p_term_id: string }
+        Returns: number
+      }
       redeem_parent_invite: {
         Args: { p_code_hash: string; p_privacy_version: string }
         Returns: string
@@ -2684,6 +2684,10 @@ export type Database = {
       }
       set_school_feature: {
         Args: { p_feature: string; p_on: boolean; p_school_id: string }
+        Returns: undefined
+      }
+      set_school_status: {
+        Args: { p_school_id: string; p_status: string }
         Returns: undefined
       }
       sign_in_schools: {

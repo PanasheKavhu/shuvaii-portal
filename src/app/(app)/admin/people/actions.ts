@@ -44,6 +44,7 @@ import { createClient } from "@/lib/supabase/server";
 import { failed, notAllowed, saved, type FormState } from "../../platform/form-state";
 import type { SecretState } from "./secret-state";
 import {
+  autoLearnerNumbers,
   currentYear,
   existingStaffFor,
   getImportJob,
@@ -86,7 +87,8 @@ function learnerJson(guardians: readonly GuardianPlan[], learners: readonly Lear
       email: g.email,
     })) as Json,
     p_learners: learners.map((l) => ({
-      learner_number: l.learnerNumber,
+      // Blank: the database makes the next number (D64).
+      learner_number: l.learnerNumber || null,
       first_name: l.firstName,
       last_name: l.lastName,
       date_of_birth: l.dateOfBirth,
@@ -138,7 +140,9 @@ function guardianErrors(errors: Record<string, string | undefined>): FormState["
 export async function addLearner(_prev: FormState, formData: FormData): Promise<FormState> {
   const ctx = await schoolAdminContext();
   if (!ctx) return NOT_ALLOWED;
-  const learner = parseLearnerForm(learnerFields(formData), today());
+  const learner = parseLearnerForm(learnerFields(formData), today(), {
+    allowBlankNumber: await autoLearnerNumbers(ctx.schoolId),
+  });
   if (!learner.ok) return failed("Check the learner's details.", learner.errors);
 
   const year = await currentYear(ctx.schoolId);
@@ -185,6 +189,8 @@ export async function addLearner(_prev: FormState, formData: FormData): Promise<
   });
   if (error?.code === "23505")
     return failed(null, { learnerNumber: "That learner number is already used in the school." });
+  if (error?.code === "23502")
+    return failed(null, { learnerNumber: "Enter the learner number (up to 30 characters)." });
   if (error) return failed(TRY_AGAIN);
 
   const ids = (data as { learner_ids?: string[] } | null)?.learner_ids ?? [];
@@ -646,14 +652,15 @@ async function planFile(schoolId: string, kind: ImportKind, bytes: Uint8Array) {
     return { read, errors: plan.errors, staff: plan, summary: summariseStaffPlan(plan) } as const;
   }
   const year = await currentYear(schoolId);
-  const [classes, numbers, guardians] = await Promise.all([
+  const [classes, numbers, guardians, autoNumbers] = await Promise.all([
     year ? listYearClasses(year.id) : Promise.resolve([]),
     listLearnerNumbers(schoolId),
     listGuardians(schoolId),
+    autoLearnerNumbers(schoolId),
   ]);
   const plan = planLearnerImport(
     read.rows,
-    { classes, existingLearnerNumbers: numbers, existingGuardians: guardians },
+    { classes, existingLearnerNumbers: numbers, existingGuardians: guardians, autoNumbers },
     today(),
   );
   const errors = year

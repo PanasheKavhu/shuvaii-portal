@@ -196,6 +196,26 @@ describe("manual forms", () => {
     });
   });
 
+  it("lets a new learner have no number only with automatic numbers on (D64)", () => {
+    const form = {
+      learnerNumber: " ",
+      firstName: "Rudo",
+      lastName: "Moyo",
+      dateOfBirth: "",
+      sex: "",
+      admissionDate: "",
+      classId: "",
+    };
+    expect(parseLearnerForm(form, "2026-10-08").ok).toBe(false);
+    const parsed = parseLearnerForm(form, "2026-10-08", { allowBlankNumber: true });
+    expect(parsed.ok && parsed.value.learnerNumber).toBe("");
+    expect(
+      parseLearnerForm({ ...form, learnerNumber: "x".repeat(31) }, "2026-10-08", {
+        allowBlankNumber: true,
+      }).ok,
+    ).toBe(false);
+  });
+
   it("needs a guardian's phone or email", () => {
     expect(parseGuardianForm({ fullName: "Mum", phone: "", email: "", relationship: "" })).toEqual({
       ok: false,

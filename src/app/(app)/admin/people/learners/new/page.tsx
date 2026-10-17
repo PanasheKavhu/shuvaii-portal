@@ -9,7 +9,13 @@ import {
 import { ActionForm } from "@/components/setup/action-form";
 import { SelectField } from "@/components/setup/fields";
 import { addLearner } from "../../actions";
-import { currentYear, isPrimaryStage, listYearClasses, requireSchoolAdmin } from "../../data";
+import {
+  autoLearnerNumbers,
+  currentYear,
+  isPrimaryStage,
+  listYearClasses,
+  requireSchoolAdmin,
+} from "../../data";
 
 export const metadata: Metadata = { title: "Add a learner" };
 
@@ -17,7 +23,10 @@ export const metadata: Metadata = { title: "Add a learner" };
 export default async function NewLearnerPage() {
   const { schoolId } = await requireSchoolAdmin();
   const year = await currentYear(schoolId);
-  const classes = year ? await listYearClasses(year.id) : [];
+  const [classes, autoNumbers] = await Promise.all([
+    year ? listYearClasses(year.id) : Promise.resolve([]),
+    autoLearnerNumbers(schoolId),
+  ]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -38,7 +47,13 @@ export default async function NewLearnerPage() {
       >
         <fieldset className="bg-card flex flex-col gap-4 rounded-2xl border p-4">
           <legend className="px-1 font-semibold">Learner</legend>
-          <LearnerFields prefix="new" showStatus={false} />
+          <LearnerFields
+            prefix="new"
+            showStatus={false}
+            numberHint={
+              autoNumbers ? "Leave it blank and the portal gives the next number." : undefined
+            }
+          />
           <SelectField
             id="new-class"
             name="classId"

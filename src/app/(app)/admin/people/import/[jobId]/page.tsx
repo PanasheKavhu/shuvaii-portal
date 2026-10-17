@@ -19,6 +19,11 @@ function LearnerSummary({ summary }: { summary: LearnerImportSummary }) {
   return (
     <ul aria-label="What will be imported" className="flex list-disc flex-col gap-1 pl-5">
       <li>{plural(summary.learners, "learner")}</li>
+      {(summary.autoNumbered ?? 0) > 0 && (
+        <li className="ml-4 list-[circle]">
+          {plural(summary.autoNumbered, "learner")} without a number will get the next one
+        </li>
+      )}
       {summary.byClass.map((c) => (
         <li key={c.className} className="ml-4 list-[circle]">
           {c.className}: {c.count}
